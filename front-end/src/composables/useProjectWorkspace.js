@@ -171,7 +171,7 @@ export function useProjectWorkspace() {
   const completionRate = computed(() => tasks.value.length ? Math.round((completedTasks.value.length / tasks.value.length) * 100) : 0)
 
   function findMember(memberId) {
-    return members.value.find((member) => member.id === memberId) || members.value[0]
+    return members.value.find((member) => member.id === memberId) || members.value[0] || { id: null, name: 'Khách', initials: '??', color: 'slate', role: '' }
   }
 
   function findProject(projectId) {
@@ -330,12 +330,34 @@ export function useProjectWorkspace() {
     }
   }
 
-  async function addComment(taskId, text) {
+  async function updateTaskStatus(taskId, status) {
+    return moveTask(taskId, status)
+  }
+
+  async function deleteTask(taskId) {
+    try {
+      const res = await fetch(`${API_URL}/tasks/${taskId}`, {
+        method: 'DELETE',
+        headers: { 'Accept': 'application/json' }
+      })
+      if (res.ok) {
+        tasks.value = tasks.value.filter(t => t.id !== taskId)
+        if (activeTaskId.value === taskId) {
+          activeTaskId.value = null
+        }
+        notify('Đã xóa nhiệm vụ')
+      }
+    } catch (e) {
+      notify('Lỗi kết nối: Không thể xóa nhiệm vụ')
+    }
+  }
+
+  async function addComment(taskId, text, fileUrl = null, fileName = null) {
     try {
       const res = await fetch(`${API_URL}/tasks/${taskId}/comments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-        body: JSON.stringify({ text })
+        body: JSON.stringify({ text, file_url: fileUrl, file_name: fileName })
       })
       if (res.ok) {
         const data = await res.json()
@@ -344,6 +366,25 @@ export function useProjectWorkspace() {
       }
     } catch (e) {
       notify('Lỗi kết nối: Không thể gửi bình luận')
+    }
+  }
+
+  async function uploadFile(file, targetType, targetCode) {
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('target_type', targetType)
+    formData.append('target_code', targetCode)
+    try {
+      const res = await fetch(`${API_URL}/upload`, {
+        method: 'POST',
+        body: formData
+      })
+      if (res.ok) {
+        return await res.json()
+      }
+      return null
+    } catch (e) {
+      return null
     }
   }
 
@@ -542,7 +583,12 @@ export function useProjectWorkspace() {
     moveTask,
     toggleTaskComplete,
     updateTask,
+    updateTaskStatus,
+    deleteTask,
     addComment,
+    uploadFile,
+    
+    // Member APIs
     addMember,
     updateMember,
     addGroup,

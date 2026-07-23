@@ -15,7 +15,7 @@ class Task extends Model
     protected $keyType = 'string';
 
     protected $fillable = [
-        'project_code', 'title', 'description', 'status', 'priority', 'due_date', 'assignee_code'
+        'project_code', 'title', 'description', 'status', 'priority', 'due_date', 'assignee_code', 'progress'
     ];
 
     public function getCodePrefix()

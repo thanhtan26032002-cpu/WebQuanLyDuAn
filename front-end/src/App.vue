@@ -57,9 +57,7 @@ const { projectModalOpen, taskModalOpen, toastMessage, sidebarOpen } =
       >
         <div class="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
           <router-view v-slot="{ Component }">
-            <transition name="fade-slide" mode="out-in">
-              <component :is="Component" :key="route.path" />
-            </transition>
+            <component :is="Component" :key="route.path" />
           </router-view>
         </div>
       </main>

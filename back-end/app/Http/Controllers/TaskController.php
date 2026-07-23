@@ -26,6 +26,7 @@ class TaskController extends Controller
             'status' => 'nullable|string',
             'priority' => 'nullable|string',
             'due_date' => 'nullable|date',
+            'progress' => 'nullable|integer|min:0|max:100',
             'assignee_code' => 'nullable|exists:members,code',
         ]);
 
@@ -66,6 +67,7 @@ class TaskController extends Controller
             'status' => 'nullable|string',
             'priority' => 'nullable|string',
             'due_date' => 'nullable|date',
+            'progress' => 'nullable|integer|min:0|max:100',
             'assignee_code' => 'nullable|exists:members,code',
         ]);
 
@@ -148,13 +150,17 @@ class TaskController extends Controller
     {
         $validated = $request->validate([
             'text' => 'required|string',
-            'member_code' => 'nullable|exists:members,code'
+            'member_code' => 'nullable|exists:members,code',
+            'file_url' => 'nullable|string',
+            'file_name' => 'nullable|string',
         ]);
 
         $comment = TaskComment::create([
             'task_code' => $taskCode,
             'member_code' => $validated['member_code'] ?? 'MB0001',
             'text' => $validated['text'],
+            'file_url' => $validated['file_url'] ?? null,
+            'file_name' => $validated['file_name'] ?? null,
         ]);
 
         $comment->load('member:code,name,avatar');

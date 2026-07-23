@@ -3,10 +3,18 @@ import { computed, ref, watch } from 'vue'
 import { X, CalendarDays, Flag, CheckCircle2, MessageSquare, Paperclip, Send, Clock, User, Download, FileText, Trash2, Edit2, Check, ListChecks, Plus } from '@lucide/vue'
 import { useProjectWorkspace } from '../../composables/useProjectWorkspace'
 
+const props = defineProps({
+  task: {
+    type: Object,
+    required: true
+  }
+})
+
 const { 
   tasks, projects, members, comments, 
-  activeTaskId, taskStatusMap, priorityMap, 
-  findMember, findProject, formatDate, updateTask, addComment 
+  projectStatusMap, priorityMap, taskStatusMap, 
+  taskModalOpen, activeTaskId, 
+  findMember, findProject, formatDate, updateTask, addComment, uploadFile 
 } = useProjectWorkspace()
 
 const task = computed(() => tasks.value.find(t => t.id === activeTaskId.value))
@@ -41,10 +49,43 @@ const handleSave = () => {
   isEditing.value = false
 }
 
+const fileInput = ref(null)
+const attachedFile = ref(null)
+const isUploading = ref(false)
+
+const triggerFileInput = () => {
+  if (fileInput.value) fileInput.value.click()
+}
+
+const handleFileUpload = async (event) => {
+  const file = event.target.files[0]
+  if (!file) return
+
+  isUploading.value = true
+  const res = await uploadFile(file, 'Task', task.value.id)
+  if (res && res.attachment) {
+    attachedFile.value = res.attachment
+  } else {
+    alert('Không thể tải lên file đính kèm.')
+  }
+  isUploading.value = false
+  if (fileInput.value) fileInput.value.value = ''
+}
+
+const removeAttachment = () => {
+  attachedFile.value = null
+}
+
 const submitComment = () => {
-  if (!newComment.value.trim()) return
-  addComment(task.value.id, newComment.value)
+  if (!newComment.value.trim() && !attachedFile.value) return
+  
+  const fileUrl = attachedFile.value?.file_path || null
+  const fileName = attachedFile.value?.file_name || null
+
+  addComment(task.value.id, newComment.value, fileUrl, fileName)
+  
   newComment.value = ''
+  attachedFile.value = null
 }
 
 const timeAgo = (dateStr) => {
@@ -237,8 +278,8 @@ const formatDateTime = (isoStr) => {
               >
                 <option v-for="(v, k) in taskStatusMap" :key="k" :value="k">{{ v.label }}</option>
               </select>
-              <span v-else :class="['px-2.5 py-1 text-xs font-semibold rounded-full border', `bg-${taskStatusMap[task.status].color}-50 text-${taskStatusMap[task.status].color}-700 border-${taskStatusMap[task.status].color}-200`]">
-                {{ taskStatusMap[task.status]?.label }}
+              <span v-else :class="['px-2.5 py-1 text-xs font-semibold rounded-full border', `bg-${taskStatusMap[task.status]?.color || 'slate'}-50 text-${taskStatusMap[task.status]?.color || 'slate'}-700 border-${taskStatusMap[task.status]?.color || 'slate'}-200`]">
+                {{ taskStatusMap[task.status]?.label || task.status }}
               </span>
             </div>
             
@@ -518,20 +559,32 @@ const formatDateTime = (isoStr) => {
               US
             </div>
             <div class="flex-1 relative">
+              <input type="file" ref="fileInput" class="hidden" @change="handleFileUpload" />
               <textarea 
                 v-model="newComment"
                 class="w-full bg-white border border-slate-200 rounded-xl p-3 pb-12 text-sm focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition-all resize-none min-h-[90px]"
                 placeholder="Cập nhật tiến độ... Bạn có thể tải lên tệp minh chứng ở đây."
                 @keydown.enter.prevent="submitComment"
               ></textarea>
+              
+              <div v-if="attachedFile" class="absolute bottom-12 left-3 right-3 bg-slate-50 p-2 mb-1 rounded-lg border border-slate-200 flex items-center justify-between">
+                <div class="flex items-center gap-2 text-sm text-slate-700 truncate">
+                  <Paperclip class="w-4 h-4 text-violet-500 shrink-0" />
+                  <span class="truncate">{{ attachedFile.file_name }}</span>
+                </div>
+                <button @click="removeAttachment" class="text-slate-400 hover:text-red-500 transition-colors">
+                  <X class="w-4 h-4" />
+                </button>
+              </div>
+
               <div class="absolute bottom-2 right-2 left-2 flex items-center justify-between border-t border-slate-100 pt-2">
-                <button class="px-2 py-1 text-xs font-medium text-slate-500 hover:text-violet-600 hover:bg-violet-50 rounded flex items-center gap-1.5 transition-colors">
-                  <Paperclip class="w-3.5 h-3.5" /> Đính kèm file
+                <button @click="triggerFileInput" :disabled="isUploading" class="px-2 py-1 text-xs font-medium text-slate-500 hover:text-violet-600 hover:bg-violet-50 rounded flex items-center gap-1.5 transition-colors disabled:opacity-50">
+                  <Paperclip class="w-3.5 h-3.5" /> {{ isUploading ? 'Đang tải...' : 'Đính kèm file' }}
                 </button>
                 <button 
                   @click="submitComment"
-                  :disabled="!newComment.trim()"
-                  :class="['px-3 py-1.5 rounded text-white text-xs font-medium transition-colors flex items-center gap-1.5', newComment.trim() ? 'bg-violet-600 hover:bg-violet-700' : 'bg-slate-300 cursor-not-allowed']"
+                  :disabled="(!newComment.trim() && !attachedFile) || isUploading"
+                  :class="['px-3 py-1.5 rounded text-white text-xs font-medium transition-colors flex items-center gap-1.5', (newComment.trim() || attachedFile) ? 'bg-violet-600 hover:bg-violet-700' : 'bg-slate-300 cursor-not-allowed']"
                 >
                   <Send class="w-3.5 h-3.5" /> Bình luận
                 </button>
@@ -551,7 +604,21 @@ const formatDateTime = (isoStr) => {
                     <span class="text-sm font-bold text-slate-800">{{ findMember(comment.memberId).name }}</span>
                     <span class="text-xs text-slate-400 font-medium">{{ timeAgo(comment.createdAt) }}</span>
                   </div>
-                  <p class="text-sm text-slate-600 whitespace-pre-wrap leading-relaxed">{{ comment.text }}</p>
+                  <p v-if="comment.text" class="text-sm text-slate-600 whitespace-pre-wrap leading-relaxed">{{ comment.text }}</p>
+                  
+                  <!-- Hiển thị file đính kèm -->
+                  <div v-if="comment.file_url" class="mt-3 inline-flex items-center gap-3 p-2 bg-white border border-slate-200 rounded-lg shadow-sm">
+                    <div class="w-8 h-8 rounded bg-violet-50 text-violet-600 flex items-center justify-center shrink-0">
+                      <FileText class="w-4 h-4" />
+                    </div>
+                    <div class="flex-1 min-w-0 pr-4">
+                      <p class="text-sm font-medium text-slate-700 truncate max-w-[200px]" :title="comment.file_name">{{ comment.file_name || 'File đính kèm' }}</p>
+                    </div>
+                    <a :href="comment.file_url" target="_blank" download class="p-1.5 text-slate-400 hover:text-violet-600 hover:bg-violet-50 rounded transition-colors shrink-0">
+                      <Download class="w-4 h-4" />
+                    </a>
+                  </div>
+                  
                 </div>
               </div>
             </div>

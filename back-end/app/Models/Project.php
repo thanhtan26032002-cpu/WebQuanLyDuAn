@@ -16,7 +16,7 @@ class Project extends Model
 
     protected $fillable = [
         'name', 'description', 'status', 
-        'start_date', 'due_date', 'created_by'
+        'start_date', 'due_date', 'created_by', 'progress'
     ];
 
     public function getCodePrefix()

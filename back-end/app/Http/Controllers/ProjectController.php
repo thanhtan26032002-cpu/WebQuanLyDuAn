@@ -41,6 +41,7 @@ class ProjectController extends Controller
             'status' => 'nullable|string',
             'start_date' => 'nullable|date',
             'due_date' => 'nullable|date',
+            'progress' => 'nullable|integer|min:0|max:100',
         ]);
 
         $validated['created_by'] = 'US0001';
@@ -72,6 +73,7 @@ class ProjectController extends Controller
             'status' => 'nullable|string',
             'start_date' => 'nullable|date',
             'due_date' => 'nullable|date',
+            'progress' => 'nullable|integer|min:0|max:100',
         ]);
 
         $project->update($validated);

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Attachment;
 use App\Models\Activity;
 use Illuminate\Http\Request;
+use App\Services\ActivityService;
 
 class FileController extends Controller
 {
@@ -14,7 +15,7 @@ class FileController extends Controller
         $request->validate([
             'file' => 'required|file|max:10240', // Max 10MB
             'target_type' => 'required|string',
-            'target_id' => 'required|integer',
+            'target_code' => 'required|string',
         ]);
 
         if ($request->hasFile('file')) {
@@ -31,17 +32,16 @@ class FileController extends Controller
                 'mime_type' => $file->getClientMimeType(),
                 'size_bytes' => $file->getSize(),
                 'target_type' => $request->target_type,
-                'target_id' => $request->target_id,
-                'uploaded_by' => 1, // Mock user_id = 1
+                'target_code' => $request->target_code,
+                'uploaded_by' => 'US0001', 
             ]);
 
-            // Ghi log activity
-            Activity::create([
-                'user_id' => 1,
-                'action' => 'Đã tải lên tệp: ' . $attachment->file_name,
-                'target_type' => $request->target_type,
-                'target_id' => $request->target_id,
-            ]);
+            ActivityService::log(
+                'US0001',
+                'Đã tải lên tệp: ' . $attachment->file_name,
+                $request->target_type,
+                $request->target_code
+            );
 
             return response()->json([
                 'message' => 'Upload thành công',

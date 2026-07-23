@@ -14,7 +14,7 @@ class TaskComment extends Model
     public $incrementing = false;
     protected $keyType = 'string';
 
-    protected $fillable = ['task_code', 'member_code', 'text'];
+    protected $fillable = ['task_code', 'member_code', 'text', 'file_url', 'file_name'];
 
     public function getCodePrefix()
     {
