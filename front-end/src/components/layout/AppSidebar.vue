@@ -1,0 +1,109 @@
+<script setup>
+import { useRoute, useRouter } from 'vue-router'
+import { computed } from 'vue'
+import { 
+  LayoutDashboard, 
+  FolderKanban, 
+  CheckSquare, 
+  Users, 
+  Calendar as CalendarIcon, 
+  Settings,
+  Plus
+} from '@lucide/vue'
+import { useProjectWorkspace } from '../../composables/useProjectWorkspace'
+
+const route = useRoute()
+const router = useRouter()
+const { projectModalOpen, tasks } = useProjectWorkspace()
+
+// Badge for Tasks that are not done
+const pendingTasksCount = computed(() => tasks.value.filter(t => t.status !== 'done').length)
+
+const navigation = computed(() => [
+  { name: 'Tổng quan', href: '/', icon: LayoutDashboard },
+  { name: 'Dự án', href: '/projects', icon: FolderKanban },
+  { name: 'Nhiệm vụ', href: '/tasks', icon: CheckSquare, badge: pendingTasksCount.value },
+  { name: 'Nhóm', href: '/team', icon: Users },
+  { name: 'Lịch', href: '/calendar', icon: CalendarIcon },
+])
+
+const isActive = (path) => {
+  if (path === '/') return route.path === '/'
+  return route.path.startsWith(path)
+}
+</script>
+
+<template>
+  <aside class="w-64 h-full flex flex-col bg-white border-r border-slate-100">
+    <!-- Logo -->
+    <div class="h-16 flex items-center px-5 border-b border-slate-100 shrink-0">
+      <div class="w-8 h-8 rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center mr-3 shadow-md shadow-violet-500/30">
+        <div class="w-3 h-3 bg-white rounded-sm rotate-12"></div>
+      </div>
+      <div>
+        <span class="text-lg font-bold text-slate-900 leading-none">RingNet</span>
+        <span class="block text-[10px] text-slate-400 font-medium tracking-wide leading-none mt-0.5">Quản lý dự án</span>
+      </div>
+    </div>
+
+    <!-- Navigation -->
+    <nav class="flex-1 overflow-y-auto py-4 px-3 space-y-0.5">
+      <router-link 
+        v-for="item in navigation" 
+        :key="item.name" 
+        :to="item.href"
+        class="relative flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all duration-200"
+        :class="isActive(item.href) 
+          ? 'bg-violet-50 text-violet-700' 
+          : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'"
+      >
+        <!-- Active indicator bar -->
+        <div 
+          v-if="isActive(item.href)"
+          class="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-violet-500 rounded-r-full"
+        ></div>
+        
+        <component 
+          :is="item.icon" 
+          class="w-5 h-5 shrink-0"
+          :class="isActive(item.href) ? 'text-violet-600' : 'text-slate-400'"
+        />
+        <span class="flex-1">{{ item.name }}</span>
+
+        <!-- Badge -->
+        <span 
+          v-if="item.badge"
+          :class="['px-2 py-0.5 rounded-full text-xs font-bold', isActive(item.href) ? 'bg-violet-200 text-violet-700' : 'bg-slate-100 text-slate-500']"
+        >
+          {{ item.badge }}
+        </span>
+      </router-link>
+    </nav>
+
+    <!-- Add Project Button -->
+    <div class="px-3 pb-3">
+      <button 
+        @click="projectModalOpen = true"
+        class="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-violet-500 to-indigo-600 text-white py-2.5 rounded-xl font-semibold text-sm hover:shadow-lg hover:shadow-violet-500/25 transition-all duration-300 active:scale-95"
+      >
+        <Plus class="w-4 h-4" /> Thêm dự án
+      </button>
+    </div>
+
+    <!-- Settings -->
+    <div class="px-3 pb-4 border-t border-slate-50 pt-3">
+      <router-link 
+        to="/settings"
+        class="relative flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all duration-200"
+        :class="isActive('/settings') ? 'bg-violet-50 text-violet-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'"
+      >
+        <div 
+          v-if="isActive('/settings')"
+          class="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-violet-500 rounded-r-full"
+        ></div>
+        <Settings class="w-5 h-5" :class="isActive('/settings') ? 'text-violet-600' : 'text-slate-400'" />
+        Cài đặt
+      </router-link>
+    </div>
+  </aside>
+</template>

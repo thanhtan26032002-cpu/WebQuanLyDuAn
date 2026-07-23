@@ -1,0 +1,14 @@
+/node_modules
+/back-end/vendor
+/front-end/node_modules
+.env
+.idea
+.vscode
+*.log
+/back-end/storage/logs
+/back-end/storage/framework
+/back-end/storage/app
+/back-end/bootstrap/cache
+/back-end/.phpunit.cache
+/front-end/dist
+/front-end/.DS_Store

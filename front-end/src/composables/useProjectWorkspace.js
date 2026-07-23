@@ -1,0 +1,560 @@
+import { computed, ref } from 'vue'
+
+// ========== CẤU HÌNH HỆ THỐNG (Không còn phụ thuộc file dữ liệu ảo) ==========
+const navigationItems = [
+  { id: 'dashboard', label: 'Tổng quan', icon: 'grid', path: '/' },
+  { id: 'projects', label: 'Dự án', icon: 'briefcase', path: '/projects' },
+  { id: 'tasks', label: 'Nhiệm vụ', icon: 'circleCheck', path: '/tasks' },
+  { id: 'team', label: 'Nhóm', icon: 'users', path: '/team' },
+  { id: 'calendar', label: 'Lịch', icon: 'calendar', path: '/calendar' },
+]
+
+const projectStatusMap = {
+  active: { label: 'Đang triển khai', className: 'status-active' },
+  planning: { label: 'Lập kế hoạch', className: 'status-planning' },
+  on_hold: { label: 'Tạm dừng', className: 'status-hold' },
+  completed: { label: 'Hoàn thành', className: 'status-completed' },
+}
+
+const taskStatusMap = {
+  todo: { label: 'Cần làm', color: 'slate' },
+  in_progress: { label: 'Đang làm', color: 'amber' },
+  done: { label: 'Hoàn thành', color: 'emerald' },
+}
+
+const priorityMap = {
+  high: { label: 'Cao', className: 'priority-high' },
+  medium: { label: 'Trung bình', className: 'priority-medium' },
+  low: { label: 'Thấp', className: 'priority-low' },
+}
+
+const API_URL = 'http://localhost:8000/api'
+
+// ========== CHUYỂN ĐỔI DỮ LIỆU API → FRONTEND ==========
+// API trả về snake_case (due_date), Frontend dùng camelCase (dueDate)
+function mapProject(p) {
+  return {
+    ...p,
+    id: p.code, // Map code sang id để frontend không bị lỗi
+    dueDate: p.due_date || p.dueDate,
+    startDate: p.start_date || p.startDate,
+    createdAt: p.created_at || p.createdAt,
+    memberIds: p.members ? p.members.map(m => m.code) : (p.memberIds || []),
+    progress: p.progress || 0,
+    color: p.color || 'indigo',
+    files: p.files || [],
+  }
+}
+
+function mapTask(t) {
+  return {
+    ...t,
+    id: t.code,
+    projectId: t.project_code || t.projectId,
+    assigneeId: t.assignee_code || t.assigneeId,
+    dueDate: t.due_date || t.dueDate,
+    createdAt: t.created_at || t.createdAt,
+    tags: t.tags || [],
+    progress: t.progress || 0,
+    files: t.files || [],
+    checklists: t.checklists || [],
+    workLogs: t.workLogs || [],
+  }
+}
+
+function mapActivity(a) {
+  return {
+    ...a,
+    id: a.code,
+    memberId: a.member_code || a.memberId,
+    targetType: a.target_type || a.targetType,
+    targetId: a.target_code || a.targetId,
+    createdAt: a.created_at || a.createdAt,
+  }
+}
+
+function mapMember(m) {
+  const colorIndex = m.code ? m.code.charCodeAt(m.code.length - 1) % 6 : 0;
+  return {
+    ...m,
+    id: m.code,
+    joinDate: m.join_date || m.joinDate,
+    initials: m.name ? m.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : '??',
+    color: m.color || ['purple', 'blue', 'pink', 'orange', 'green', 'sky'][colorIndex],
+    createdAt: m.created_at || m.createdAt,
+  }
+}
+
+// ========== STATE (Khởi tạo rỗng, dữ liệu sẽ được tải từ DB) ==========
+const projects = ref([])
+const tasks = ref([])
+const members = ref([])
+const groups = ref([])
+const comments = ref([])
+const activities = ref([])
+
+// ========== FETCH DỮ LIỆU TỪ DATABASE ==========
+const loadDataFromAPI = async () => {
+  try {
+    const [resProjects, resMembers, resTasks, resActivities, resNotifications] = await Promise.all([
+      fetch(`${API_URL}/projects`).catch(() => null),
+      fetch(`${API_URL}/members`).catch(() => null),
+      fetch(`${API_URL}/tasks`).catch(() => null),
+      fetch(`${API_URL}/activities`).catch(() => null),
+      fetch(`${API_URL}/notifications`).catch(() => null)
+    ])
+
+    if (resProjects && resProjects.ok) {
+      const raw = await resProjects.json()
+      projects.value = raw.map(mapProject)
+    }
+    if (resMembers && resMembers.ok) {
+      const raw = await resMembers.json()
+      members.value = raw.map(mapMember)
+    }
+    if (resTasks && resTasks.ok) {
+      const raw = await resTasks.json()
+      tasks.value = raw.map(mapTask)
+    }
+    if (resActivities && resActivities.ok) {
+      const raw = await resActivities.json()
+      activities.value = raw.map(mapActivity)
+    }
+    if (resNotifications && resNotifications.ok) {
+      notifications.value = await resNotifications.json()
+    }
+
+    console.log('✅ Đã tải dữ liệu từ Database thành công')
+  } catch (error) {
+    console.error('❌ Lỗi kết nối Database:', error)
+  }
+}
+
+// Tự động gọi khi khởi tạo
+loadDataFromAPI()
+
+
+const globalSearch = ref('')
+const darkMode = ref(false)
+const sidebarOpen = ref(false)
+const notificationDropdownOpen = ref(false)
+const globalSearchModalOpen = ref(false)
+const projectModalOpen = ref(false)
+const taskModalOpen = ref(false)
+const toastMessage = ref('')
+
+// New states for v2.0
+const activeTaskId = ref(null)
+const editingProjectId = ref(null)
+const memberDetailModalOpen = ref(false)
+const activeMemberId = ref(null)
+const addMemberModalOpen = ref(false)
+const addGroupModalOpen = ref(false)
+const projectSettingsModalOpen = ref(false)
+const fileUploadModalOpen = ref(false)
+const manageMembersModalOpen = ref(false)
+const editGroupModalOpen = ref(false)
+const activeEditGroupId = ref(null)
+const importProjectModalOpen = ref(false)
+
+const notifications = ref([])
+
+let toastTimer
+
+export function useProjectWorkspace() {
+  const planningProjects = computed(() => projects.value.filter((project) => project.status === 'planning'))
+  const activeProjects = computed(() => projects.value.filter((project) => project.status === 'active'))
+  const completedProjects = computed(() => projects.value.filter((project) => project.status === 'completed'))
+  const projectCompletionRate = computed(() => projects.value.length ? Math.round((completedProjects.value.length / projects.value.length) * 100) : 0)
+  
+  const completedTasks = computed(() => tasks.value.filter((task) => task.status === 'done'))
+  const completionRate = computed(() => tasks.value.length ? Math.round((completedTasks.value.length / tasks.value.length) * 100) : 0)
+
+  function findMember(memberId) {
+    return members.value.find((member) => member.id === Number(memberId)) || members.value[0]
+  }
+
+  function findProject(projectId) {
+    return projects.value.find((project) => project.id === Number(projectId))
+  }
+
+  function formatDate(dateValue) {
+    if (!dateValue) return 'Chưa đặt'
+    const [year, month, day] = dateValue.split('T')[0].split('-')
+    return `${day}/${month}/${year}`
+  }
+
+  function notify(message) {
+    toastMessage.value = message
+    clearTimeout(toastTimer)
+    toastTimer = setTimeout(() => { toastMessage.value = '' }, 2600)
+  }
+
+  // ========== DỰ ÁN (Projects) - Gọi API ==========
+
+  async function addProject(payload) {
+    try {
+      const res = await fetch(`${API_URL}/projects`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({
+          name: payload.name,
+          description: payload.description || '',
+          status: payload.status || 'planning',
+          start_date: payload.startDate || new Date().toISOString().split('T')[0],
+          due_date: payload.dueDate || null,
+        })
+      })
+      if (res.ok) {
+        const data = await res.json()
+        projects.value.unshift(mapProject(data.project))
+        projectModalOpen.value = false
+        notify('Đã tạo dự án mới thành công')
+      } else {
+        const err = await res.json()
+        notify('Lỗi: ' + (err.message || 'Không thể tạo dự án'))
+      }
+    } catch (e) {
+      notify('Lỗi kết nối: Không thể tạo dự án')
+    }
+  }
+
+  async function updateProject(projectId, updates) {
+    try {
+      const res = await fetch(`${API_URL}/projects/${projectId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify(updates)
+      })
+      if (res.ok) {
+        const data = await res.json()
+        const idx = projects.value.findIndex(p => p.id === projectId)
+        if (idx >= 0) Object.assign(projects.value[idx], mapProject(data.project))
+        notify('Đã cập nhật thông tin dự án')
+      }
+    } catch (e) {
+      notify('Lỗi kết nối: Không thể cập nhật dự án')
+    }
+  }
+
+  async function deleteProject(projectId) {
+    try {
+      const res = await fetch(`${API_URL}/projects/${projectId}`, {
+        method: 'DELETE',
+        headers: { 'Accept': 'application/json' }
+      })
+      if (res.ok) {
+        projects.value = projects.value.filter(p => p.id !== projectId)
+        tasks.value = tasks.value.filter(t => t.projectId !== projectId)
+        notify('Đã xóa dự án thành công')
+      }
+    } catch (e) {
+      notify('Lỗi kết nối: Không thể xóa dự án')
+    }
+  }
+
+  // ========== NHIỆM VỤ (Tasks) - Gọi API ==========
+
+  async function addTask(payload) {
+    try {
+      const res = await fetch(`${API_URL}/tasks`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({
+          project_code: payload.projectId || null,
+          title: payload.title,
+          description: payload.description || '',
+          status: payload.status || 'todo',
+          priority: payload.priority || 'medium',
+          due_date: payload.dueDate || null,
+          assignee_code: payload.assigneeId || null,
+        })
+      })
+      if (res.ok) {
+        const data = await res.json()
+        tasks.value.unshift(mapTask(data.task))
+        taskModalOpen.value = false
+        notify('Đã tạo nhiệm vụ mới thành công')
+      } else {
+        const err = await res.json()
+        notify('Lỗi: ' + (err.message || 'Không thể tạo nhiệm vụ'))
+      }
+    } catch (e) {
+      notify('Lỗi kết nối: Không thể tạo nhiệm vụ')
+    }
+  }
+
+  async function moveTask(taskId, status) {
+    const task = tasks.value.find((item) => item.id === taskId)
+    if (!task || task.status === status) return
+    const oldStatus = task.status
+    task.status = status // Cập nhật giao diện ngay lập tức
+    try {
+      const res = await fetch(`${API_URL}/tasks/${taskId}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({ status })
+      })
+      if (res.ok) {
+        notify('Đã cập nhật trạng thái nhiệm vụ')
+      } else {
+        task.status = oldStatus // Hoàn tác nếu API lỗi
+        notify('Lỗi: Không thể cập nhật trạng thái')
+      }
+    } catch (e) {
+      task.status = oldStatus
+      notify('Lỗi kết nối')
+    }
+  }
+
+  async function toggleTaskComplete(task) {
+    const newStatus = task.status === 'done' ? 'todo' : 'done'
+    await moveTask(task.id, newStatus)
+  }
+
+  async function updateTask(taskId, updates) {
+    try {
+      const res = await fetch(`${API_URL}/tasks/${taskId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify(updates)
+      })
+      if (res.ok) {
+        const data = await res.json()
+        const idx = tasks.value.findIndex(t => t.id === taskId)
+        if (idx >= 0) Object.assign(tasks.value[idx], mapTask(data.task))
+        notify('Đã cập nhật nhiệm vụ')
+      }
+    } catch (e) {
+      notify('Lỗi kết nối: Không thể cập nhật nhiệm vụ')
+    }
+  }
+
+  async function addComment(taskId, text) {
+    try {
+      const res = await fetch(`${API_URL}/tasks/${taskId}/comments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({ text })
+      })
+      if (res.ok) {
+        const data = await res.json()
+        comments.value.unshift(data.comment)
+        notify('Đã gửi bình luận')
+      }
+    } catch (e) {
+      notify('Lỗi kết nối: Không thể gửi bình luận')
+    }
+  }
+
+  // ========== THÀNH VIÊN (Members) - Gọi API ==========
+
+  async function addMember(payload) {
+    try {
+      const res = await fetch(`${API_URL}/members`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+      if (res.ok) {
+        const data = await res.json()
+        members.value.push(mapMember(data.user))
+        addMemberModalOpen.value = false
+        notify('Đã thêm thành viên mới')
+      } else {
+        const err = await res.json()
+        notify('Lỗi: ' + (err.message || 'Không thể thêm thành viên'))
+      }
+    } catch (e) {
+      notify('Lỗi kết nối: Không thể thêm thành viên')
+    }
+  }
+
+  function updateMember(memberId, updates) {
+    const member = members.value.find(m => m.id === memberId)
+    if (member) {
+      Object.assign(member, updates)
+      notify('Đã cập nhật thông tin thành viên')
+    }
+  }
+
+  // ========== NHÓM (Groups) - Tạm lưu local ==========
+
+  function addGroup(payload) {
+    groups.value.push({
+      id: Date.now(),
+      name: payload.name,
+      icon: payload.icon || '🚀',
+      description: payload.description || 'Nhóm mới',
+      color: payload.color || 'violet',
+      memberIds: []
+    })
+    addGroupModalOpen.value = false
+    notify('Đã tạo nhóm mới thành công')
+  }
+
+  function updateGroup(groupId, payload) {
+    const group = groups.value.find(g => g.id === groupId)
+    if (group) {
+      group.name = payload.name
+      group.icon = payload.icon || group.icon
+      group.description = payload.description || group.description
+      group.color = payload.color || group.color
+      editGroupModalOpen.value = false
+      notify('Đã cập nhật thông tin nhóm')
+    }
+  }
+
+  function deleteGroup(groupId) {
+    const idx = groups.value.findIndex(g => g.id === groupId)
+    if (idx !== -1) {
+      groups.value.splice(idx, 1)
+      editGroupModalOpen.value = false
+      notify('Đã xóa nhóm')
+    }
+  }
+
+  function assignMemberToGroup(memberId, targetGroupId) {
+    groups.value.forEach(group => {
+      group.memberIds = group.memberIds.filter(id => id !== memberId)
+    })
+    
+    if (targetGroupId) {
+      const targetGroup = groups.value.find(g => g.id === targetGroupId)
+      if (targetGroup && !targetGroup.memberIds.includes(memberId)) {
+        targetGroup.memberIds.push(memberId)
+      }
+      notify('Đã đưa thành viên vào nhóm')
+    } else {
+      notify('Đã loại thành viên khỏi nhóm')
+    }
+  }
+
+  // ========== FILE & MISC ==========
+
+  function uploadFilesToProject(projectId, files) {
+    const project = projects.value.find(p => p.id === projectId)
+    if (project) {
+      if (!project.files) project.files = []
+      project.files.push(...files)
+      notify(`Đã tải lên ${files.length} tệp`)
+    }
+  }
+
+  function removeFileFromProject(projectId, fileIndex) {
+    const project = projects.value.find(p => p.id === projectId)
+    if (project && project.files) {
+      project.files.splice(fileIndex, 1)
+      notify('Đã xóa tệp đính kèm')
+    }
+  }
+
+  function updateProjectMembers(projectId, memberIds) {
+    const project = projects.value.find(p => p.id === projectId)
+    if (project) {
+      project.memberIds = [...memberIds]
+      notify('Đã cập nhật thành viên dự án')
+    }
+  }
+
+  function removeMemberFromProject(projectId, memberId) {
+    const project = projects.value.find(p => p.id === projectId)
+    if (project) {
+      project.memberIds = project.memberIds.filter(id => id !== memberId)
+      notify('Đã xóa thành viên khỏi dự án')
+    }
+  }
+
+  function setTheme(isDark) {
+    darkMode.value = isDark
+    notify(isDark ? 'Đã chuyển sang giao diện tối' : 'Đã chuyển sang giao diện sáng')
+  }
+
+  const markNotificationAsRead = async (id) => {
+    try {
+      const res = await fetch(`${API_URL}/notifications/${id}/read`, { method: 'PUT' })
+      if (res.ok) {
+        const notif = notifications.value.find(n => n.id === id)
+        if (notif) notif.read = true
+      }
+    } catch (e) {
+      console.error('Failed to mark notification as read', e)
+    }
+  }
+
+  const markAllNotificationsAsRead = async () => {
+    try {
+      const res = await fetch(`${API_URL}/notifications/read-all`, { method: 'PUT' })
+      if (res.ok) {
+        notifications.value.forEach(n => n.read = true)
+      }
+    } catch (e) {
+      console.error('Failed to mark all notifications as read', e)
+    }
+  }
+
+  return {
+    projects,
+    tasks,
+    members,
+    groups,
+    comments,
+    activities,
+    navigationItems,
+    projectStatusMap,
+    taskStatusMap,
+    priorityMap,
+    globalSearch,
+    darkMode,
+    sidebarOpen,
+    notificationDropdownOpen,
+    globalSearchModalOpen,
+    projectModalOpen,
+    taskModalOpen,
+    toastMessage,
+    activeTaskId,
+    editingProjectId,
+    memberDetailModalOpen,
+    activeMemberId,
+    addMemberModalOpen,
+    addGroupModalOpen,
+    editGroupModalOpen,
+    activeEditGroupId,
+    projectSettingsModalOpen,
+    fileUploadModalOpen,
+    manageMembersModalOpen,
+    importProjectModalOpen,
+    notifications,
+    planningProjects,
+    activeProjects,
+    completedProjects,
+    projectCompletionRate,
+    completedTasks,
+    completionRate,
+    findMember,
+    findProject,
+    formatDate,
+    notify,
+    addProject,
+    updateProject,
+    deleteProject,
+    addTask,
+    moveTask,
+    toggleTaskComplete,
+    updateTask,
+    addComment,
+    addMember,
+    updateMember,
+    addGroup,
+    updateGroup,
+    deleteGroup,
+    assignMemberToGroup,
+    uploadFilesToProject,
+    removeFileFromProject,
+    updateProjectMembers,
+    removeMemberFromProject,
+    setTheme,
+    markNotificationAsRead,
+    markAllNotificationsAsRead
+  }
+}
