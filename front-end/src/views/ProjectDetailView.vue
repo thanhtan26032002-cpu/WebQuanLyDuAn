@@ -12,7 +12,7 @@ const route = useRoute()
 const router = useRouter()
 const { projects, tasks, members, activities, projectStatusMap, priorityMap, taskStatusMap, findMember, formatDate, taskModalOpen, projectSettingsModalOpen, fileUploadModalOpen, manageMembersModalOpen, editingProjectId, removeFileFromProject, removeMemberFromProject, moveTask, activeTaskId } = useProjectWorkspace()
 
-const projectId = computed(() => Number(route.params.id))
+const projectId = computed(() => route.params.id)
 const project = computed(() => projects.value.find(p => p.id === projectId.value))
 const projectTasks = computed(() => tasks.value.filter(t => t.projectId === projectId.value))
 

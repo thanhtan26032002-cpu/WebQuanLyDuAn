@@ -66,7 +66,7 @@ function mapActivity(a) {
   return {
     ...a,
     id: a.code,
-    memberId: a.member_code || a.memberId,
+    memberId: a.user_code || a.memberId,
     targetType: a.target_type || a.targetType,
     targetId: a.target_code || a.targetId,
     createdAt: a.created_at || a.createdAt,
@@ -171,11 +171,11 @@ export function useProjectWorkspace() {
   const completionRate = computed(() => tasks.value.length ? Math.round((completedTasks.value.length / tasks.value.length) * 100) : 0)
 
   function findMember(memberId) {
-    return members.value.find((member) => member.id === Number(memberId)) || members.value[0]
+    return members.value.find((member) => member.id === memberId) || members.value[0]
   }
 
   function findProject(projectId) {
-    return projects.value.find((project) => project.id === Number(projectId))
+    return projects.value.find((project) => project.id === projectId)
   }
 
   function formatDate(dateValue) {

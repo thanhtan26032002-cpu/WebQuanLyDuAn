@@ -10,7 +10,7 @@ class ActivityController extends Controller
     // Lấy danh sách nhật ký hệ thống
     public function index()
     {
-        $activities = Activity::with('member:code,name,avatar')
+        $activities = Activity::with('user:code,name,avatar')
             ->orderBy('created_at', 'desc')
             ->limit(50)
             ->get();
