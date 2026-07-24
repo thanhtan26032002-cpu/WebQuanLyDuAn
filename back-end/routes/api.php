@@ -37,6 +37,7 @@ Route::get('/tasks/{taskId}/comments', [TaskController::class, 'comments']);
 Route::post('/tasks/{taskId}/comments', [TaskController::class, 'storeComment']);
 
 Route::get('/users', [UserController::class, 'index']);
+Route::post('/users/{code}', [UserController::class, 'updateProfile']);
 Route::get('/members', [MemberController::class, 'index']);
 Route::post('/members', [MemberController::class, 'store']);
 

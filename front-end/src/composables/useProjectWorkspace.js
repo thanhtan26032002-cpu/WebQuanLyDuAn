@@ -112,17 +112,29 @@ const members = ref([])
 const groups = ref([])
 const comments = ref([])
 const activities = ref([])
+const users = ref([])
 
 // ========== FETCH DỮ LIỆU TỪ DATABASE ==========
 const loadDataFromAPI = async () => {
   try {
-    const [resProjects, resMembers, resTasks, resActivities, resNotifications] = await Promise.all([
+    const [resProjects, resMembers, resTasks, resActivities, resNotifications, resUsers] = await Promise.all([
       fetch(`${API_URL}/projects`).catch(() => null),
       fetch(`${API_URL}/members`).catch(() => null),
       fetch(`${API_URL}/tasks`).catch(() => null),
       fetch(`${API_URL}/activities`).catch(() => null),
-      fetch(`${API_URL}/notifications`).catch(() => null)
+      fetch(`${API_URL}/notifications`).catch(() => null),
+      fetch(`${API_URL}/users`).catch(() => null)
     ])
+
+    if (resUsers && resUsers.ok) {
+      const rawUsers = await resUsers.json()
+      users.value = rawUsers
+      const current = rawUsers.find(u => u.code === currentUser.value.code)
+      if (current) {
+        currentUser.value = { ...currentUser.value, ...current }
+        localStorage.setItem('currentUser', JSON.stringify(currentUser.value))
+      }
+    }
 
     if (resProjects && resProjects.ok) {
       const raw = await resProjects.json()
@@ -472,6 +484,52 @@ export function useProjectWorkspace() {
     }
   }
 
+  async function loadUsers() {
+    try {
+      const response = await fetch(`${API_URL}/users`)
+      if (response.ok) {
+        users.value = await response.json()
+      }
+    } catch (e) {
+      console.error('Failed to load users:', e)
+    }
+  }
+
+  async function updateUserProfile(code, formData) {
+    try {
+      const response = await fetch(`${API_URL}/users/${code}`, {
+        method: 'POST',
+        body: formData // Using FormData for file upload
+      })
+      
+      if (!response.ok) {
+        return { success: false, errors: await parseValidationErrors(response) }
+      }
+      
+      const result = await response.json()
+      
+      // Update currentUser state
+      currentUser.value = { ...currentUser.value, ...result.user }
+      localStorage.setItem('currentUser', JSON.stringify(currentUser.value))
+      
+      // Update in users/members lists if applicable
+      const userIndex = users.value.findIndex(u => u.code === code)
+      if (userIndex !== -1) {
+        users.value[userIndex] = { ...users.value[userIndex], ...result.user }
+      }
+      
+      const memberIndex = teamMembers.value.findIndex(m => m.code === code)
+      if (memberIndex !== -1) {
+        teamMembers.value[memberIndex] = { ...teamMembers.value[memberIndex], ...result.user }
+      }
+      
+      return { success: true, user: result.user }
+    } catch (e) {
+      console.error('Failed to update profile:', e)
+      return { success: false, errors: { _general: 'Lỗi mạng khi cập nhật hồ sơ.' } }
+    }
+  }
+
   async function loadComments(taskId) {
     try {
       const res = await fetch(`${API_URL}/tasks/${taskId}/comments`)
@@ -779,6 +837,8 @@ export function useProjectWorkspace() {
     addProject,
     updateProject,
     deleteProject,
+    loadUsers,
+    updateUserProfile,
     downloadArchive,
     downloadSingleFile,
     addTask,

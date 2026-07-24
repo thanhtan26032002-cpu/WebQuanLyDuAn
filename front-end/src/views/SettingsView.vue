@@ -1,10 +1,93 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { User, Bell, Palette, Moon, Sun, CheckCircle2 } from '@lucide/vue'
 import { useProjectWorkspace } from '../composables/useProjectWorkspace'
 
 const activeTab = ref('profile')
-const { darkMode, setTheme, notify } = useProjectWorkspace()
+const { darkMode, setTheme, notify, currentUser, updateUserProfile } = useProjectWorkspace()
+
+const userProfile = ref({
+  name: currentUser.value?.name || '',
+  email: currentUser.value?.email || '',
+  role: currentUser.value?.role || '',
+  phone: currentUser.value?.phone || '',
+  department: currentUser.value?.department || ''
+})
+
+const selectedAvatarFile = ref(null)
+const avatarPreview = ref(currentUser.value?.avatar || null)
+
+watch(currentUser, (newVal) => {
+  if (newVal) {
+    userProfile.value.name = newVal.name || ''
+    userProfile.value.email = newVal.email || ''
+    userProfile.value.role = newVal.role || ''
+    userProfile.value.phone = newVal.phone || ''
+    userProfile.value.department = newVal.department || ''
+    if (!selectedAvatarFile.value) {
+      avatarPreview.value = newVal.avatar || null
+    }
+  }
+}, { deep: true })
+
+const isSavingProfile = ref(false)
+const profileErrors = ref({})
+
+const onAvatarSelected = (event) => {
+  const file = event.target.files[0]
+  if (!file) return
+  
+  if (file.size > 2 * 1024 * 1024) {
+    notify('Kích thước ảnh tối đa là 2MB!')
+    return
+  }
+  
+  selectedAvatarFile.value = file
+  avatarPreview.value = URL.createObjectURL(file)
+}
+
+const clearAvatar = () => {
+  selectedAvatarFile.value = null
+  avatarPreview.value = null
+  // Cần cơ chế backend để xóa avatar thực sự, tạm thời chỉ clear UI
+}
+
+const saveProfile = async () => {
+  isSavingProfile.value = true
+  profileErrors.value = {}
+  
+  // Validate
+  if (!userProfile.value.name.trim()) profileErrors.value.name = 'Họ và tên không được để trống'
+  if (!userProfile.value.email.trim()) profileErrors.value.email = 'Email không được để trống'
+  
+  if (Object.keys(profileErrors.value).length > 0) {
+    isSavingProfile.value = false
+    notify('Vui lòng kiểm tra lại thông tin')
+    return
+  }
+  
+  const formData = new FormData()
+  formData.append('name', userProfile.value.name)
+  formData.append('email', userProfile.value.email)
+  formData.append('role', userProfile.value.role)
+  formData.append('phone', userProfile.value.phone)
+  formData.append('department', userProfile.value.department)
+  
+  if (selectedAvatarFile.value) {
+    formData.append('avatar', selectedAvatarFile.value)
+  }
+
+  const result = await updateUserProfile(currentUser.value.code, formData)
+  
+  isSavingProfile.value = false
+  
+  if (result.success) {
+    notify('Đã lưu thông tin cá nhân')
+  } else {
+    profileErrors.value = result.errors
+    notify(result.errors._general || 'Không thể lưu thông tin. Vui lòng kiểm tra lỗi.')
+  }
+}
 
 const tabs = [
   { id: 'profile', label: 'Hồ sơ', icon: User },
@@ -88,15 +171,20 @@ if (activeColor.value) {
           </div>
 
           <div class="flex items-center gap-6">
-            <div class="w-24 h-24 rounded-2xl bg-gradient-to-br from-violet-100 to-indigo-100 border-2 border-violet-200 flex items-center justify-center text-3xl font-bold text-violet-700 shadow-sm">
-              US
+            <div 
+              class="w-24 h-24 rounded-2xl border-2 border-violet-200 flex items-center justify-center text-3xl font-bold text-violet-700 shadow-sm overflow-hidden"
+              :class="avatarPreview ? '' : 'bg-gradient-to-br from-violet-100 to-indigo-100'"
+            >
+              <img v-if="avatarPreview" :src="avatarPreview.startsWith('blob:') ? avatarPreview : `http://localhost:8000${avatarPreview}`" alt="Avatar" class="w-full h-full object-cover" />
+              <span v-else>{{ userProfile.name ? userProfile.name.charAt(0).toUpperCase() : 'U' }}</span>
             </div>
             <div>
               <div class="flex gap-3 mb-2">
-                <button class="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors">
+                <input type="file" ref="avatarInput" class="hidden" accept="image/jpeg, image/png, image/gif" @change="onAvatarSelected">
+                <button @click="$refs.avatarInput.click()" class="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors">
                   Thay ảnh
                 </button>
-                <button class="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-medium text-rose-600 hover:bg-rose-50 hover:border-rose-200 transition-colors">
+                <button @click="clearAvatar" class="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-medium text-rose-600 hover:bg-rose-50 hover:border-rose-200 transition-colors">
                   Xóa
                 </button>
               </div>
@@ -106,20 +194,29 @@ if (activeColor.value) {
 
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
             <div class="space-y-2">
-              <label class="block text-sm font-semibold text-slate-700">Họ và tên</label>
-              <input type="text" value="User" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 focus:bg-white focus:border-violet-300 focus:ring-4 focus:ring-violet-500/10 transition-all outline-none" />
+              <label class="block text-sm font-semibold text-slate-700">Họ và tên <span class="text-rose-500">*</span></label>
+              <input type="text" v-model="userProfile.name" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 focus:bg-white focus:border-violet-300 focus:ring-4 focus:ring-violet-500/10 transition-all outline-none" :class="{'border-rose-300 focus:border-rose-500 focus:ring-rose-500/20': profileErrors.name}" />
+              <p v-if="profileErrors.name" class="text-xs text-rose-500 mt-1">{{ profileErrors.name }}</p>
             </div>
             <div class="space-y-2">
-              <label class="block text-sm font-semibold text-slate-700">Chức vụ</label>
-              <input type="text" value="Quản lý dự án" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 focus:bg-white focus:border-violet-300 focus:ring-4 focus:ring-violet-500/10 transition-all outline-none" />
+              <label class="block text-sm font-semibold text-slate-700">Chức vụ <span class="text-rose-500">*</span></label>
+              <input type="text" v-model="userProfile.role" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 focus:bg-white focus:border-violet-300 focus:ring-4 focus:ring-violet-500/10 transition-all outline-none" :class="{'border-rose-300 focus:border-rose-500 focus:ring-rose-500/20': profileErrors.role}" />
+              <p v-if="profileErrors.role" class="text-xs text-rose-500 mt-1">{{ profileErrors.role }}</p>
             </div>
             <div class="space-y-2">
-              <label class="block text-sm font-semibold text-slate-700">Email</label>
-              <input type="email" value="user@ringnet.vn" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 focus:bg-white focus:border-violet-300 focus:ring-4 focus:ring-violet-500/10 transition-all outline-none" />
+              <label class="block text-sm font-semibold text-slate-700">Email <span class="text-rose-500">*</span></label>
+              <input type="email" v-model="userProfile.email" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 focus:bg-white focus:border-violet-300 focus:ring-4 focus:ring-violet-500/10 transition-all outline-none" :class="{'border-rose-300 focus:border-rose-500 focus:ring-rose-500/20': profileErrors.email}" />
+              <p v-if="profileErrors.email" class="text-xs text-rose-500 mt-1">{{ profileErrors.email }}</p>
             </div>
             <div class="space-y-2">
               <label class="block text-sm font-semibold text-slate-700">Số điện thoại</label>
-              <input type="tel" value="(+84) 912 345 678" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 focus:bg-white focus:border-violet-300 focus:ring-4 focus:ring-violet-500/10 transition-all outline-none" />
+              <input type="tel" v-model="userProfile.phone" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 focus:bg-white focus:border-violet-300 focus:ring-4 focus:ring-violet-500/10 transition-all outline-none" :class="{'border-rose-300 focus:border-rose-500 focus:ring-rose-500/20': profileErrors.phone}" />
+              <p v-if="profileErrors.phone" class="text-xs text-rose-500 mt-1">{{ profileErrors.phone }}</p>
+            </div>
+            <div class="space-y-2 sm:col-span-2">
+              <label class="block text-sm font-semibold text-slate-700">Phòng ban</label>
+              <input type="text" v-model="userProfile.department" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 focus:bg-white focus:border-violet-300 focus:ring-4 focus:ring-violet-500/10 transition-all outline-none" :class="{'border-rose-300 focus:border-rose-500 focus:ring-rose-500/20': profileErrors.department}" />
+              <p v-if="profileErrors.department" class="text-xs text-rose-500 mt-1">{{ profileErrors.department }}</p>
             </div>
           </div>
 
@@ -127,8 +224,9 @@ if (activeColor.value) {
             <button class="px-5 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors">
               Hủy
             </button>
-            <button @click="notify('Đã lưu thông tin cá nhân')" class="px-5 py-2.5 bg-gradient-to-r from-violet-500 to-indigo-600 text-white rounded-xl text-sm font-medium shadow-md shadow-violet-500/25 hover:shadow-premium transition-all">
-              Lưu thay đổi
+            <button @click="saveProfile" :disabled="isSavingProfile" class="px-5 py-2.5 bg-gradient-to-r from-violet-500 to-indigo-600 text-white rounded-xl text-sm font-medium shadow-md shadow-violet-500/25 hover:shadow-premium transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+              <span v-if="isSavingProfile">Đang lưu...</span>
+              <span v-else>Lưu thay đổi</span>
             </button>
           </div>
         </div>
