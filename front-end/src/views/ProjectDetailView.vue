@@ -393,7 +393,7 @@ const projectStatusClasses = {
             </span>
 
             <!-- Due date -->
-            <div class="flex items-center gap-1 text-xs text-slate-400 shrink-0 hidden sm:flex">
+            <div class="hidden sm:flex items-center gap-1 text-xs text-slate-400 shrink-0">
               <CalendarDays class="w-3.5 h-3.5" />
               {{ formatDate(task.dueDate) }}
             </div>

@@ -691,7 +691,22 @@ export function useProjectWorkspace() {
 
   function setTheme(isDark) {
     darkMode.value = isDark
+    if (isDark) {
+      document.documentElement.classList.add('dark')
+    } else {
+      document.documentElement.classList.remove('dark')
+    }
+    localStorage.setItem('theme', isDark ? 'dark' : 'light')
     notify(isDark ? 'Đã chuyển sang giao diện tối' : 'Đã chuyển sang giao diện sáng')
+  }
+
+  // Khôi phục theme từ localStorage hoặc hệ thống
+  if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+    darkMode.value = true
+    document.documentElement.classList.add('dark')
+  } else {
+    darkMode.value = false
+    document.documentElement.classList.remove('dark')
   }
 
   const markNotificationAsRead = async (id) => {

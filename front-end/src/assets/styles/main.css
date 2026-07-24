@@ -1,41 +1,47 @@
 @import "tailwindcss";
 
-/* ===== Custom Theme for RingNet ===== */
 @theme {
   --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
   --font-display: 'Outfit', ui-sans-serif, system-ui, sans-serif;
 
   --shadow-soft: 0 4px 20px -2px rgba(0, 0, 0, 0.05);
   --shadow-premium: 0 10px 40px -10px rgba(139, 92, 246, 0.15);
+
+  --color-white: var(--t-white, #ffffff);
+  --color-slate-50: var(--t-slate-50, #f8fafc);
+  --color-slate-100: var(--t-slate-100, #f1f5f9);
+  --color-slate-200: var(--t-slate-200, #e2e8f0);
+  --color-slate-300: var(--t-slate-300, #cbd5e1);
+  --color-slate-400: var(--t-slate-400, #94a3b8);
+  --color-slate-500: var(--t-slate-500, #64748b);
+  --color-slate-600: var(--t-slate-600, #475569);
+  --color-slate-700: var(--t-slate-700, #334155);
+  --color-slate-800: var(--t-slate-800, #1e293b);
+  --color-slate-900: var(--t-slate-900, #0f172a);
+  --color-slate-950: var(--t-slate-950, #020617);
+  
+  --color-violet-50: var(--t-primary-50, #f5f3ff);
+  --color-violet-100: var(--t-primary-100, #ede9fe);
+  --color-violet-200: var(--t-primary-200, #ddd6fe);
+  --color-violet-300: var(--t-primary-300, #c4b5fd);
+  --color-violet-400: var(--t-primary-400, #a78bfa);
+  --color-violet-500: var(--t-primary-500, #8b5cf6);
+  --color-violet-600: var(--t-primary-600, #7c3aed);
+  --color-violet-700: var(--t-primary-700, #6d28d9);
+  --color-violet-800: var(--t-primary-800, #5b21b6);
+  --color-violet-900: var(--t-primary-900, #4c1d95);
+  --color-violet-950: var(--t-primary-950, #2e1065);
 }
 
-/* ===== Base Styles ===== */
 @layer base {
-  :root {
-    --background: 210 40% 98%;
-    --foreground: 222.2 84% 4.9%;
-    --primary: 262.1 83.3% 57.8%;
-    --border-color: 214.3 31.8% 91.4%;
-    --radius: 1rem;
-  }
-
-  .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --primary: 262.1 83.3% 57.8%;
-    --border-color: 217.2 32.6% 17.5%;
-  }
-
   body {
     @apply bg-slate-50 text-slate-900 antialiased min-h-screen font-sans;
   }
-
   h1, h2, h3, h4, h5, h6 {
     @apply font-display font-semibold tracking-tight;
   }
 }
 
-/* ===== Utility Classes ===== */
 @layer utilities {
   .glass-panel {
     background: rgba(255, 255, 255, 0.7);
@@ -51,18 +57,79 @@
   }
 }
 
-/* ===== Scrollbar ===== */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background-color: var(--t-slate-300, #cbd5e1); border-radius: 20px; }
+::-webkit-scrollbar-thumb:hover { background-color: var(--t-slate-400, #94a3b8); }
+
+/* ===== Dynamic Theming Overrides ===== */
+html.dark {
+  --t-white: #020617;
+  --t-slate-50: #0f172a;
+  --t-slate-100: #1e293b;
+  --t-slate-200: #334155;
+  --t-slate-300: #475569;
+  --t-slate-400: #64748b;
+  --t-slate-500: #94a3b8;
+  --t-slate-600: #cbd5e1;
+  --t-slate-700: #e2e8f0;
+  --t-slate-800: #f1f5f9;
+  --t-slate-900: #f8fafc;
+  --t-slate-950: #ffffff;
 }
-::-webkit-scrollbar-track {
-  background: transparent;
+
+:root[data-theme-color="blue"] {
+  --t-primary-50: #eff6ff;
+  --t-primary-100: #dbeafe;
+  --t-primary-200: #bfdbfe;
+  --t-primary-300: #93c5fd;
+  --t-primary-400: #60a5fa;
+  --t-primary-500: #3b82f6;
+  --t-primary-600: #2563eb;
+  --t-primary-700: #1d4ed8;
+  --t-primary-800: #1e40af;
+  --t-primary-900: #1e3a8a;
+  --t-primary-950: #172554;
 }
-::-webkit-scrollbar-thumb {
-  background-color: #cbd5e1;
-  border-radius: 20px;
+
+:root[data-theme-color="emerald"] {
+  --t-primary-50: #ecfdf5;
+  --t-primary-100: #d1fae5;
+  --t-primary-200: #a7f3d0;
+  --t-primary-300: #6ee7b7;
+  --t-primary-400: #34d399;
+  --t-primary-500: #10b981;
+  --t-primary-600: #059669;
+  --t-primary-700: #047857;
+  --t-primary-800: #065f46;
+  --t-primary-900: #064e3b;
+  --t-primary-950: #022c22;
 }
-::-webkit-scrollbar-thumb:hover {
-  background-color: #94a3b8;
+
+:root[data-theme-color="amber"] {
+  --t-primary-50: #fffbeb;
+  --t-primary-100: #fef3c7;
+  --t-primary-200: #fde68a;
+  --t-primary-300: #fcd34d;
+  --t-primary-400: #fbbf24;
+  --t-primary-500: #f59e0b;
+  --t-primary-600: #d97706;
+  --t-primary-700: #b45309;
+  --t-primary-800: #92400e;
+  --t-primary-900: #78350f;
+  --t-primary-950: #451a03;
+}
+
+:root[data-theme-color="rose"] {
+  --t-primary-50: #fff1f2;
+  --t-primary-100: #ffe4e6;
+  --t-primary-200: #fecdd3;
+  --t-primary-300: #fda4af;
+  --t-primary-400: #fb7185;
+  --t-primary-500: #f43f5e;
+  --t-primary-600: #e11d48;
+  --t-primary-700: #be123c;
+  --t-primary-800: #9f1239;
+  --t-primary-900: #881337;
+  --t-primary-950: #4c0519;
 }

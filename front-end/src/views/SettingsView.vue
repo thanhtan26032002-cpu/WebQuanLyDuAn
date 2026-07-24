@@ -12,26 +12,39 @@ const tabs = [
   { id: 'appearance', label: 'Giao diện', icon: Palette }
 ]
 
-const notifications = [
+const savedNotifications = JSON.parse(localStorage.getItem('notificationSettings')) || [
   { id: 'email', title: 'Thông báo qua email', desc: 'Nhận bản tóm tắt hoạt động qua email.', checked: true },
   { id: 'push', title: 'Thông báo đẩy', desc: 'Hiển thị thông báo ngay trên thiết bị.', checked: true },
   { id: 'deadline', title: 'Nhắc hạn nhiệm vụ', desc: 'Nhắc bạn trước khi nhiệm vụ đến hạn.', checked: true },
   { id: 'mention', title: 'Khi được đề cập', desc: 'Khi đồng đội nhắc đến tên của bạn.', checked: false },
   { id: 'report', title: 'Báo cáo tiến độ', desc: 'Nhận báo cáo vào mỗi sáng thứ Hai.', checked: true }
 ]
+const notifications = ref(savedNotifications)
+
+const toggleNotification = (item) => {
+  localStorage.setItem('notificationSettings', JSON.stringify(notifications.value))
+  notify(item.checked ? `Đã bật: ${item.title}` : `Đã tắt: ${item.title}`)
+}
 
 const colors = [
-  { id: 'violet', bg: 'bg-violet-500', ring: 'ring-violet-500' },
-  { id: 'blue', bg: 'bg-blue-500', ring: 'ring-blue-500' },
-  { id: 'emerald', bg: 'bg-emerald-500', ring: 'ring-emerald-500' },
-  { id: 'amber', bg: 'bg-amber-500', ring: 'ring-amber-500' },
-  { id: 'rose', bg: 'bg-rose-500', ring: 'ring-rose-500' }
+  { id: 'violet', bg: 'bg-[#8b5cf6]', ring: 'ring-[#8b5cf6]' },
+  { id: 'blue', bg: 'bg-[#3b82f6]', ring: 'ring-[#3b82f6]' },
+  { id: 'emerald', bg: 'bg-[#10b981]', ring: 'ring-[#10b981]' },
+  { id: 'amber', bg: 'bg-[#f59e0b]', ring: 'ring-[#f59e0b]' },
+  { id: 'rose', bg: 'bg-[#f43f5e]', ring: 'ring-[#f43f5e]' }
 ]
-const activeColor = ref('violet')
+const activeColor = ref(localStorage.getItem('primaryColor') || 'violet')
 
 const toggleColor = (colorId) => {
   activeColor.value = colorId
+  localStorage.setItem('primaryColor', colorId)
+  document.documentElement.setAttribute('data-theme-color', colorId)
   notify('Đã cập nhật màu chủ đạo')
+}
+
+// Khởi tạo màu theme nếu có
+if (activeColor.value) {
+  document.documentElement.setAttribute('data-theme-color', activeColor.value)
 }
 </script>
 
@@ -138,7 +151,7 @@ const toggleColor = (colorId) => {
                 <p class="text-sm text-slate-500">{{ item.desc }}</p>
               </div>
               <div class="relative inline-flex items-center cursor-pointer mt-1">
-                <input type="checkbox" class="sr-only peer" :checked="item.checked" @change="item.checked = !item.checked">
+                <input type="checkbox" class="sr-only peer" v-model="item.checked" @change="toggleNotification(item)">
                 <div class="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-violet-500"></div>
               </div>
             </label>
