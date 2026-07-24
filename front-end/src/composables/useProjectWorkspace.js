@@ -31,6 +31,26 @@ const priorityMap = {
 const API_URL = 'http://localhost:8000/api'
 
 // ========== CHUYỂN ĐỔI DỮ LIỆU API → FRONTEND ==========
+// Helper function to format bytes for attachments
+function formatBytes(bytes) {
+  if (!bytes || bytes === 0) return '0 Bytes'
+  const k = 1024
+  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+}
+
+function mapAttachment(a) {
+  return {
+    code: a.code,
+    name: a.file_name,
+    url: a.file_path,
+    size: a.size_bytes ? formatBytes(a.size_bytes) : 'Không xác định',
+    uploadedAt: a.created_at || new Date().toISOString(),
+    uploadedBy: a.uploaded_by
+  }
+}
+
 // API trả về snake_case (due_date), Frontend dùng camelCase (dueDate)
 function mapProject(p) {
   return {
@@ -42,7 +62,7 @@ function mapProject(p) {
     memberIds: p.members ? p.members.map(m => m.code) : (p.memberIds || []),
     progress: p.progress || 0,
     color: p.color || 'indigo',
-    files: p.files || [],
+    files: p.attachments ? p.attachments.map(mapAttachment) : (p.files || []),
   }
 }
 
@@ -56,7 +76,7 @@ function mapTask(t) {
     createdAt: t.created_at || t.createdAt,
     tags: t.tags || [],
     progress: t.progress || 0,
-    files: t.files || [],
+    files: t.attachments ? t.attachments.map(mapAttachment) : (t.files || []),
     checklists: t.checklists || [],
     workLogs: t.workLogs || [],
   }
@@ -130,6 +150,24 @@ const loadDataFromAPI = async () => {
   }
 }
 
+// const refreshActivitiesAndNotifications = async () => {
+//   try {
+//     const [resActivities, resNotifications] = await Promise.all([
+//       fetch(`${API_URL}/activities`).catch(() => null),
+//       fetch(`${API_URL}/notifications`).catch(() => null)
+//     ])
+//     if (resActivities && resActivities.ok) {
+//       const raw = await resActivities.json()
+//       activities.value = raw.map(mapActivity)
+//     }
+//     if (resNotifications && resNotifications.ok) {
+//       notifications.value = await resNotifications.json()
+//     }
+//   } catch (e) {
+//     console.error(e)
+//   }
+// }
+
 // Tự động gọi khi khởi tạo
 loadDataFromAPI()
 
@@ -159,7 +197,28 @@ const importProjectModalOpen = ref(false)
 
 const notifications = ref([])
 
+// Lấy thông tin user đang đăng nhập từ localStorage
+const currentUser = ref(JSON.parse(localStorage.getItem('currentUser') || 'null') || { code: 'US0001', name: 'Quản trị viên' })
+
 let toastTimer
+
+// Helper: Phân tích lỗi 422 từ Backend Laravel
+async function parseValidationErrors(response) {
+  try {
+    const data = await response.json()
+    if (data.errors) {
+      // Laravel trả về { errors: { field: ['msg1', 'msg2'] } }
+      const result = {}
+      for (const [field, messages] of Object.entries(data.errors)) {
+        result[field] = messages[0] // Lấy lỗi đầu tiên của mỗi trường
+      }
+      return result
+    }
+    return { _general: data.message || 'Đã xảy ra lỗi.' }
+  } catch {
+    return { _general: 'Đã xảy ra lỗi không xác định.' }
+  }
+}
 
 export function useProjectWorkspace() {
   const planningProjects = computed(() => projects.value.filter((project) => project.status === 'planning'))
@@ -184,6 +243,18 @@ export function useProjectWorkspace() {
     return `${day}/${month}/${year}`
   }
 
+  function formatDateTime(dateValue) {
+    if (!dateValue) return 'Chưa đặt'
+    const date = new Date(dateValue)
+    if (isNaN(date.getTime())) return 'Ngày không hợp lệ'
+    const day = String(date.getDate()).padStart(2, '0')
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const year = date.getFullYear()
+    const hours = String(date.getHours()).padStart(2, '0')
+    const minutes = String(date.getMinutes()).padStart(2, '0')
+    return `${hours}:${minutes} - ${day}/${month}/${year}`
+  }
+
   function notify(message) {
     toastMessage.value = message
     clearTimeout(toastTimer)
@@ -203,6 +274,7 @@ export function useProjectWorkspace() {
           status: payload.status || 'planning',
           start_date: payload.startDate || new Date().toISOString().split('T')[0],
           due_date: payload.dueDate || null,
+          user_code: currentUser.value.code,
         })
       })
       if (res.ok) {
@@ -210,12 +282,15 @@ export function useProjectWorkspace() {
         projects.value.unshift(mapProject(data.project))
         projectModalOpen.value = false
         notify('Đã tạo dự án mới thành công')
+        return { success: true }
       } else {
-        const err = await res.json()
-        notify('Lỗi: ' + (err.message || 'Không thể tạo dự án'))
+        const errors = await parseValidationErrors(res)
+        if (errors._general) notify('Lỗi: ' + errors._general)
+        return { success: false, errors }
       }
     } catch (e) {
       notify('Lỗi kết nối: Không thể tạo dự án')
+      return { success: false, errors: { _general: 'Lỗi kết nối' } }
     }
   }
 
@@ -230,6 +305,7 @@ export function useProjectWorkspace() {
         const data = await res.json()
         const idx = projects.value.findIndex(p => p.id === projectId)
         if (idx >= 0) Object.assign(projects.value[idx], mapProject(data.project))
+        //refreshActivitiesAndNotifications()
         notify('Đã cập nhật thông tin dự án')
       }
     } catch (e) {
@@ -246,6 +322,7 @@ export function useProjectWorkspace() {
       if (res.ok) {
         projects.value = projects.value.filter(p => p.id !== projectId)
         tasks.value = tasks.value.filter(t => t.projectId !== projectId)
+        //refreshActivitiesAndNotifications()
         notify('Đã xóa dự án thành công')
       }
     } catch (e) {
@@ -268,6 +345,7 @@ export function useProjectWorkspace() {
           priority: payload.priority || 'medium',
           due_date: payload.dueDate || null,
           assignee_code: payload.assigneeId || null,
+          user_code: currentUser.value.code,
         })
       })
       if (res.ok) {
@@ -275,12 +353,15 @@ export function useProjectWorkspace() {
         tasks.value.unshift(mapTask(data.task))
         taskModalOpen.value = false
         notify('Đã tạo nhiệm vụ mới thành công')
+        return { success: true }
       } else {
-        const err = await res.json()
-        notify('Lỗi: ' + (err.message || 'Không thể tạo nhiệm vụ'))
+        const errors = await parseValidationErrors(res)
+        if (errors._general) notify('Lỗi: ' + errors._general)
+        return { success: false, errors }
       }
     } catch (e) {
       notify('Lỗi kết nối: Không thể tạo nhiệm vụ')
+      return { success: false, errors: { _general: 'Lỗi kết nối' } }
     }
   }
 
@@ -296,6 +377,7 @@ export function useProjectWorkspace() {
         body: JSON.stringify({ status })
       })
       if (res.ok) {
+        //refreshActivitiesAndNotifications()
         notify('Đã cập nhật trạng thái nhiệm vụ')
       } else {
         task.status = oldStatus // Hoàn tác nếu API lỗi
@@ -323,6 +405,7 @@ export function useProjectWorkspace() {
         const data = await res.json()
         const idx = tasks.value.findIndex(t => t.id === taskId)
         if (idx >= 0) Object.assign(tasks.value[idx], mapTask(data.task))
+        //refreshActivitiesAndNotifications()
         notify('Đã cập nhật nhiệm vụ')
       }
     } catch (e) {
@@ -345,6 +428,7 @@ export function useProjectWorkspace() {
         if (activeTaskId.value === taskId) {
           activeTaskId.value = null
         }
+        //refreshActivitiesAndNotifications()
         notify('Đã xóa nhiệm vụ')
       }
     } catch (e) {
@@ -357,15 +441,55 @@ export function useProjectWorkspace() {
       const res = await fetch(`${API_URL}/tasks/${taskId}/comments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-        body: JSON.stringify({ text, file_url: fileUrl, file_name: fileName })
+        body: JSON.stringify({ 
+          text, 
+          file_url: fileUrl, 
+          file_name: fileName,
+          user_code: currentUser.value.code
+        })
       })
       if (res.ok) {
         const data = await res.json()
-        comments.value.unshift(data.comment)
+        const c = data.comment
+        comments.value.unshift({
+          ...c,
+          id: c.code,
+          taskId: c.task_code,
+          userId: c.user_code,
+          user: c.user,
+          createdAt: c.created_at
+        })
         notify('Đã gửi bình luận')
+        return { success: true }
+      } else {
+        const errors = await parseValidationErrors(res)
+        if (errors._general) notify('Lỗi: ' + errors._general)
+        return { success: false, errors }
       }
     } catch (e) {
       notify('Lỗi kết nối: Không thể gửi bình luận')
+      return { success: false, errors: { _general: 'Lỗi kết nối' } }
+    }
+  }
+
+  async function loadComments(taskId) {
+    try {
+      const res = await fetch(`${API_URL}/tasks/${taskId}/comments`)
+      if (res.ok) {
+        const raw = await res.json()
+        const mapped = raw.map(c => ({
+          ...c,
+          id: c.code,
+          taskId: c.task_code,
+          userId: c.user_code,
+          user: c.user,
+          createdAt: c.created_at
+        }))
+        comments.value = comments.value.filter(c => c.taskId !== taskId)
+        comments.value.push(...mapped)
+      }
+    } catch (e) {
+      console.error(e)
     }
   }
 
@@ -388,6 +512,62 @@ export function useProjectWorkspace() {
     }
   }
 
+  async function downloadArchive(targetType, targetCode, fileName, format = '.zip') {
+    try {
+      const res = await fetch(`${API_URL}/download-archive`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/zip, application/json'
+        },
+        body: JSON.stringify({ target_type: targetType, target_code: targetCode, file_name: fileName, format: format })
+      })
+
+      if (res.ok) {
+        const blob = await res.blob()
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = fileName.endsWith(format) ? fileName : `${fileName}${format}`
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        window.URL.revokeObjectURL(url)
+        return true
+      } else {
+        const err = await res.json()
+        notify(err.message || 'Lỗi khi tải xuống.')
+        return false
+      }
+    } catch (e) {
+      notify('Lỗi kết nối: Không thể tải xuống')
+      return false
+    }
+  }
+
+  async function downloadSingleFile(url, fileName) {
+    try {
+      // url = '/storage/attachments/...', so we need full URL
+      const fullUrl = url.startsWith('http') ? url : `${API_URL.replace('/api', '')}${url}`
+      const res = await fetch(fullUrl)
+      if (res.ok) {
+        const blob = await res.blob()
+        const blobUrl = window.URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = blobUrl
+        a.download = fileName || 'download'
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        window.URL.revokeObjectURL(blobUrl)
+      } else {
+        notify('Không tìm thấy tệp hoặc lỗi tải xuống.')
+      }
+    } catch (error) {
+      notify('Lỗi khi tải tệp xuống.')
+    }
+  }
+
   // ========== THÀNH VIÊN (Members) - Gọi API ==========
 
   async function addMember(payload) {
@@ -402,12 +582,15 @@ export function useProjectWorkspace() {
         members.value.push(mapMember(data.user))
         addMemberModalOpen.value = false
         notify('Đã thêm thành viên mới')
+        return { success: true }
       } else {
-        const err = await res.json()
-        notify('Lỗi: ' + (err.message || 'Không thể thêm thành viên'))
+        const errors = await parseValidationErrors(res)
+        if (errors._general) notify('Lỗi: ' + errors._general)
+        return { success: false, errors }
       }
     } catch (e) {
       notify('Lỗi kết nối: Không thể thêm thành viên')
+      return { success: false, errors: { _general: 'Lỗi kết nối' } }
     }
   }
 
@@ -541,6 +724,7 @@ export function useProjectWorkspace() {
     groups,
     comments,
     activities,
+    currentUser,
     navigationItems,
     projectStatusMap,
     taskStatusMap,
@@ -575,16 +759,20 @@ export function useProjectWorkspace() {
     findMember,
     findProject,
     formatDate,
+    formatDateTime,
     notify,
     addProject,
     updateProject,
     deleteProject,
+    downloadArchive,
+    downloadSingleFile,
     addTask,
     moveTask,
     toggleTaskComplete,
     updateTask,
     updateTaskStatus,
     deleteTask,
+    loadComments,
     addComment,
     uploadFile,
     

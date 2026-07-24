@@ -14,16 +14,16 @@ class TaskComment extends Model
     public $incrementing = false;
     protected $keyType = 'string';
 
-    protected $fillable = ['task_code', 'member_code', 'text', 'file_url', 'file_name'];
+    protected $fillable = ['task_code', 'user_code', 'text', 'file_url', 'file_name'];
 
     public function getCodePrefix()
     {
         return 'TC';
     }
 
-    public function member()
+    public function user()
     {
-        return $this->belongsTo(Member::class, 'member_code', 'code');
+        return $this->belongsTo(User::class, 'user_code', 'code');
     }
 
     public function task()

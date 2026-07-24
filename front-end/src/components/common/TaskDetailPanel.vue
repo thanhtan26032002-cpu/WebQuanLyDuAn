@@ -2,6 +2,8 @@
 import { computed, ref, watch } from 'vue'
 import { X, CalendarDays, Flag, CheckCircle2, MessageSquare, Paperclip, Send, Clock, User, Download, FileText, Trash2, Edit2, Check, ListChecks, Plus } from '@lucide/vue'
 import { useProjectWorkspace } from '../../composables/useProjectWorkspace'
+import UserAvatar from './UserAvatar.vue'
+import DownloadArchiveModal from '../modals/DownloadArchiveModal.vue'
 
 const props = defineProps({
   task: {
@@ -14,8 +16,11 @@ const {
   tasks, projects, members, comments, 
   projectStatusMap, priorityMap, taskStatusMap, 
   taskModalOpen, activeTaskId, 
-  findMember, findProject, formatDate, updateTask, addComment, uploadFile 
+  findMember, findProject, formatDate, updateTask, loadComments, addComment, uploadFile,
+  downloadArchive, downloadSingleFile
 } = useProjectWorkspace()
+
+const isDownloadModalOpen = ref(false)
 
 const task = computed(() => tasks.value.find(t => t.id === activeTaskId.value))
 const project = computed(() => findProject(task.value?.projectId))
@@ -26,10 +31,11 @@ const newComment = ref('')
 const isEditing = ref(false)
 const editedTask = ref({})
 
-watch(activeTaskId, (newVal) => {
+watch(activeTaskId, async (newVal) => {
   if (newVal) {
     isEditing.value = false
     editedTask.value = JSON.parse(JSON.stringify(task.value))
+    await loadComments(newVal)
   }
 })
 
@@ -62,7 +68,7 @@ const handleFileUpload = async (event) => {
   if (!file) return
 
   isUploading.value = true
-  const res = await uploadFile(file, 'Task', task.value.id)
+  const res = await uploadFile(file, 'TaskComment', task.value.id)
   if (res && res.attachment) {
     attachedFile.value = res.attachment
   } else {
@@ -76,16 +82,25 @@ const removeAttachment = () => {
   attachedFile.value = null
 }
 
-const submitComment = () => {
+const handleDownloadArchive = async (payload) => {
+  await downloadArchive(payload.targetType, payload.targetCode, payload.fileName, payload.format)
+  isDownloadModalOpen.value = false
+}
+
+const submitComment = async () => {
   if (!newComment.value.trim() && !attachedFile.value) return
   
   const fileUrl = attachedFile.value?.file_path || null
   const fileName = attachedFile.value?.file_name || null
 
-  addComment(task.value.id, newComment.value, fileUrl, fileName)
+  const res = await addComment(task.value.id, newComment.value, fileUrl, fileName)
   
-  newComment.value = ''
-  attachedFile.value = null
+  if (res && res.success === false && res.errors) {
+    alert(res.errors._general || 'Vui lòng kiểm tra lại dữ liệu.')
+  } else if (res && res.success) {
+    newComment.value = ''
+    attachedFile.value = null
+  }
 }
 
 const timeAgo = (dateStr) => {
@@ -170,15 +185,23 @@ const addWorkLog = () => {
 }
 
 // Temporary file selection for work log
-const onWorkLogFileSelect = (e) => {
+const isWorkLogUploading = ref(false)
+const onWorkLogFileSelect = async (e) => {
   if (e.target.files && e.target.files.length > 0) {
-    const files = Array.from(e.target.files).map(f => ({
-      name: f.name,
-      size: (f.size / 1024 / 1024).toFixed(2) + ' MB',
-      uploadedBy: 1,
-      uploadedAt: new Date().toISOString()
-    }))
-    newWorkLogFiles.value.push(...files)
+    isWorkLogUploading.value = true
+    for (const file of Array.from(e.target.files)) {
+      const res = await uploadFile(file, 'Task', task.value.id)
+      if (res && res.attachment) {
+        newWorkLogFiles.value.push({
+          name: res.attachment.file_name,
+          size: (res.attachment.size_bytes / 1024 / 1024).toFixed(2) + ' MB',
+          uploadedBy: res.attachment.uploaded_by,
+          uploadedAt: res.attachment.created_at,
+          url: res.attachment.file_path
+        })
+      }
+    }
+    isWorkLogUploading.value = false
   }
 }
 const removeWorkLogFile = (idx) => {
@@ -192,17 +215,26 @@ const openTaskFileUpload = () => {
     taskFileInput.value.click()
   }
 }
-const onTaskFileSelect = (e) => {
+const isTaskFileUploading = ref(false)
+const onTaskFileSelect = async (e) => {
   if (e.target.files && e.target.files.length > 0) {
-    const files = Array.from(e.target.files).map(f => ({
-      name: f.name,
-      size: (f.size / 1024 / 1024).toFixed(2) + ' MB',
-      uploadedBy: 1,
-      uploadedAt: new Date().toISOString()
-    }))
-    if (!task.value.files) task.value.files = []
-    task.value.files.unshift(...files)
+    isTaskFileUploading.value = true
+    for (const file of Array.from(e.target.files)) {
+      const res = await uploadFile(file, 'Task', task.value.id)
+      if (res && res.attachment) {
+        if (!task.value.files) task.value.files = []
+        task.value.files.unshift({
+          name: res.attachment.file_name,
+          size: (res.attachment.size_bytes / 1024 / 1024).toFixed(2) + ' MB',
+          uploadedBy: res.attachment.uploaded_by,
+          uploadedAt: res.attachment.created_at,
+          url: res.attachment.file_path
+        })
+      }
+    }
+    isTaskFileUploading.value = false
   }
+  if (taskFileInput.value) taskFileInput.value.value = ''
 }
 
 const formatDateTime = (isoStr) => {
@@ -404,6 +436,7 @@ const formatDateTime = (isoStr) => {
             <div class="bg-white border border-slate-200 rounded-lg p-3">
               <label class="text-xs font-semibold text-slate-600 block mb-2">Tệp minh chứng (Tùy chọn):</label>
               <input type="file" multiple class="block w-full text-sm text-slate-500 file:mr-4 file:py-1.5 file:px-3 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-violet-50 file:text-violet-700 hover:file:bg-violet-100 transition-colors" @change="onWorkLogFileSelect" />
+              <div v-if="isWorkLogUploading" class="text-xs text-violet-600 mt-2 italic">Đang tải lên...</div>
               <div v-if="newWorkLogFiles.length" class="mt-2 space-y-1">
                 <div v-for="(file, idx) in newWorkLogFiles" :key="idx" class="flex items-center justify-between bg-slate-50 rounded px-2 py-1">
                   <span class="text-xs text-slate-600 truncate mr-2">{{ file.name }}</span>
@@ -518,9 +551,14 @@ const formatDateTime = (isoStr) => {
             <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
               <Paperclip class="w-4 h-4 text-slate-400" /> Tệp đính kèm
             </h3>
-            <button @click="openTaskFileUpload" class="text-xs font-medium text-violet-600 hover:text-violet-700 bg-violet-50 hover:bg-violet-100 px-2 py-1 rounded transition-colors">
-              + Tải lên
-            </button>
+            <div class="flex gap-2">
+              <button @click="isDownloadModalOpen = true" :disabled="!task.files?.length" class="text-xs font-medium text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded transition-colors disabled:opacity-50">
+                Tải xuống tất cả
+              </button>
+              <button @click="openTaskFileUpload" :disabled="isTaskFileUploading" class="text-xs font-medium text-violet-600 hover:text-violet-700 bg-violet-50 hover:bg-violet-100 px-2 py-1 rounded transition-colors disabled:opacity-50">
+                {{ isTaskFileUploading ? 'Đang tải...' : '+ Tải lên' }}
+              </button>
+            </div>
             <input type="file" multiple ref="taskFileInput" @change="onTaskFileSelect" class="hidden" />
           </div>
           
@@ -536,7 +574,7 @@ const formatDateTime = (isoStr) => {
                 </div>
               </div>
               <div class="flex items-center opacity-0 group-hover:opacity-100 transition-opacity gap-1">
-                <button class="p-1.5 text-slate-400 hover:text-violet-600 hover:bg-violet-50 rounded-lg"><Download class="w-4 h-4" /></button>
+                <button @click.prevent="downloadSingleFile(file.url || file.file_path, file.name)" title="Tải xuống" class="p-1.5 text-slate-400 hover:text-violet-600 hover:bg-violet-50 rounded-lg"><Download class="w-4 h-4" /></button>
                 <button class="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg"><Trash2 class="w-4 h-4" /></button>
               </div>
             </div>
@@ -595,13 +633,13 @@ const formatDateTime = (isoStr) => {
           <!-- Comments list -->
           <div class="space-y-6">
             <div v-for="comment in taskComments" :key="comment.id" class="flex gap-3">
-              <div :class="['w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0 mt-0.5 shadow-sm', `bg-${findMember(comment.memberId).color}-500`]">
-                {{ findMember(comment.memberId).initials }}
+              <div :class="['w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0 mt-0.5 shadow-sm bg-violet-500']">
+                {{ comment.user?.name ? comment.user.name.substring(0, 2).toUpperCase() : '??' }}
               </div>
               <div class="flex-1">
                 <div class="bg-slate-50 border border-slate-100 rounded-2xl rounded-tl-none p-3 shadow-sm inline-block max-w-full">
                   <div class="flex items-center gap-2 mb-1">
-                    <span class="text-sm font-bold text-slate-800">{{ findMember(comment.memberId).name }}</span>
+                    <span class="text-sm font-bold text-slate-800">{{ comment.user?.name || 'Người dùng' }}</span>
                     <span class="text-xs text-slate-400 font-medium">{{ timeAgo(comment.createdAt) }}</span>
                   </div>
                   <p v-if="comment.text" class="text-sm text-slate-600 whitespace-pre-wrap leading-relaxed">{{ comment.text }}</p>
@@ -614,7 +652,7 @@ const formatDateTime = (isoStr) => {
                     <div class="flex-1 min-w-0 pr-4">
                       <p class="text-sm font-medium text-slate-700 truncate max-w-[200px]" :title="comment.file_name">{{ comment.file_name || 'File đính kèm' }}</p>
                     </div>
-                    <a :href="comment.file_url" target="_blank" download class="p-1.5 text-slate-400 hover:text-violet-600 hover:bg-violet-50 rounded transition-colors shrink-0">
+                    <a :href="'http://localhost:8000' + comment.file_url" target="_blank" download class="p-1.5 text-slate-400 hover:text-violet-600 hover:bg-violet-50 rounded transition-colors shrink-0">
                       <Download class="w-4 h-4" />
                     </a>
                   </div>
@@ -628,6 +666,14 @@ const formatDateTime = (isoStr) => {
       </div>
     </div>
   </div>
+
+  <DownloadArchiveModal
+    :is-open="isDownloadModalOpen"
+    target-type="Task"
+    :target-code="task?.id"
+    @close="isDownloadModalOpen = false"
+    @download="handleDownloadArchive"
+  />
 </template>
 
 <style scoped>

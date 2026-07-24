@@ -37,4 +37,9 @@ class Task extends Model
     {
         return $this->hasMany(TaskComment::class, 'task_code', 'code');
     }
+
+    public function attachments()
+    {
+        return $this->hasMany(Attachment::class, 'target_code', 'code')->where('target_type', 'Task');
+    }
 }

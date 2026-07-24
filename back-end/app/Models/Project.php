@@ -33,4 +33,9 @@ class Project extends Model
     {
         return $this->hasMany(Task::class, 'project_code', 'code');
     }
+
+    public function attachments()
+    {
+        return $this->hasMany(Attachment::class, 'target_code', 'code')->where('target_type', 'Project');
+    }
 }

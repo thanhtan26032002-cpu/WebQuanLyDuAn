@@ -27,18 +27,31 @@ const colors = [
   { id: 'sky', bg: 'bg-sky-500' },
 ]
 
+const errors = ref({})
+
 const close = () => {
   addMemberModalOpen.value = false
   // reset
   formData.value = {
     name: '', email: '', phone: '', role: '', department: '', groupId: null, bio: '', color: 'blue'
   }
+  errors.value = {}
 }
 
-const submit = () => {
-  if (!formData.value.name || !formData.value.email) return
-  addMember(formData.value)
-  close()
+const submit = async () => {
+  errors.value = {}
+  if (!formData.value.name || !formData.value.email) {
+    if (!formData.value.name) errors.value.name = 'Vui lòng nhập họ tên.'
+    if (!formData.value.email) errors.value.email = 'Vui lòng nhập email.'
+    return
+  }
+  
+  const res = await addMember(formData.value)
+  if (res && res.success === false && res.errors) {
+    errors.value = res.errors
+  } else if (res && res.success) {
+    close()
+  }
 }
 </script>
 
@@ -75,15 +88,19 @@ const submit = () => {
             <div>
               <label class="block text-sm font-semibold text-slate-700 mb-1">Họ tên *</label>
               <div class="relative">
-                <input v-model="formData.name" required type="text" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500" placeholder="Nguyễn Văn A" />
+                <input v-model="formData.name" required type="text" :class="['w-full bg-slate-50 border rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-1 transition-all', errors.name ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : 'border-slate-200 focus:border-violet-500 focus:ring-violet-500']" placeholder="Nguyễn Văn A" />
               </div>
+              <p v-if="errors.name" class="text-xs font-medium text-red-500 mt-1">{{ errors.name }}</p>
             </div>
             <div>
               <label class="block text-sm font-semibold text-slate-700 mb-1">Email *</label>
               <div class="relative">
-                <Mail class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <input v-model="formData.email" required type="email" class="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-4 py-2 text-sm focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500" placeholder="email@company.com" />
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Mail class="h-4 w-4 text-slate-400" />
+                </div>
+                <input v-model="formData.email" required type="email" :class="['w-full bg-slate-50 border rounded-xl pl-9 pr-4 py-2 text-sm focus:outline-none focus:ring-1 transition-all', errors.email ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : 'border-slate-200 focus:border-violet-500 focus:ring-violet-500']" placeholder="nguyenvana@example.com" />
               </div>
+              <p v-if="errors.email" class="text-xs font-medium text-red-500 mt-1">{{ errors.email }}</p>
             </div>
           </div>
           
@@ -91,9 +108,12 @@ const submit = () => {
             <div>
               <label class="block text-sm font-semibold text-slate-700 mb-1">Số điện thoại</label>
               <div class="relative">
-                <Phone class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <input v-model="formData.phone" type="tel" class="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-4 py-2 text-sm focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500" placeholder="09xx xxx xxx" />
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Phone class="h-4 w-4 text-slate-400" />
+                </div>
+                <input v-model="formData.phone" type="text" :class="['w-full bg-slate-50 border rounded-xl pl-9 pr-4 py-2 text-sm focus:outline-none focus:ring-1 transition-all', errors.phone ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : 'border-slate-200 focus:border-violet-500 focus:ring-violet-500']" placeholder="0901234567" />
               </div>
+              <p v-if="errors.phone" class="text-xs font-medium text-red-500 mt-1">{{ errors.phone }}</p>
             </div>
             <div>
               <label class="block text-sm font-semibold text-slate-700 mb-1">Vị trí (Role)</label>

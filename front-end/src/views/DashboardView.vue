@@ -226,7 +226,7 @@ const timeAgo = (dateStr) => {
           </div>
           
           <div class="p-5 flex-1 overflow-y-auto custom-scrollbar">
-            <div class="relative border-l border-slate-200 ml-4 space-y-6 pb-4">
+            <div v-if="false" class="relative border-l border-slate-200 ml-4 space-y-6 pb-4">
               <div v-for="activity in activities.slice(0, 8)" :key="activity.id" class="relative pl-6">
                 <!-- Timeline dot -->
                 <div class="absolute -left-[17px] top-1">
@@ -245,6 +245,9 @@ const timeAgo = (dateStr) => {
                   <p class="text-[10px] font-medium text-slate-400 mt-2 uppercase tracking-wide">{{ timeAgo(activity.createdAt) }}</p>
                 </div>
               </div>
+            </div>
+            <div v-else class="text-center py-8">
+              <p class="text-slate-500 text-sm">Chưa có hoạt động nào (hoặc đang ẩn).</p>
             </div>
           </div>
         </div>

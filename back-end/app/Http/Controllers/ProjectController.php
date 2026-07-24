@@ -12,9 +12,12 @@ class ProjectController extends Controller
     public function index()
     {
         $projects = Project::withCount('tasks')
-            ->with(['members' => function($q) {
-                $q->select('members.code', 'members.name', 'members.avatar');
-            }])
+            ->with([
+                'members' => function($q) {
+                    $q->select('members.code', 'members.name', 'members.avatar');
+                },
+                'attachments'
+            ])
             ->orderBy('created_at', 'desc')
             ->get();
 
@@ -38,18 +41,18 @@ class ProjectController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
-            'status' => 'nullable|string',
+            'status' => 'nullable|string|in:planning,active,on_hold,completed',
             'start_date' => 'nullable|date',
-            'due_date' => 'nullable|date',
+            'due_date' => 'nullable|date|after_or_equal:today',
             'progress' => 'nullable|integer|min:0|max:100',
         ]);
 
-        $validated['created_by'] = 'US0001';
+        $validated['created_by'] = $request->input('user_code', 'US0001');
 
         $project = Project::create($validated);
 
         ActivityService::log(
-            'US0001',
+            $validated['created_by'],
             'tạo dự án',
             'Project',
             $project->code,
@@ -70,7 +73,7 @@ class ProjectController extends Controller
         $validated = $request->validate([
             'name' => 'nullable|string|max:255',
             'description' => 'nullable|string',
-            'status' => 'nullable|string',
+            'status' => 'nullable|string|in:planning,active,on_hold,completed',
             'start_date' => 'nullable|date',
             'due_date' => 'nullable|date',
             'progress' => 'nullable|integer|min:0|max:100',
@@ -78,8 +81,9 @@ class ProjectController extends Controller
 
         $project->update($validated);
 
+        $userCode = $request->input('user_code', 'US0001');
         ActivityService::log(
-            'US0001',
+            $userCode,
             'cập nhật dự án',
             'Project',
             $project->code,
@@ -93,7 +97,7 @@ class ProjectController extends Controller
     }
 
     // Xóa dự án
-    public function destroy($code)
+    public function destroy(Request $request, $code)
     {
         $project = Project::findOrFail($code);
         $projectName = $project->name;
@@ -101,8 +105,9 @@ class ProjectController extends Controller
 
         $project->delete();
 
+        $userCode = $request->input('user_code', 'US0001');
         ActivityService::log(
-            'US0001',
+            $userCode,
             'xóa dự án',
             'Project',
             $projectCode,

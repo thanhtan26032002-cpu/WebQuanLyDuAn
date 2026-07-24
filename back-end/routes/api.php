@@ -10,6 +10,7 @@ use App\Http\Controllers\FileController;
 use App\Http\Controllers\ActivityController;
 use App\Http\Controllers\MemberController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\DownloadController;
 
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
@@ -41,6 +42,7 @@ Route::post('/members', [MemberController::class, 'store']);
 
 // Upload File & Activities & Notifications
 Route::post('/upload', [FileController::class, 'upload']);
+Route::post('/download-archive', [DownloadController::class, 'downloadArchive']);
 Route::get('/activities', [ActivityController::class, 'index']);
 
 Route::get('/notifications', [NotificationController::class, 'index']);

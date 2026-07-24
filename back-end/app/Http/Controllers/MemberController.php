@@ -20,13 +20,19 @@ class MemberController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:members',
-            'role' => 'nullable|string'
+            'role' => 'nullable|string|max:100',
+            'phone' => 'nullable|string|regex:/^[0-9\+\-\(\)\s]{7,20}$/',
+            'department' => 'nullable|string|max:255',
+            'bio' => 'nullable|string|max:1000',
         ]);
 
         $member = new Member();
         $member->name = $validated['name'];
         $member->email = $validated['email'];
         $member->role = $validated['role'] ?? 'member';
+        $member->phone = $validated['phone'] ?? null;
+        $member->department = $validated['department'] ?? null;
+        $member->bio = $validated['bio'] ?? null;
         $member->join_date = now()->toDateString();
         $member->save();
 

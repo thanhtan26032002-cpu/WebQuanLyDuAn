@@ -3,7 +3,7 @@ import { ref, watch, onMounted, onUnmounted } from 'vue'
 import { X, UploadCloud, File, AlertCircle } from '@lucide/vue'
 import { useProjectWorkspace } from '../../composables/useProjectWorkspace'
 
-const { fileUploadModalOpen, editingProjectId, uploadFilesToProject } = useProjectWorkspace()
+const { fileUploadModalOpen, editingProjectId, uploadFilesToProject, uploadFile } = useProjectWorkspace()
 
 const isDragging = ref(false)
 const selectedFiles = ref([])
@@ -65,34 +65,38 @@ const removeSelectedFile = (index) => {
   selectedFiles.value.splice(index, 1)
 }
 
-const submit = () => {
+const submit = async () => {
   if (selectedFiles.value.length === 0 || !editingProjectId.value) return
   
   isUploading.value = true
+  uploadProgress.value = 0
   
-  // Simulate upload progress
-  let progress = 0
-  const interval = setInterval(() => {
-    progress += Math.random() * 30
-    if (progress >= 100) {
-      progress = 100
-      uploadProgress.value = 100
-      clearInterval(interval)
-      
-      // Upload finished
-      setTimeout(() => {
-        uploadFilesToProject(editingProjectId.value, selectedFiles.value.map(f => ({
-          name: f.name,
-          size: f.size,
-          uploadedAt: f.uploadedAt,
-          uploadedBy: 1 // current user
-        })))
-        fileUploadModalOpen.value = false
-      }, 500)
-    } else {
-      uploadProgress.value = progress
+  const totalFiles = selectedFiles.value.length
+  let uploadedCount = 0
+  const uploadedFiles = []
+  
+  for (const file of selectedFiles.value) {
+    const res = await uploadFile(file.fileObj, 'Project', editingProjectId.value)
+    if (res && res.attachment) {
+      uploadedFiles.push({
+        code: res.attachment.code,
+        name: res.attachment.file_name,
+        size: formatBytes(res.attachment.size_bytes),
+        uploadedAt: res.attachment.created_at || new Date().toISOString(),
+        uploadedBy: res.attachment.uploaded_by,
+        url: res.attachment.file_path
+      })
     }
-  }, 300)
+    uploadedCount++
+    uploadProgress.value = (uploadedCount / totalFiles) * 100
+  }
+  
+  if (uploadedFiles.length > 0) {
+    uploadFilesToProject(editingProjectId.value, uploadedFiles)
+  }
+  
+  isUploading.value = false
+  fileUploadModalOpen.value = false
 }
 
 // Close on escape

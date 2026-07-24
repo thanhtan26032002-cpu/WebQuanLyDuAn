@@ -2,36 +2,38 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
-//use Database\Factories\UserFactory;
-use Illuminate\Database\Eloquent\Attributes\Fillable;
-use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use App\Traits\GeneratesCode;
 
-#[Fillable(['name', 'email', 'password', 'avatar', 'role'])]
-#[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
-    /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable;
+    use HasFactory, Notifiable, GeneratesCode;
+
+    protected $primaryKey = 'code';
+    public $incrementing = false;
+    protected $keyType = 'string';
+
+    protected $fillable = ['name', 'email', 'password', 'avatar', 'role'];
+
+    protected $hidden = ['password', 'remember_token'];
+
+    public function getCodePrefix()
+    {
+        return 'US';
+    }
 
     public function projects()
     {
-        return $this->hasMany(Project::class, 'created_by');
+        return $this->hasMany(Project::class, 'created_by', 'code');
     }
 
     public function assignedTasks()
     {
-        return $this->hasMany(Task::class, 'assignee_id');
+        return $this->hasMany(Task::class, 'assignee_code', 'code');
     }
 
-    /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
-     */
     protected function casts(): array
     {
         return [

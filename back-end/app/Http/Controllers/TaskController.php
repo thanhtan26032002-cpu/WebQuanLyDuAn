@@ -12,7 +12,7 @@ class TaskController extends Controller
     // Lấy danh sách tasks
     public function index()
     {
-        $tasks = Task::with('assignee:code,name,avatar')->get();
+        $tasks = Task::with(['assignee:code,name,avatar', 'attachments'])->get();
         return response()->json($tasks);
     }
 
@@ -20,21 +20,22 @@ class TaskController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'project_code' => 'required|exists:projects,code',
+            'project_code' => 'nullable|exists:projects,code',
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
-            'status' => 'nullable|string',
-            'priority' => 'nullable|string',
-            'due_date' => 'nullable|date',
+            'status' => 'nullable|string|in:todo,in_progress,done',
+            'priority' => 'nullable|string|in:low,medium,high',
+            'due_date' => 'nullable|date|after_or_equal:today',
             'progress' => 'nullable|integer|min:0|max:100',
             'assignee_code' => 'nullable|exists:members,code',
         ]);
 
         $task = Task::create($validated);
-        $task->load('assignee:code,name,avatar');
+        $task->load(['assignee:code,name,avatar', 'attachments']);
 
+        $userCode = $request->input('user_code', 'US0001');
         ActivityService::log(
-            'US0001', 
+            $userCode, 
             'tạo nhiệm vụ', 
             'Task', 
             $task->code, 
@@ -43,7 +44,7 @@ class TaskController extends Controller
 
         if ($task->assignee_code) {
             ActivityService::notify(
-                'US0001', 
+                $userCode, 
                 'Nhiệm vụ mới', 
                 "Bạn đã được phân công nhiệm vụ: {$task->title}",
                 'info'
@@ -64,18 +65,19 @@ class TaskController extends Controller
         $validated = $request->validate([
             'title' => 'nullable|string|max:255',
             'description' => 'nullable|string',
-            'status' => 'nullable|string',
-            'priority' => 'nullable|string',
+            'status' => 'nullable|string|in:todo,in_progress,done',
+            'priority' => 'nullable|string|in:low,medium,high',
             'due_date' => 'nullable|date',
             'progress' => 'nullable|integer|min:0|max:100',
             'assignee_code' => 'nullable|exists:members,code',
         ]);
 
         $task->update($validated);
-        $task->load('assignee:code,name,avatar');
+        $task->load(['assignee:code,name,avatar', 'attachments']);
 
+        $userCode = $request->input('user_code', 'US0001');
         ActivityService::log(
-            'US0001', 
+            $userCode, 
             'cập nhật nhiệm vụ', 
             'Task', 
             $task->code, 
@@ -92,14 +94,15 @@ class TaskController extends Controller
     public function updateStatus(Request $request, $code)
     {
         $validated = $request->validate([
-            'status' => 'required|string'
+            'status' => 'required|string|in:todo,in_progress,done'
         ]);
 
         $task = Task::findOrFail($code);
         $task->update(['status' => $validated['status']]);
 
+        $userCode = $request->input('user_code', 'US0001');
         ActivityService::log(
-            'US0001', 
+            $userCode, 
             'chuyển trạng thái', 
             'Task', 
             $task->code, 
@@ -113,7 +116,7 @@ class TaskController extends Controller
     }
 
     // Xóa Task
-    public function destroy($code)
+    public function destroy(Request $request, $code)
     {
         $task = Task::findOrFail($code);
         $taskTitle = $task->title;
@@ -121,8 +124,9 @@ class TaskController extends Controller
         
         $task->delete();
 
+        $userCode = $request->input('user_code', 'US0001');
         ActivityService::log(
-            'US0001', 
+            $userCode, 
             'xóa nhiệm vụ', 
             'Task', 
             $taskCode, 
@@ -138,7 +142,7 @@ class TaskController extends Controller
     public function comments($taskCode)
     {
         $comments = TaskComment::where('task_code', $taskCode)
-            ->with('member:code,name,avatar')
+            ->with('user:code,name,avatar')
             ->orderBy('created_at', 'desc')
             ->get();
             
@@ -149,24 +153,35 @@ class TaskController extends Controller
     public function storeComment(Request $request, $taskCode)
     {
         $validated = $request->validate([
-            'text' => 'required|string',
-            'member_code' => 'nullable|exists:members,code',
+            'text' => 'nullable|string',
+            'user_code' => 'nullable|exists:users,code',
             'file_url' => 'nullable|string',
             'file_name' => 'nullable|string',
         ]);
 
+        // Đảm bảo ít nhất có text hoặc file
+        $text = $validated['text'] ?? '';
+        $fileUrl = $validated['file_url'] ?? null;
+        if (empty(trim($text)) && empty($fileUrl)) {
+            return response()->json([
+                'message' => 'Vui lòng nhập nội dung hoặc đính kèm tệp.'
+            ], 422);
+        }
+
+        $userCode = $validated['user_code'] ?? 'US0001';
+
         $comment = TaskComment::create([
             'task_code' => $taskCode,
-            'member_code' => $validated['member_code'] ?? 'MB0001',
-            'text' => $validated['text'],
-            'file_url' => $validated['file_url'] ?? null,
+            'user_code' => $userCode,
+            'text' => $text,
+            'file_url' => $fileUrl,
             'file_name' => $validated['file_name'] ?? null,
         ]);
 
-        $comment->load('member:code,name,avatar');
+        $comment->load('user:code,name,avatar');
 
         ActivityService::log(
-            'US0001', 
+            $userCode, 
             'bình luận', 
             'Task', 
             $taskCode, 

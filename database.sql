@@ -71,7 +71,7 @@ CREATE TABLE IF NOT EXISTS `project_members` (
 
 CREATE TABLE IF NOT EXISTS `tasks` (
   `code` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `project_code` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `project_code` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `title` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   `description` text COLLATE utf8mb4_unicode_ci,
   `status` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'todo',
@@ -102,7 +102,7 @@ CREATE TABLE IF NOT EXISTS `activities` (
 CREATE TABLE IF NOT EXISTS `task_comments` (
   `code` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
   `task_code` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `member_code` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `user_code` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
   `text` text COLLATE utf8mb4_unicode_ci NOT NULL,
   `file_url` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `file_name` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
@@ -110,7 +110,7 @@ CREATE TABLE IF NOT EXISTS `task_comments` (
   `updated_at` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`code`),
   FOREIGN KEY (`task_code`) REFERENCES `tasks` (`code`) ON DELETE CASCADE,
-  FOREIGN KEY (`member_code`) REFERENCES `members` (`code`) ON DELETE CASCADE
+  FOREIGN KEY (`user_code`) REFERENCES `users` (`code`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `attachments` (

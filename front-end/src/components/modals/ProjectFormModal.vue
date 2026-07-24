@@ -1,5 +1,5 @@
 <script setup>
-import { reactive, onMounted, onUnmounted } from 'vue'
+import { reactive, ref, onMounted, onUnmounted } from 'vue'
 import { X, FolderKanban, Plus, Check } from '@lucide/vue'
 import { useProjectWorkspace } from '../../composables/useProjectWorkspace'
 
@@ -25,16 +25,31 @@ const colors = [
   { id: 'orange', bg: 'bg-orange-500', ring: 'ring-orange-500' }
 ]
 
+const errors = ref({})
+
 function toggleMember(memberId) {
   const index = form.memberIds.indexOf(memberId)
   if (index >= 0) form.memberIds.splice(index, 1)
   else form.memberIds.push(memberId)
 }
 
-function submit() {
-  if (!form.name.trim()) return
-  addProject({ ...form, name: form.name.trim(), memberIds: [...form.memberIds] })
-  projectModalOpen.value = false
+async function submit() {
+  errors.value = {}
+  if (!form.name.trim()) {
+    errors.value.name = 'Vui lòng nhập tên dự án.'
+    return
+  }
+  
+  const res = await addProject({ ...form, name: form.name.trim(), memberIds: [...form.memberIds] })
+  if (res && res.success === false && res.errors) {
+    errors.value = res.errors
+  } else if (res && res.success) {
+    // modal is closed in useProjectWorkspace
+    form.name = ''
+    form.description = ''
+    form.dueDate = ''
+    form.progress = 0
+  }
 }
 
 // Close on escape
@@ -74,12 +89,14 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
         <div class="p-6 overflow-y-auto space-y-5 custom-scrollbar flex-1">
           <div class="space-y-2">
             <label class="block text-sm font-semibold text-slate-700">Tên dự án *</label>
-            <input v-model="form.name" required autofocus placeholder="Ví dụ: Thiết kế lại website" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 focus:bg-white focus:border-violet-300 focus:ring-4 focus:ring-violet-500/10 transition-all outline-none" />
+            <input v-model="form.name" required autofocus placeholder="Ví dụ: Thiết kế lại website" :class="['w-full bg-slate-50 border rounded-xl px-4 py-2.5 text-slate-900 focus:bg-white focus:ring-4 transition-all outline-none', errors.name ? 'border-red-300 focus:border-red-300 focus:ring-red-500/10' : 'border-slate-200 focus:border-violet-300 focus:ring-violet-500/10']" />
+            <p v-if="errors.name" class="text-xs font-medium text-red-500">{{ errors.name }}</p>
           </div>
 
           <div class="space-y-2">
             <label class="block text-sm font-semibold text-slate-700">Mô tả</label>
             <textarea v-model="form.description" rows="3" placeholder="Mô tả ngắn về dự án..." class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 focus:bg-white focus:border-violet-300 focus:ring-4 focus:ring-violet-500/10 transition-all outline-none resize-none"></textarea>
+            <p v-if="errors.description" class="text-xs font-medium text-red-500">{{ errors.description }}</p>
           </div>
 
           <div class="space-y-3">
@@ -107,16 +124,18 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
             <div class="space-y-2">
               <label class="block text-sm font-semibold text-slate-700">Trạng thái</label>
-              <select v-model="form.status" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 focus:bg-white focus:border-violet-300 focus:ring-4 focus:ring-violet-500/10 transition-all outline-none appearance-none cursor-pointer">
+              <select v-model="form.status" :class="['w-full bg-slate-50 border rounded-xl px-4 py-2.5 text-slate-900 focus:bg-white focus:ring-4 transition-all outline-none appearance-none cursor-pointer', errors.status ? 'border-red-300 focus:border-red-300 focus:ring-red-500/10' : 'border-slate-200 focus:border-violet-300 focus:ring-violet-500/10']">
                 <option value="planning">Lập kế hoạch</option>
                 <option value="active">Đang triển khai</option>
                 <option value="on_hold">Tạm dừng</option>
                 <option value="completed">Hoàn thành</option>
               </select>
+              <p v-if="errors.status" class="text-xs font-medium text-red-500">{{ errors.status }}</p>
             </div>
             <div class="space-y-2">
               <label class="block text-sm font-semibold text-slate-700">Hạn chót</label>
-              <input v-model="form.dueDate" type="date" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 focus:bg-white focus:border-violet-300 focus:ring-4 focus:ring-violet-500/10 transition-all outline-none cursor-pointer" />
+              <input v-model="form.dueDate" type="date" :class="['w-full bg-slate-50 border rounded-xl px-4 py-2.5 text-slate-900 focus:bg-white focus:ring-4 transition-all outline-none cursor-pointer', errors.due_date ? 'border-red-300 focus:border-red-300 focus:ring-red-500/10' : 'border-slate-200 focus:border-violet-300 focus:ring-violet-500/10']" />
+              <p v-if="errors.due_date" class="text-xs font-medium text-red-500">{{ errors.due_date }}</p>
             </div>
           </div>
 

@@ -7,12 +7,14 @@ import { useProjectWorkspace } from '../composables/useProjectWorkspace'
 import UserAvatar from '../components/common/UserAvatar.vue'
 import TaskCard from '../components/common/TaskCard.vue'
 import { ref } from 'vue'
+import DownloadArchiveModal from '../components/modals/DownloadArchiveModal.vue'
 
 const route = useRoute()
 const router = useRouter()
-const { projects, tasks, members, activities, projectStatusMap, priorityMap, taskStatusMap, findMember, formatDate, taskModalOpen, projectSettingsModalOpen, fileUploadModalOpen, manageMembersModalOpen, editingProjectId, removeFileFromProject, removeMemberFromProject, moveTask, activeTaskId } = useProjectWorkspace()
+const { projects, tasks, members, activities, projectStatusMap, priorityMap, taskStatusMap, findMember, formatDate, taskModalOpen, projectSettingsModalOpen, fileUploadModalOpen, manageMembersModalOpen, editingProjectId, removeFileFromProject, removeMemberFromProject, moveTask, activeTaskId, downloadArchive, downloadSingleFile } = useProjectWorkspace()
 
 const projectId = computed(() => route.params.id)
+const isDownloadModalOpen = ref(false)
 const project = computed(() => projects.value.find(p => p.id === projectId.value))
 const projectTasks = computed(() => tasks.value.filter(t => t.projectId === projectId.value))
 
@@ -46,6 +48,11 @@ const handleEdit = () => {
 const openFileUpload = () => {
   editingProjectId.value = project.value.id
   fileUploadModalOpen.value = true
+}
+
+const handleDownloadArchive = async (payload) => {
+  await downloadArchive(payload.targetType, payload.targetCode, payload.fileName, payload.format)
+  isDownloadModalOpen.value = false
 }
 
 const openManageMembers = () => {
@@ -237,9 +244,14 @@ const projectStatusClasses = {
       <div class="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 flex flex-col">
         <div class="flex items-center justify-between mb-4">
           <h2 class="text-lg font-bold text-slate-900">Tệp đính kèm</h2>
-          <button @click="openFileUpload" class="text-sm font-medium text-violet-600 hover:text-violet-700 bg-violet-50 hover:bg-violet-100 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5">
-            <Plus class="w-4 h-4" /> Tải lên
-          </button>
+          <div class="flex gap-2">
+            <button @click="isDownloadModalOpen = true" :disabled="!projectFiles.length" class="text-sm font-medium text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50">
+              Tải xuống tất cả
+            </button>
+            <button @click="openFileUpload" class="text-sm font-medium text-violet-600 hover:text-violet-700 bg-violet-50 hover:bg-violet-100 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5">
+              <Plus class="w-4 h-4" /> Tải lên
+            </button>
+          </div>
         </div>
         
         <div v-if="projectFiles.length > 0" class="space-y-3 flex-1 overflow-y-auto custom-scrollbar pr-2 max-h-[300px]">
@@ -253,9 +265,14 @@ const projectStatusClasses = {
                 <p class="text-[10px] text-slate-500 uppercase tracking-wide font-medium">{{ file.size }} • {{ formatDate(file.uploadedAt) }}</p>
               </div>
             </div>
-            <button @click="confirmRemoveFile(idx)" title="Xóa tệp" class="text-slate-300 hover:text-rose-500 p-2 rounded-lg hover:bg-rose-50 transition-colors opacity-0 group-hover:opacity-100">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
-            </button>
+            <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              <button @click.prevent="downloadSingleFile(file.url, file.name)" title="Tải xuống" class="text-slate-300 hover:text-violet-600 p-2 rounded-lg hover:bg-violet-50 transition-colors flex items-center justify-center">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+              </button>
+              <button @click="confirmRemoveFile(idx)" title="Xóa tệp" class="text-slate-300 hover:text-rose-500 p-2 rounded-lg hover:bg-rose-50 transition-colors flex items-center justify-center">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
+              </button>
+            </div>
           </div>
         </div>
         <div v-else class="flex flex-col items-center justify-center py-8 text-center flex-1 bg-slate-50 rounded-xl border border-dashed border-slate-200 cursor-pointer hover:bg-slate-100 transition-colors" @click="openFileUpload">
@@ -269,7 +286,7 @@ const projectStatusClasses = {
       <div class="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 flex flex-col md:col-span-2 lg:col-span-3">
         <h2 class="text-lg font-bold text-slate-900 mb-6">Nhật ký hoạt động</h2>
         
-        <div v-if="projectActivities.length > 0" class="relative">
+        <div v-if="false" class="relative">
           <div class="absolute top-2 bottom-2 left-[19px] w-px bg-slate-200"></div>
           <div class="space-y-6 relative">
             <div v-for="activity in projectActivities" :key="activity.id" class="flex gap-4">
@@ -431,5 +448,12 @@ const projectStatusClasses = {
       </div>
     </div>
   </div>
+  <DownloadArchiveModal
+    :is-open="isDownloadModalOpen"
+    target-type="Project"
+    :target-code="project?.id"
+    @close="isDownloadModalOpen = false"
+    @download="handleDownloadArchive"
+  />
 </div>
 </template>

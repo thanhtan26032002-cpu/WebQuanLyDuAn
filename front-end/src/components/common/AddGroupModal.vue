@@ -27,13 +27,20 @@ const colors = [
 
 const emojis = ['🚀', '🖥️', '🎨', '📱', '📈', '💡', '🔥', '✨', '⚡', '🛠️']
 
+const errors = ref({})
+
 const close = () => {
   addGroupModalOpen.value = false
   formData.value = { name: '', description: '', icon: '🚀', color: 'violet' }
+  errors.value = {}
 }
 
 const submit = () => {
-  if (!formData.value.name) return
+  errors.value = {}
+  if (!formData.value.name.trim()) {
+    errors.value.name = 'Vui lòng nhập tên nhóm.'
+    return
+  }
   addGroup({ ...formData.value })
   close()
 }
@@ -58,9 +65,9 @@ const submit = () => {
           <div>
             <label class="block text-sm font-semibold text-slate-700 mb-1">Tên nhóm *</label>
             <div class="relative">
-              <Hash class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <input v-model="formData.name" required type="text" class="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-4 py-2 text-sm focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500" placeholder="VD: Nhóm Marketing" />
+              <input v-model="formData.name" required autofocus type="text" :class="['w-full bg-slate-50 border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-4 transition-all', errors.name ? 'border-red-300 focus:border-red-300 focus:ring-red-500/10' : 'border-slate-200 focus:border-violet-300 focus:ring-violet-500/10']" placeholder="Ví dụ: Đội Frontend" />
             </div>
+            <p v-if="errors.name" class="text-xs font-medium text-red-500 mt-1">{{ errors.name }}</p>
           </div>
 
           <div>
