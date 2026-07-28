@@ -3,7 +3,7 @@ import { ref, watch } from 'vue'
 import { X, UploadCloud, CheckCircle2, Server, FolderKanban, Columns, Loader2, FileJson, Code, Webhook } from '@lucide/vue'
 import { useProjectWorkspace } from '../../composables/useProjectWorkspace'
 
-const { importProjectModalOpen, addProject, notify } = useProjectWorkspace()
+const { importProjectModalOpen, addProject, formatBytes, notify } = useProjectWorkspace()
 
 const step = ref(1) // 1: Select Source, 2: Uploading & Success
 const selectedSource = ref('file') // 'file', 'jira', 'trello', 'asana'
@@ -11,6 +11,7 @@ const isDragging = ref(false)
 const progress = ref(0)
 const uploadComplete = ref(false)
 const selectedFileName = ref('')
+const selectedFiles = ref([])
 
 const sources = [
   { id: 'file', name: 'File dữ liệu', desc: 'JSON, CSV, Excel', icon: FileJson, color: 'text-violet-600', bg: 'bg-violet-100', border: 'border-violet-200' },
@@ -27,6 +28,7 @@ const reset = () => {
   progress.value = 0
   uploadComplete.value = false
   selectedFileName.value = ''
+  selectedFiles.value = []
   isDragging.value = false
 }
 
@@ -63,7 +65,14 @@ const onFileSelect = (e) => {
 }
 
 const handleFiles = (files) => {
-  selectedFileName.value = files[0].name
+  const fileArray = Array.from(files)
+  selectedFiles.value = [...selectedFiles.value, ...fileArray]
+  selectedFileName.value = selectedFiles.value.map(f => f.name).join(', ')
+}
+
+const removeSelectedFile = (index) => {
+  selectedFiles.value.splice(index, 1)
+  selectedFileName.value = selectedFiles.value.map(f => f.name).join(', ')
 }
 
 const simulateUpload = () => {
@@ -78,15 +87,23 @@ const simulateUpload = () => {
       uploadComplete.value = true
       
       // Simulate adding a project
-      setTimeout(() => {
+      setTimeout(async () => {
         const sourceName = sources.find(s => s.id === selectedSource.value)?.name || 'Nguồn ngoài'
-        addProject({
-          name: `Dự án nhập từ ${sourceName}`,
+        let projName = `Dự án nhập từ ${sourceName}`
+        if (selectedSource.value === 'file' && selectedFiles.value.length > 0) {
+          const firstFile = selectedFiles.value[0].name
+          const nameWithoutExt = firstFile.substring(0, firstFile.lastIndexOf('.')) || firstFile
+          projName = `Dự án: ${nameWithoutExt}`
+        }
+
+        await addProject({
+          name: projName,
           description: `Dữ liệu được đồng bộ từ ${sourceName} vào ${new Date().toLocaleDateString('vi-VN')}`,
           status: 'planning',
           color: 'indigo',
           dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // +30 days
           memberIds: [1],
+          files: selectedSource.value === 'file' ? selectedFiles.value : []
         })
         notify('Đã tải và nhập dữ liệu dự án thành công!')
       }, 500)
@@ -165,27 +182,42 @@ const closeModal = () => {
               selectedFileName ? 'border-emerald-400 bg-emerald-50/30' : ''
             ]"
           >
-            <input type="file" id="project-upload" class="hidden" accept=".json,.csv,.xlsx" @change="onFileSelect" />
+            <input type="file" id="project-upload" multiple class="hidden" @change="onFileSelect" />
             
-            <div v-if="!selectedFileName" class="flex flex-col items-center">
+            <div v-if="selectedFiles.length === 0" class="flex flex-col items-center">
               <div class="w-16 h-16 rounded-2xl bg-white shadow-sm flex items-center justify-center mb-4 text-violet-600">
                 <UploadCloud class="w-8 h-8" />
               </div>
               <h4 class="text-lg font-bold text-slate-900 mb-2">Kéo thả file dự án vào đây</h4>
-              <p class="text-sm text-slate-500 font-medium mb-6">Hỗ trợ các định dạng: .json, .csv, .xlsx</p>
+              <p class="text-sm text-slate-500 font-medium mb-6">Hỗ trợ tất cả các định dạng file đính kèm</p>
               <label for="project-upload" class="px-6 py-2.5 bg-white border border-slate-200 text-slate-700 font-medium rounded-xl hover:bg-slate-50 cursor-pointer transition-colors shadow-sm inline-block">
                 Chọn file từ máy tính
               </label>
             </div>
             
-            <div v-else class="flex flex-col items-center">
-              <div class="w-16 h-16 rounded-2xl bg-emerald-100 flex items-center justify-center mb-4 text-emerald-600">
-                <FileJson class="w-8 h-8" />
+            <div v-else class="flex flex-col items-center w-full">
+              <div class="w-14 h-14 rounded-2xl bg-emerald-100 flex items-center justify-center mb-3 text-emerald-600">
+                <FileJson class="w-7 h-7" />
               </div>
-              <h4 class="text-lg font-bold text-slate-900 mb-1">Đã chọn file</h4>
-              <p class="text-sm text-emerald-600 font-semibold mb-6">{{ selectedFileName }}</p>
-              <label for="project-upload" class="text-sm text-slate-500 hover:text-violet-600 cursor-pointer font-medium underline inline-block">
-                Chọn file khác
+              <h4 class="text-base font-bold text-slate-900 mb-1">Đã chọn {{ selectedFiles.length }} file đính kèm</h4>
+              <div class="max-h-36 overflow-y-auto w-full max-w-md space-y-2 my-3 text-left custom-scrollbar pr-1">
+                <div v-for="(f, idx) in selectedFiles" :key="idx" class="bg-white border border-slate-200 rounded-xl p-2.5 flex items-center justify-between shadow-sm">
+                  <div class="flex items-center gap-2.5 min-w-0">
+                    <div class="w-8 h-8 rounded-lg bg-violet-50 text-violet-600 flex items-center justify-center shrink-0 font-bold text-xs">
+                      FILE
+                    </div>
+                    <div class="min-w-0">
+                      <p class="text-sm font-semibold text-slate-800 truncate">{{ f.name }}</p>
+                      <p class="text-[11px] text-slate-500">{{ formatBytes(f.size) }}</p>
+                    </div>
+                  </div>
+                  <button @click.stop="removeSelectedFile(idx)" class="text-slate-400 hover:text-rose-500 p-1.5 rounded-lg hover:bg-rose-50 transition-colors shrink-0">
+                    <X class="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+              <label for="project-upload" class="text-sm text-slate-500 hover:text-violet-600 cursor-pointer font-medium underline inline-block mt-1">
+                Chọn thêm file khác
               </label>
             </div>
           </div>
@@ -254,10 +286,10 @@ const closeModal = () => {
         <button 
           v-if="step === 1"
           @click="simulateUpload"
-          :disabled="selectedSource === 'file' && !selectedFileName"
+          :disabled="selectedSource === 'file' && selectedFiles.length === 0"
           :class="[
             'px-6 py-2.5 text-sm font-medium text-white rounded-xl transition-all shadow-md flex items-center gap-2',
-            (selectedSource === 'file' && !selectedFileName)
+            (selectedSource === 'file' && selectedFiles.length === 0)
               ? 'bg-slate-300 shadow-none cursor-not-allowed'
               : 'bg-gradient-to-r from-violet-500 to-indigo-600 hover:shadow-violet-500/25 hover:shadow-lg hover:-translate-y-0.5'
           ]"

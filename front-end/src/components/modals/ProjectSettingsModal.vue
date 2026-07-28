@@ -17,6 +17,7 @@ const form = reactive({
 })
 
 const isDeleting = ref(false)
+const errors = ref({})
 
 const project = computed(() => projects.value.find(p => p.id === editingProjectId.value))
 
@@ -29,6 +30,7 @@ watch(projectSettingsModalOpen, (isOpen) => {
     form.dueDate = project.value.dueDate ? project.value.dueDate.split('T')[0] : ''
     form.progress = project.value.progress
     isDeleting.value = false
+    errors.value = {}
   } else if (!isOpen) {
     editingProjectId.value = null
   }
@@ -45,7 +47,11 @@ const colors = [
 ]
 
 function submit() {
-  if (!form.name.trim()) return
+  errors.value = {}
+  if (!form.name.trim()) {
+    errors.value.name = 'Vui lòng nhập tên dự án.'
+    return
+  }
   updateProject(editingProjectId.value, { ...form, name: form.name.trim() })
   projectSettingsModalOpen.value = false
 }
@@ -96,7 +102,8 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
           <form id="project-settings-form" @submit.prevent="submit" class="space-y-5">
             <div class="space-y-2">
               <label class="block text-sm font-semibold text-slate-700">Tên dự án *</label>
-              <input v-model="form.name" required placeholder="Ví dụ: Thiết kế lại website" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 focus:bg-white focus:border-violet-300 focus:ring-4 focus:ring-violet-500/10 transition-all outline-none" />
+              <input v-model="form.name" placeholder="Ví dụ: Thiết kế lại website" @input="errors.name = ''" :class="['w-full bg-slate-50 border rounded-xl px-4 py-2.5 text-slate-900 focus:bg-white focus:ring-4 transition-all outline-none', errors.name ? 'border-red-300 focus:border-red-300 focus:ring-red-500/10' : 'border-slate-200 focus:border-violet-300 focus:ring-violet-500/10']" />
+              <p v-if="errors.name" class="text-xs font-medium text-red-500 mt-1">{{ errors.name }}</p>
             </div>
 
             <div class="space-y-2">

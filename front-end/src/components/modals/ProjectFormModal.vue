@@ -1,9 +1,11 @@
 <script setup>
 import { reactive, ref, onMounted, onUnmounted } from 'vue'
-import { X, FolderKanban, Plus, Check } from '@lucide/vue'
+import { X, FolderKanban, Plus, Check, Paperclip, UploadCloud } from '@lucide/vue'
 import { useProjectWorkspace } from '../../composables/useProjectWorkspace'
 
-const { members, projectModalOpen, addProject } = useProjectWorkspace()
+const { members, projectModalOpen, addProject, formatBytes } = useProjectWorkspace()
+
+const selectedFiles = ref([])
 
 const form = reactive({
   name: '',
@@ -40,7 +42,7 @@ async function submit() {
     return
   }
   
-  const res = await addProject({ ...form, name: form.name.trim(), memberIds: [...form.memberIds] })
+  const res = await addProject({ ...form, name: form.name.trim(), memberIds: [...form.memberIds], files: [...selectedFiles.value] })
   if (res && res.success === false && res.errors) {
     errors.value = res.errors
   } else if (res && res.success) {
@@ -49,7 +51,18 @@ async function submit() {
     form.description = ''
     form.dueDate = ''
     form.progress = 0
+    selectedFiles.value = []
   }
+}
+
+const onFileSelect = (e) => {
+  if (e.target.files && e.target.files.length > 0) {
+    selectedFiles.value.push(...Array.from(e.target.files))
+  }
+}
+
+const removeSelectedFile = (idx) => {
+  selectedFiles.value.splice(idx, 1)
 }
 
 // Close on escape
@@ -89,7 +102,7 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
         <div class="p-6 overflow-y-auto space-y-5 custom-scrollbar flex-1">
           <div class="space-y-2">
             <label class="block text-sm font-semibold text-slate-700">Tên dự án *</label>
-            <input v-model="form.name" required autofocus placeholder="Ví dụ: Thiết kế lại website" :class="['w-full bg-slate-50 border rounded-xl px-4 py-2.5 text-slate-900 focus:bg-white focus:ring-4 transition-all outline-none', errors.name ? 'border-red-300 focus:border-red-300 focus:ring-red-500/10' : 'border-slate-200 focus:border-violet-300 focus:ring-violet-500/10']" />
+            <input v-model="form.name" autofocus placeholder="Ví dụ: Thiết kế lại website" @input="errors.name = ''" :class="['w-full bg-slate-50 border rounded-xl px-4 py-2.5 text-slate-900 focus:bg-white focus:ring-4 transition-all outline-none', errors.name ? 'border-red-300 focus:border-red-300 focus:ring-red-500/10' : 'border-slate-200 focus:border-violet-300 focus:ring-violet-500/10']" />
             <p v-if="errors.name" class="text-xs font-medium text-red-500">{{ errors.name }}</p>
           </div>
 
@@ -167,6 +180,27 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
                 </span>
                 {{ member.name }}
               </button>
+            </div>
+          </div>
+
+          <div class="space-y-3">
+            <label class="block text-sm font-semibold text-slate-700">Tệp đính kèm (Tuỳ chọn)</label>
+            <div class="border border-dashed border-slate-300 rounded-xl p-4 bg-slate-50 flex flex-col items-center justify-center text-center">
+              <input type="file" id="new-project-upload" multiple class="hidden" @change="onFileSelect" />
+              <label for="new-project-upload" class="flex items-center gap-2 text-xs font-semibold text-violet-600 hover:text-violet-700 bg-violet-100/60 hover:bg-violet-100 px-3 py-1.5 rounded-lg cursor-pointer transition-colors">
+                <Paperclip class="w-3.5 h-3.5" /> Thêm file đính kèm
+              </label>
+            </div>
+            <div v-if="selectedFiles.length > 0" class="space-y-1.5 max-h-28 overflow-y-auto custom-scrollbar pr-1">
+              <div v-for="(f, idx) in selectedFiles" :key="idx" class="bg-white border border-slate-200 rounded-lg p-2 flex items-center justify-between text-xs shadow-sm">
+                <span class="truncate font-medium text-slate-700 max-w-[280px]">{{ f.name }}</span>
+                <div class="flex items-center gap-2 shrink-0">
+                  <span class="text-slate-400">{{ formatBytes(f.size) }}</span>
+                  <button type="button" @click.stop="removeSelectedFile(idx)" class="text-slate-400 hover:text-rose-500 p-0.5 rounded hover:bg-rose-50">
+                    <X class="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>

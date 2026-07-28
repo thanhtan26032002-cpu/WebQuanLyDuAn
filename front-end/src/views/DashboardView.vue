@@ -13,6 +13,7 @@ const {
   tasks,
   planningProjects,
   activeProjects,
+  operatingProjects,
   completedProjects,
   projectCompletionRate,
   completedTasks,
@@ -36,7 +37,7 @@ const todayTasks = computed(() => {
 })
 
 const stats = computed(() => [
-  { icon: FolderKanban, color: 'text-violet-600', bg: 'bg-violet-100', value: planningProjects.value.length, label: 'Dự án hoạt động', trend: '12%', up: true },
+  { icon: FolderKanban, color: 'text-violet-600', bg: 'bg-violet-100', value: operatingProjects.value.length, label: 'Dự án hoạt động', trend: '12%', up: true },
   { icon: Clock, color: 'text-amber-600', bg: 'bg-amber-100', value: activeProjects.value.length, label: 'Đang thực hiện', trend: '5%', up: false },
   { icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-100', value: completedProjects.value.length, label: 'Đã hoàn thành', trend: '23%', up: true },
   { icon: Target, color: 'text-sky-600', bg: 'bg-sky-100', value: `${projectCompletionRate.value}%`, label: 'Tỷ lệ hoàn thành', trend: '8%', up: true },

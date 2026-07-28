@@ -13,17 +13,23 @@ const emit = defineEmits(['close', 'download'])
 const fileName = ref('attachments')
 const format = ref('.zip')
 const isDownloading = ref(false)
+const error = ref('')
 
 watch(() => props.isOpen, (val) => {
   if (val) {
     fileName.value = 'attachments'
     format.value = '.zip'
     isDownloading.value = false
+    error.value = ''
   }
 })
 
 const handleSubmit = () => {
-  if (!fileName.value.trim()) return
+  error.value = ''
+  if (!fileName.value.trim()) {
+    error.value = 'Vui lòng nhập tên tệp.'
+    return
+  }
   
   isDownloading.value = true
   // Trigger event to parent
@@ -67,14 +73,15 @@ const handleSubmit = () => {
         <form @submit.prevent="handleSubmit" class="p-6">
           <div class="space-y-4">
             <div class="space-y-2">
-              <label class="block text-sm font-semibold text-slate-700">Tên tệp</label>
+              <label class="block text-sm font-semibold text-slate-700">Tên tệp *</label>
               <input 
                 v-model="fileName" 
                 type="text" 
-                required
-                class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 focus:bg-white focus:border-violet-300 focus:ring-4 focus:ring-violet-500/10 transition-all outline-none"
+                @input="error = ''"
+                :class="['w-full bg-slate-50 border rounded-xl px-4 py-2.5 text-slate-900 focus:bg-white focus:ring-4 transition-all outline-none', error ? 'border-red-300 focus:border-red-300 focus:ring-red-500/10' : 'border-slate-200 focus:border-violet-300 focus:ring-violet-500/10']"
                 placeholder="Nhập tên tệp..."
               />
+              <p v-if="error" class="text-xs font-medium text-red-500 mt-1">{{ error }}</p>
             </div>
             
             <div class="space-y-2">

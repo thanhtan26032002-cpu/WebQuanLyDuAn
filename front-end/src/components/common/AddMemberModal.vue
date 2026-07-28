@@ -40,9 +40,13 @@ const close = () => {
 
 const submit = async () => {
   errors.value = {}
-  if (!formData.value.name || !formData.value.email) {
-    if (!formData.value.name) errors.value.name = 'Vui lòng nhập họ tên.'
-    if (!formData.value.email) errors.value.email = 'Vui lòng nhập email.'
+  if (!formData.value.name?.trim() || !formData.value.email?.trim()) {
+    if (!formData.value.name?.trim()) errors.value.name = 'Vui lòng nhập họ tên.'
+    if (!formData.value.email?.trim()) errors.value.email = 'Vui lòng nhập email.'
+    return
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.value.email.trim())) {
+    errors.value.email = 'Vui lòng nhập địa chỉ email hợp lệ.'
     return
   }
   
@@ -88,7 +92,7 @@ const submit = async () => {
             <div>
               <label class="block text-sm font-semibold text-slate-700 mb-1">Họ tên *</label>
               <div class="relative">
-                <input v-model="formData.name" required type="text" :class="['w-full bg-slate-50 border rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-1 transition-all', errors.name ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : 'border-slate-200 focus:border-violet-500 focus:ring-violet-500']" placeholder="Nguyễn Văn A" />
+                <input v-model="formData.name" type="text" @input="errors.name = ''" :class="['w-full bg-slate-50 border rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-1 transition-all', errors.name ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : 'border-slate-200 focus:border-violet-500 focus:ring-violet-500']" placeholder="Nguyễn Văn A" />
               </div>
               <p v-if="errors.name" class="text-xs font-medium text-red-500 mt-1">{{ errors.name }}</p>
             </div>
@@ -98,7 +102,7 @@ const submit = async () => {
                 <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <Mail class="h-4 w-4 text-slate-400" />
                 </div>
-                <input v-model="formData.email" required type="email" :class="['w-full bg-slate-50 border rounded-xl pl-9 pr-4 py-2 text-sm focus:outline-none focus:ring-1 transition-all', errors.email ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : 'border-slate-200 focus:border-violet-500 focus:ring-violet-500']" placeholder="nguyenvana@example.com" />
+                <input v-model="formData.email" type="email" @input="errors.email = ''" :class="['w-full bg-slate-50 border rounded-xl pl-9 pr-4 py-2 text-sm focus:outline-none focus:ring-1 transition-all', errors.email ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : 'border-slate-200 focus:border-violet-500 focus:ring-violet-500']" placeholder="nguyenvana@example.com" />
               </div>
               <p v-if="errors.email" class="text-xs font-medium text-red-500 mt-1">{{ errors.email }}</p>
             </div>

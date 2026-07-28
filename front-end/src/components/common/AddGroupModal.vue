@@ -65,7 +65,7 @@ const submit = () => {
           <div>
             <label class="block text-sm font-semibold text-slate-700 mb-1">Tên nhóm *</label>
             <div class="relative">
-              <input v-model="formData.name" required autofocus type="text" :class="['w-full bg-slate-50 border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-4 transition-all', errors.name ? 'border-red-300 focus:border-red-300 focus:ring-red-500/10' : 'border-slate-200 focus:border-violet-300 focus:ring-violet-500/10']" placeholder="Ví dụ: Đội Frontend" />
+              <input v-model="formData.name" autofocus type="text" @input="errors.name = ''" :class="['w-full bg-slate-50 border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-4 transition-all', errors.name ? 'border-red-300 focus:border-red-300 focus:ring-red-500/10' : 'border-slate-200 focus:border-violet-300 focus:ring-violet-500/10']" placeholder="Ví dụ: Đội Frontend" />
             </div>
             <p v-if="errors.name" class="text-xs font-medium text-red-500 mt-1">{{ errors.name }}</p>
           </div>

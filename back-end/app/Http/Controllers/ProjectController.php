@@ -29,7 +29,8 @@ class ProjectController extends Controller
     {
         $project = Project::with([
             'tasks.assignee',
-            'members'
+            'members',
+            'attachments'
         ])->findOrFail($code);
 
         return response()->json($project);
@@ -58,6 +59,8 @@ class ProjectController extends Controller
             $project->code,
             "Đã tạo dự án mới: {$project->name}"
         );
+
+        $project->load('members', 'attachments');
 
         return response()->json([
             'message' => 'Tạo dự án thành công',

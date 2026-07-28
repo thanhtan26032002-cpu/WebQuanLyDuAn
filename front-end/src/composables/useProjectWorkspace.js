@@ -214,6 +214,60 @@ const currentUser = ref(JSON.parse(localStorage.getItem('currentUser') || 'null'
 
 let toastTimer
 
+// Helper: Dịch lỗi xác thực từ Backend sang tiếng Việt
+function translateValidationMessage(msg, field = '') {
+  if (!msg || typeof msg !== 'string') return 'Dữ liệu không hợp lệ.'
+  
+  const fieldNames = {
+    name: 'Tên',
+    title: 'Tiêu đề',
+    email: 'Email',
+    phone: 'Số điện thoại',
+    role: 'Vị trí',
+    department: 'Phòng ban',
+    description: 'Mô tả',
+    due_date: 'Hạn chót',
+    start_date: 'Ngày bắt đầu',
+    status: 'Trạng thái',
+    priority: 'Mức độ ưu tiên',
+    code: 'Mã',
+    color: 'Màu sắc'
+  }
+  const fieldName = fieldNames[field] || 'Trường này'
+
+  if (msg.includes('is required') || msg.includes('required')) {
+    return `Vui lòng nhập ${fieldName.toLowerCase()}.`
+  }
+  if (msg.includes('already been taken') || msg.includes('taken')) {
+    return `${fieldName} này đã tồn tại trong hệ thống.`
+  }
+  if (msg.includes('valid email address') || msg.includes('email') && msg.includes('valid')) {
+    return 'Vui lòng nhập địa chỉ email hợp lệ.'
+  }
+  if (msg.includes('after or equal to today') || msg.includes('after_or_equal')) {
+    return 'Hạn chót phải từ ngày hôm nay trở đi.'
+  }
+  if (msg.includes('must be a date') || msg.includes('date') || msg.includes('invalid date')) {
+    return 'Ngày tháng không hợp lệ.'
+  }
+  if (msg.includes('must not be greater than') || msg.includes('max')) {
+    return `${fieldName} vượt quá độ dài hoặc giá trị cho phép.`
+  }
+  if (msg.includes('must be at least') || msg.includes('min')) {
+    return `${fieldName} chưa đạt độ dài hoặc giá trị tối thiểu.`
+  }
+  if (msg.includes('must be an integer') || msg.includes('integer') || msg.includes('numeric')) {
+    return `Vui lòng nhập số hợp lệ cho ${fieldName.toLowerCase()}.`
+  }
+  if (msg.includes('selected') && (msg.includes('is invalid') || msg.includes('invalid'))) {
+    return 'Giá trị được chọn không hợp lệ.'
+  }
+  if (msg === 'The given data was invalid.') {
+    return 'Dữ liệu nhập vào không hợp lệ.'
+  }
+  return msg
+}
+
 // Helper: Phân tích lỗi 422 từ Backend Laravel
 async function parseValidationErrors(response) {
   try {
@@ -222,11 +276,11 @@ async function parseValidationErrors(response) {
       // Laravel trả về { errors: { field: ['msg1', 'msg2'] } }
       const result = {}
       for (const [field, messages] of Object.entries(data.errors)) {
-        result[field] = messages[0] // Lấy lỗi đầu tiên của mỗi trường
+        result[field] = translateValidationMessage(messages[0], field) // Lấy lỗi đầu tiên và dịch sang tiếng Việt
       }
       return result
     }
-    return { _general: data.message || 'Đã xảy ra lỗi.' }
+    return { _general: translateValidationMessage(data.message || 'Đã xảy ra lỗi.') }
   } catch {
     return { _general: 'Đã xảy ra lỗi không xác định.' }
   }
@@ -235,6 +289,7 @@ async function parseValidationErrors(response) {
 export function useProjectWorkspace() {
   const planningProjects = computed(() => projects.value.filter((project) => project.status === 'planning'))
   const activeProjects = computed(() => projects.value.filter((project) => project.status === 'active'))
+  const operatingProjects = computed(() => projects.value.filter((project) => project.status === 'planning' || project.status === 'active'))
   const completedProjects = computed(() => projects.value.filter((project) => project.status === 'completed'))
   const projectCompletionRate = computed(() => projects.value.length ? Math.round((completedProjects.value.length / projects.value.length) * 100) : 0)
   
@@ -291,10 +346,22 @@ export function useProjectWorkspace() {
       })
       if (res.ok) {
         const data = await res.json()
-        projects.value.unshift(mapProject(data.project))
+        const newProject = mapProject(data.project)
+        if (!newProject.files) newProject.files = []
+        
+        if (payload.files && payload.files.length > 0) {
+          for (const fileObj of payload.files) {
+            const uploadRes = await uploadFile(fileObj, 'Project', newProject.id)
+            if (uploadRes && uploadRes.attachment) {
+              newProject.files.push(mapAttachment(uploadRes.attachment))
+            }
+          }
+        }
+
+        projects.value.unshift(newProject)
         projectModalOpen.value = false
         notify('Đã tạo dự án mới thành công')
-        return { success: true }
+        return { success: true, project: newProject }
       } else {
         const errors = await parseValidationErrors(res)
         if (errors._general) notify('Lỗi: ' + errors._general)
@@ -825,6 +892,7 @@ export function useProjectWorkspace() {
     notifications,
     planningProjects,
     activeProjects,
+    operatingProjects,
     completedProjects,
     projectCompletionRate,
     completedTasks,
@@ -833,6 +901,7 @@ export function useProjectWorkspace() {
     findProject,
     formatDate,
     formatDateTime,
+    formatBytes,
     notify,
     addProject,
     updateProject,

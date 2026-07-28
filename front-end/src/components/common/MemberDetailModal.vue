@@ -21,17 +21,33 @@ const memberGroups = computed(() => {
   return groups.value.filter(g => g.memberIds.includes(member.value.id))
 })
 
+const errors = ref({})
+
 const close = () => {
   memberDetailModalOpen.value = false
   activeMemberId.value = null
   isEditing.value = false
+  errors.value = {}
 }
 
 const save = () => {
+  errors.value = {}
   if (!member.value) return
+  if (!editedMember.value.name?.trim()) {
+    errors.value.name = 'Vui lòng nhập họ tên thành viên.'
+    return
+  }
+  if (!editedMember.value.email?.trim()) {
+    errors.value.email = 'Vui lòng nhập địa chỉ email.'
+    return
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(editedMember.value.email.trim())) {
+    errors.value.email = 'Vui lòng nhập địa chỉ email hợp lệ.'
+    return
+  }
   updateMember(member.value.id, {
-    name: editedMember.value.name,
-    email: editedMember.value.email,
+    name: editedMember.value.name.trim(),
+    email: editedMember.value.email.trim(),
     phone: editedMember.value.phone,
     role: editedMember.value.role,
     department: editedMember.value.department,
@@ -147,7 +163,8 @@ const save = () => {
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label class="block text-sm font-semibold text-slate-700 mb-1">Họ tên *</label>
-                <input v-model="editedMember.name" required type="text" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500" />
+                <input v-model="editedMember.name" type="text" @input="errors.name = ''" :class="['w-full bg-slate-50 border rounded-xl px-4 py-2 text-sm focus:outline-none transition-all', errors.name ? 'border-red-300 focus:border-red-500 focus:ring-1 focus:ring-red-500' : 'border-slate-200 focus:border-violet-500 focus:ring-1 focus:ring-violet-500']" />
+                <p v-if="errors.name" class="text-xs font-medium text-red-500 mt-1">{{ errors.name }}</p>
               </div>
               <div>
                 <label class="block text-sm font-semibold text-slate-700 mb-1">Vị trí (Role)</label>
@@ -157,7 +174,8 @@ const save = () => {
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label class="block text-sm font-semibold text-slate-700 mb-1">Email *</label>
-                <input v-model="editedMember.email" required type="email" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500" />
+                <input v-model="editedMember.email" type="email" @input="errors.email = ''" :class="['w-full bg-slate-50 border rounded-xl px-4 py-2 text-sm focus:outline-none transition-all', errors.email ? 'border-red-300 focus:border-red-500 focus:ring-1 focus:ring-red-500' : 'border-slate-200 focus:border-violet-500 focus:ring-1 focus:ring-violet-500']" />
+                <p v-if="errors.email" class="text-xs font-medium text-red-500 mt-1">{{ errors.email }}</p>
               </div>
               <div>
                 <label class="block text-sm font-semibold text-slate-700 mb-1">Số điện thoại</label>
