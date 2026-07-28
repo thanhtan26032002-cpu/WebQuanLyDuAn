@@ -706,9 +706,9 @@ const formatDateTime = (isoStr) => {
                     <div class="flex-1 min-w-0 pr-4">
                       <p class="text-sm font-medium text-slate-700 truncate max-w-[200px]" :title="comment.file_name">{{ comment.file_name || 'File đính kèm' }}</p>
                     </div>
-                    <a :href="'http://localhost:8000' + comment.file_url" target="_blank" download class="p-1.5 text-slate-400 hover:text-violet-600 hover:bg-violet-50 rounded transition-colors shrink-0">
+                    <button @click.prevent="downloadSingleFile(comment.file_url, comment.file_name)" title="Tải xuống" class="p-1.5 text-slate-400 hover:text-violet-600 hover:bg-violet-50 rounded transition-colors shrink-0">
                       <Download class="w-4 h-4" />
-                    </a>
+                    </button>
                   </div>
                   
                 </div>

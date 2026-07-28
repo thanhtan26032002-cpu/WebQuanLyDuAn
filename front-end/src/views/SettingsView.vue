@@ -4,7 +4,7 @@ import { User, Bell, Palette, Moon, Sun, CheckCircle2 } from '@lucide/vue'
 import { useProjectWorkspace } from '../composables/useProjectWorkspace'
 
 const activeTab = ref('profile')
-const { darkMode, setTheme, notify, currentUser, updateUserProfile } = useProjectWorkspace()
+const { darkMode, setTheme, notify, currentUser, updateUserProfile, BASE_URL } = useProjectWorkspace()
 
 const userProfile = ref({
   name: currentUser.value?.name || '',
@@ -175,7 +175,7 @@ if (activeColor.value) {
               class="w-24 h-24 rounded-2xl border-2 border-violet-200 flex items-center justify-center text-3xl font-bold text-violet-700 shadow-sm overflow-hidden"
               :class="avatarPreview ? '' : 'bg-gradient-to-br from-violet-100 to-indigo-100'"
             >
-              <img v-if="avatarPreview" :src="avatarPreview.startsWith('blob:') ? avatarPreview : `http://localhost:8000${avatarPreview}`" alt="Avatar" class="w-full h-full object-cover" />
+              <img v-if="avatarPreview" :src="avatarPreview.startsWith('blob:') || avatarPreview.startsWith('http') ? avatarPreview : `${BASE_URL}${avatarPreview.startsWith('/') ? '' : '/'}${avatarPreview}`" alt="Avatar" class="w-full h-full object-cover" />
               <span v-else>{{ userProfile.name ? userProfile.name.charAt(0).toUpperCase() : 'U' }}</span>
             </div>
             <div>

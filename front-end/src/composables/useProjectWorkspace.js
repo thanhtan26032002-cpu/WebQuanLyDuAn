@@ -28,7 +28,8 @@ const priorityMap = {
   low: { label: 'Thấp', className: 'priority-low' },
 }
 
-const API_URL = 'http://localhost:8000/api'
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
+const BASE_URL = import.meta.env.VITE_BASE_URL || API_URL.replace(/\/api\/?$/, '')
 
 // ========== CHUYỂN ĐỔI DỮ LIỆU API → FRONTEND ==========
 // Helper function to format bytes for attachments
@@ -709,24 +710,26 @@ export function useProjectWorkspace() {
 
   async function downloadSingleFile(url, fileName) {
     try {
-      // url = '/storage/attachments/...', so we need full URL
-      const fullUrl = url.startsWith('http') ? url : `${API_URL.replace('/api', '')}${url}`
-      const res = await fetch(fullUrl)
-      if (res.ok) {
-        const blob = await res.blob()
-        const blobUrl = window.URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = blobUrl
-        a.download = fileName || 'download'
-        document.body.appendChild(a)
-        a.click()
-        document.body.removeChild(a)
-        window.URL.revokeObjectURL(blobUrl)
-      } else {
-        notify('Không tìm thấy tệp hoặc lỗi tải xuống.')
+      if (!url) {
+        notify('Không tìm thấy đường dẫn tệp.')
+        return
       }
+      // url = '/storage/attachments/...', so we need full URL
+      const fullUrl = url.startsWith('http') || url.startsWith('blob:') ? url : `${BASE_URL}${url.startsWith('/') ? '' : '/'}${url}`
+      
+      // Tải xuống bằng thẻ <a> trực tiếp để không bao giờ bị chặn bởi chính sách CORS của trình duyệt đối với tệp tĩnh
+      const a = document.createElement('a')
+      a.href = fullUrl
+      if (!url.startsWith('blob:')) {
+        a.target = '_blank'
+      }
+      a.download = fileName || url.split('/').pop() || 'download'
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
     } catch (error) {
-      notify('Lỗi khi tải tệp xuống.')
+      console.error('Download error:', error)
+      notify('Lỗi kết nối khi tải tệp xuống.')
     }
   }
 
@@ -973,6 +976,7 @@ export function useProjectWorkspace() {
     removeMemberFromProject,
     setTheme,
     markNotificationAsRead,
-    markAllNotificationsAsRead
+    markAllNotificationsAsRead,
+    BASE_URL
   }
 }
