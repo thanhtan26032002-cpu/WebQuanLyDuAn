@@ -1,9 +1,9 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { X, UserPlus, Mail, Phone, Briefcase, Hash } from '@lucide/vue'
 import { useProjectWorkspace } from '../../composables/useProjectWorkspace'
 
-const { addMemberModalOpen, groups, addMember } = useProjectWorkspace()
+const { addMemberModalOpen, addMemberTargetGroupId, closeAddMemberModal, groups, addMember } = useProjectWorkspace()
 
 const formData = ref({
   name: '',
@@ -29,8 +29,14 @@ const colors = [
 
 const errors = ref({})
 
+watch(addMemberModalOpen, (isOpen) => {
+  if (isOpen) {
+    formData.value.groupId = addMemberTargetGroupId.value || null
+  }
+})
+
 const close = () => {
-  addMemberModalOpen.value = false
+  closeAddMemberModal()
   // reset
   formData.value = {
     name: '', email: '', phone: '', role: '', department: '', groupId: null, bio: '', color: 'blue'

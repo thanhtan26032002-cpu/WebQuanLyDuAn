@@ -266,6 +266,7 @@ const editingProjectId = ref(null)
 const memberDetailModalOpen = ref(false)
 const activeMemberId = ref(null)
 const addMemberModalOpen = ref(false)
+const addMemberTargetGroupId = ref(null)
 const addGroupModalOpen = ref(false)
 const projectSettingsModalOpen = ref(false)
 const fileUploadModalOpen = ref(false)
@@ -273,6 +274,16 @@ const manageMembersModalOpen = ref(false)
 const editGroupModalOpen = ref(false)
 const activeEditGroupId = ref(null)
 const importProjectModalOpen = ref(false)
+
+function openAddMemberModal(groupId = null) {
+  addMemberTargetGroupId.value = groupId || null
+  addMemberModalOpen.value = true
+}
+
+function closeAddMemberModal() {
+  addMemberModalOpen.value = false
+  addMemberTargetGroupId.value = null
+}
 
 const notifications = ref([])
 
@@ -1099,6 +1110,9 @@ export function useProjectWorkspace() {
     memberDetailModalOpen,
     activeMemberId,
     addMemberModalOpen,
+    addMemberTargetGroupId,
+    openAddMemberModal,
+    closeAddMemberModal,
     addGroupModalOpen,
     editGroupModalOpen,
     activeEditGroupId,

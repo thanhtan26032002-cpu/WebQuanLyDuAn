@@ -5,6 +5,27 @@ export default {
     "./index.html",
     "./src/**/*.{vue,js,ts,jsx,tsx}",
   ],
+  safelist: [
+    {
+      pattern: /(bg|border|border-t|text|ring|shadow|from|to)-(violet|indigo|blue|sky|emerald|amber|orange|rose|pink|slate|purple|green)-(50|100|200|300|400|500|600|700)/,
+      variants: ['hover', 'focus', 'group-hover', 'active'],
+    },
+    // Safelist opacity modifiers used in Group cards and previews
+    ...['violet', 'indigo', 'blue', 'sky', 'emerald', 'amber', 'orange', 'rose', 'pink', 'slate', 'purple', 'green'].flatMap(c => [
+      `bg-${c}-50/40`,
+      `bg-${c}-50/50`,
+      `bg-${c}-500/15`,
+      `bg-${c}-500/10`,
+      `from-${c}-500/15`,
+      `from-${c}-500/20`,
+      `to-${c}-500/5`,
+      `border-${c}-200/80`,
+      `shadow-${c}-500/10`,
+      `hover:shadow-${c}-500/10`,
+      `hover:bg-${c}-50`,
+      `hover:bg-${c}-50/50`,
+    ]),
+  ],
   theme: {
     extend: {
       colors: {
@@ -28,3 +49,4 @@ export default {
   },
   plugins: [],
 }
+

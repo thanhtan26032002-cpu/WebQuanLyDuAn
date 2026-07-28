@@ -28,6 +28,21 @@ const sizeClasses = {
   md: 'w-10 h-10 text-xs',
   lg: 'w-16 h-16 text-lg'
 }
+
+const bgClasses = {
+  blue: 'bg-blue-500',
+  purple: 'bg-purple-500',
+  pink: 'bg-pink-500',
+  orange: 'bg-orange-500',
+  green: 'bg-green-500',
+  amber: 'bg-amber-500',
+  rose: 'bg-rose-500',
+  sky: 'bg-sky-500',
+  violet: 'bg-violet-500',
+  indigo: 'bg-indigo-500',
+  emerald: 'bg-emerald-500',
+  slate: 'bg-slate-500',
+}
 </script>
 
 <script>
@@ -44,7 +59,7 @@ import { computed } from 'vue'
     <div 
       :class="[
         'rounded-full flex items-center justify-center font-bold text-white shrink-0 cursor-pointer shadow-sm', 
-        `bg-${member.color}-500`,
+        bgClasses[member?.color] || 'bg-blue-500',
         sizeClasses[size]
       ]"
     >
@@ -67,7 +82,7 @@ import { computed } from 'vue'
         @mouseleave="isHovered = false"
       >
         <div class="flex items-start gap-3 mb-3">
-          <div :class="['w-12 h-12 rounded-full flex items-center justify-center font-bold text-white shrink-0 shadow-sm', `bg-${member.color}-500`]">
+          <div :class="['w-12 h-12 rounded-full flex items-center justify-center font-bold text-white shrink-0 shadow-sm', bgClasses[member?.color] || 'bg-blue-500']">
             {{ member.initials }}
           </div>
           <div>

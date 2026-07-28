@@ -9,6 +9,17 @@ const member = computed(() => members.value.find(m => m.id === activeMemberId.va
 const isEditing = ref(false)
 const editedMember = ref({})
 
+const colors = [
+  { id: 'blue', bg: 'bg-blue-500' },
+  { id: 'purple', bg: 'bg-purple-500' },
+  { id: 'pink', bg: 'bg-pink-500' },
+  { id: 'orange', bg: 'bg-orange-500' },
+  { id: 'green', bg: 'bg-green-500' },
+  { id: 'amber', bg: 'bg-amber-500' },
+  { id: 'rose', bg: 'bg-rose-500' },
+  { id: 'sky', bg: 'bg-sky-500' },
+]
+
 watch(activeMemberId, (newVal) => {
   if (newVal && member.value) {
     isEditing.value = false
@@ -22,6 +33,77 @@ watch(activeMemberId, (newVal) => {
 const memberGroups = computed(() => {
   if (!member.value) return []
   return groups.value.filter(g => g.memberIds.includes(member.value.id))
+})
+
+const displayColor = computed(() => {
+  if (isEditing.value && editedMember.value.color) {
+    return editedMember.value.color
+  }
+  return member.value?.color || 'blue'
+})
+
+const memberThemeClasses = {
+  blue: {
+    header: 'from-blue-500 to-blue-600',
+    avatar: 'from-blue-400 to-blue-600',
+    bg: 'bg-blue-500',
+    badge: 'bg-blue-50 text-blue-700 border-blue-100',
+  },
+  purple: {
+    header: 'from-purple-500 to-purple-600',
+    avatar: 'from-purple-400 to-purple-600',
+    bg: 'bg-purple-500',
+    badge: 'bg-purple-50 text-purple-700 border-purple-100',
+  },
+  pink: {
+    header: 'from-pink-500 to-pink-600',
+    avatar: 'from-pink-400 to-pink-600',
+    bg: 'bg-pink-500',
+    badge: 'bg-pink-50 text-pink-700 border-pink-100',
+  },
+  orange: {
+    header: 'from-orange-500 to-orange-600',
+    avatar: 'from-orange-400 to-orange-600',
+    bg: 'bg-orange-500',
+    badge: 'bg-orange-50 text-orange-700 border-orange-100',
+  },
+  green: {
+    header: 'from-green-500 to-green-600',
+    avatar: 'from-green-400 to-green-600',
+    bg: 'bg-green-500',
+    badge: 'bg-green-50 text-green-700 border-green-100',
+  },
+  amber: {
+    header: 'from-amber-500 to-amber-600',
+    avatar: 'from-amber-400 to-amber-600',
+    bg: 'bg-amber-500',
+    badge: 'bg-amber-50 text-amber-700 border-amber-100',
+  },
+  rose: {
+    header: 'from-rose-500 to-rose-600',
+    avatar: 'from-rose-400 to-rose-600',
+    bg: 'bg-rose-500',
+    badge: 'bg-rose-50 text-rose-700 border-rose-100',
+  },
+  sky: {
+    header: 'from-sky-500 to-sky-600',
+    avatar: 'from-sky-400 to-sky-600',
+    bg: 'bg-sky-500',
+    badge: 'bg-sky-50 text-sky-700 border-sky-100',
+  },
+  violet: {
+    header: 'from-violet-500 to-violet-600',
+    avatar: 'from-violet-400 to-violet-600',
+    bg: 'bg-violet-500',
+    badge: 'bg-violet-50 text-violet-700 border-violet-100',
+  },
+}
+
+const displayInitials = computed(() => {
+  if (isEditing.value && editedMember.value.name) {
+    return editedMember.value.name.split(' ').filter(Boolean).map(n => n[0]).join('').toUpperCase().slice(0, 2) || '??'
+  }
+  return member.value?.initials || '??'
 })
 
 const errors = ref({})
@@ -66,6 +148,7 @@ const save = async () => {
     department: editedMember.value.department,
     bio: editedMember.value.bio,
     groupId: editedMember.value.groupId || null,
+    color: editedMember.value.color || member.value.color || 'blue',
   })
   if (result?.success) {
     isEditing.value = false
@@ -81,15 +164,15 @@ const save = async () => {
     
     <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-xl overflow-hidden flex flex-col max-h-[90vh]">
       <!-- Header with Gradient -->
-      <header :class="['relative h-32 flex items-end px-6 pb-6 pt-12 shrink-0 bg-gradient-to-br', `from-${member.color}-500 to-${member.color}-600`]">
+      <header :class="['relative h-32 flex items-end px-6 pb-6 pt-12 shrink-0 bg-gradient-to-br transition-all duration-300', memberThemeClasses[displayColor]?.header || 'from-blue-500 to-blue-600']">
         <!-- Close button -->
         <button @click="close" class="absolute top-4 right-4 text-white/70 hover:text-white bg-black/10 hover:bg-black/20 p-1.5 rounded-lg transition-colors">
           <X class="w-5 h-5" />
         </button>
 
         <div class="absolute -bottom-10 left-6">
-          <div :class="['w-24 h-24 rounded-2xl shadow-lg border-4 border-white flex items-center justify-center text-4xl font-bold text-white', `bg-gradient-to-br from-${member.color}-400 to-${member.color}-600`]">
-            {{ member.initials }}
+          <div :class="['w-24 h-24 rounded-2xl shadow-lg border-4 border-white flex items-center justify-center text-4xl font-bold text-white transition-all duration-300 bg-gradient-to-br', memberThemeClasses[displayColor]?.avatar || 'from-blue-400 to-blue-600']">
+            {{ displayInitials }}
           </div>
           <div :class="['absolute -bottom-2 -right-2 w-6 h-6 border-4 border-white rounded-full', member.online ? 'bg-emerald-500' : 'bg-slate-300']"></div>
         </div>
@@ -167,7 +250,7 @@ const save = async () => {
               <Hash class="w-4 h-4 text-slate-400" /> Nhóm tham gia
             </h3>
             <div v-if="memberGroups.length > 0" class="flex flex-wrap gap-2">
-              <div v-for="group in memberGroups" :key="group.id" :class="['px-3 py-1.5 rounded-lg text-sm font-medium border flex items-center gap-1.5', `bg-${group.color}-50 text-${group.color}-700 border-${group.color}-100`]">
+              <div v-for="group in memberGroups" :key="group.id" :class="['px-3 py-1.5 rounded-lg text-sm font-medium border flex items-center gap-1.5', memberThemeClasses[group.color]?.badge || 'bg-violet-50 text-violet-700 border-violet-100']">
                 <span>{{ group.icon }}</span> {{ group.name }}
               </div>
             </div>
@@ -178,6 +261,19 @@ const save = async () => {
         <template v-else>
           <!-- Edit Form -->
           <form @submit.prevent="save" class="space-y-4">
+            <!-- Avatar color select -->
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-2">Màu đại diện</label>
+              <div class="flex flex-wrap gap-2">
+                <button 
+                  v-for="color in colors" :key="color.id"
+                  type="button"
+                  @click="editedMember.color = color.id"
+                  :class="['w-8 h-8 rounded-full flex items-center justify-center transition-all', color.bg, editedMember.color === color.id ? 'ring-4 ring-offset-2 ring-violet-200 scale-110' : 'opacity-80 hover:opacity-100']"
+                ></button>
+              </div>
+            </div>
+
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label class="block text-sm font-semibold text-slate-700 mb-1">Họ tên *</label>

@@ -118,8 +118,37 @@ const handleDelete = async () => {
                 v-for="color in colors" :key="color.id"
                 type="button"
                 @click="formData.color = color.id"
-                :class="['w-8 h-8 rounded-full flex items-center justify-center transition-all', color.bg, formData.color === color.id ? 'ring-4 ring-offset-2 ring-violet-200 scale-110' : 'opacity-80 hover:opacity-100']"
+                :class="['w-8 h-8 rounded-full flex items-center justify-center transition-all cursor-pointer', color.bg, formData.color === color.id ? `ring-4 ring-offset-2 ring-${color.id}-300 scale-110 shadow-sm` : 'opacity-70 hover:opacity-100 hover:scale-105']"
               ></button>
+            </div>
+          </div>
+
+          <!-- Live Preview Card -->
+          <div class="pt-2">
+            <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Xem trước thẻ nhóm</label>
+            <div 
+              class="rounded-2xl p-4 border transition-all duration-300 relative overflow-hidden border-t-4 shadow-sm"
+              :class="[
+                `border-t-${formData.color}-500 bg-${formData.color}-50/40 border-${formData.color}-200/80`
+              ]"
+            >
+              <div :class="['absolute top-0 left-0 right-0 h-16 bg-gradient-to-r pointer-events-none', `from-${formData.color}-500/15 to-${formData.color}-500/5`]"></div>
+              
+              <div class="flex items-center justify-between relative z-10">
+                <div class="flex items-center gap-3">
+                  <div :class="['w-10 h-10 rounded-xl flex items-center justify-center text-lg shadow-md ring-2 ring-white', `bg-${formData.color}-500 text-white`]">
+                    {{ formData.icon }}
+                  </div>
+                  <div>
+                    <h3 class="text-base font-bold text-slate-900">{{ formData.name || 'Tên nhóm...' }}</h3>
+                    <p class="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
+                      <span :class="['w-1.5 h-1.5 rounded-full inline-block', `bg-${formData.color}-500`]"></span>
+                      {{ (formData.memberIds?.length || 0) }} thành viên
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <p v-if="formData.description" class="text-xs text-slate-600 mt-3 relative z-10 line-clamp-1">{{ formData.description }}</p>
             </div>
           </div>
         </form>

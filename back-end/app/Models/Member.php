@@ -19,7 +19,7 @@ class Member extends Model
     const UPDATED_AT = 'member_updated_at';
 
     protected $fillable = [
-        'member_name', 'member_email', 'member_avatar', 'member_role', 
+        'member_name', 'member_email', 'member_avatar', 'member_color', 'member_role', 
         'member_phone', 'member_department', 'member_join_date', 'member_bio', 'member_online'
     ];
 
@@ -35,6 +35,7 @@ class Member extends Model
             'member_name' => 'name',
             'member_email' => 'email',
             'member_avatar' => 'avatar',
+            'member_color' => 'color',
             'member_role' => 'role',
             'member_phone' => 'phone',
             'member_department' => 'department',

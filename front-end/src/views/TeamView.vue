@@ -3,7 +3,7 @@ import { computed, ref } from 'vue'
 import { Users, UserPlus, MoreHorizontal, Mail, ArrowRight, ListTodo, Hash, Plus } from '@lucide/vue'
 import { useProjectWorkspace } from '../composables/useProjectWorkspace'
 
-const { members, groups, tasks, activeMemberId, memberDetailModalOpen, addMemberModalOpen, addGroupModalOpen, editGroupModalOpen, activeEditGroupId, assignMemberToGroup } = useProjectWorkspace()
+const { members, groups, tasks, activeMemberId, memberDetailModalOpen, openAddMemberModal, addGroupModalOpen, editGroupModalOpen, activeEditGroupId, assignMemberToGroup } = useProjectWorkspace()
 
 const totalOnline = computed(() => members.value.filter(m => m.online).length)
 const totalTasksInProgress = computed(() => tasks.value.filter(t => t.status === 'in_progress').length)
@@ -67,11 +67,6 @@ const openEditGroup = (groupId) => {
   editGroupModalOpen.value = true
 }
 
-const activeDropdownGroupId = ref(null)
-const toggleDropdown = (groupId) => {
-  activeDropdownGroupId.value = activeDropdownGroupId.value === groupId ? null : groupId
-}
-
 const getMembersByGroup = (groupId) => {
   const group = groups.value.find(g => g.id === groupId)
   if (!group) return []
@@ -109,7 +104,7 @@ const taskCount = (memberId, status) => tasks.value.filter((task) => task.assign
           <Plus class="w-5 h-5 text-slate-400" /> Tạo nhóm
         </button>
         <button 
-          @click="addMemberModalOpen = true"
+          @click="openAddMemberModal()"
           class="bg-gradient-to-r from-violet-500 to-indigo-600 text-white px-5 py-2.5 rounded-xl font-medium hover:shadow-premium transition-all shadow-md shadow-violet-500/25 shrink-0 flex items-center gap-2"
         >
           <UserPlus class="w-5 h-5" /> Thêm thành viên
@@ -122,33 +117,44 @@ const taskCount = (memberId, status) => tasks.value.filter((task) => task.assign
       <div 
         v-for="group in groups" 
         :key="group.id" 
-        class="rounded-3xl p-6 border transition-all duration-200"
-        :class="dragOverGroupId === group.id ? 'bg-violet-50/50 border-violet-400 shadow-md ring-2 ring-violet-500 ring-offset-2' : 'bg-slate-50/50 border-slate-100'"
+        class="rounded-3xl p-6 border transition-all duration-300 relative overflow-hidden group border-t-4"
+        :class="[
+          `border-t-${group.color}-500`,
+          dragOverGroupId === group.id 
+            ? 'bg-violet-50/80 border-violet-400 shadow-md ring-2 ring-violet-500 ring-offset-2' 
+            : `bg-${group.color}-50/40 border-${group.color}-200/80 hover:border-${group.color}-300 hover:shadow-xl hover:shadow-${group.color}-500/10 hover:-translate-y-1`
+        ]"
         @dragover.prevent
         @dragenter.prevent="dragOverGroupId = group.id"
         @dragleave="onDragLeaveGroup($event, group.id)"
         @drop="onDrop($event, group.id)"
       >
+        <!-- Top Gradient Banner background -->
+        <div :class="['absolute top-0 left-0 right-0 h-20 bg-gradient-to-r pointer-events-none -z-0', `from-${group.color}-500/15 to-${group.color}-500/5`]"></div>
+
         <!-- Group Header -->
-        <div class="flex items-center justify-between mb-6">
+        <div class="flex items-center justify-between mb-6 relative z-10">
           <div class="flex items-center gap-3">
-            <div :class="['w-12 h-12 rounded-2xl flex items-center justify-center text-xl shadow-sm', `bg-${group.color}-100 text-${group.color}-600`]">
+            <div :class="['w-12 h-12 rounded-2xl flex items-center justify-center text-xl shadow-md ring-2 ring-white', `bg-${group.color}-500 text-white`]">
               {{ group.icon }}
             </div>
             <div>
-              <h2 class="text-xl font-bold text-slate-900">{{ group.name }}</h2>
-              <p class="text-sm text-slate-500">{{ group.memberIds.length }} thành viên</p>
+              <h2 :class="['text-xl font-bold text-slate-900 transition-colors', `group-hover:text-${group.color}-600`]">{{ group.name }}</h2>
+              <p class="text-sm text-slate-500 flex items-center gap-1.5">
+                <span :class="['w-2 h-2 rounded-full inline-block', `bg-${group.color}-500`]"></span>
+                {{ group.memberIds.length }} thành viên
+              </p>
             </div>
           </div>
-          <button @click="openEditGroup(group.id)" class="text-slate-400 hover:text-slate-700 p-2 rounded-xl hover:bg-slate-100 transition-colors">
+          <button @click="openEditGroup(group.id)" class="text-slate-400 hover:text-slate-700 p-2 rounded-xl hover:bg-white/80 shadow-sm transition-all">
             <MoreHorizontal class="w-5 h-5" />
           </button>
         </div>
 
-        <p class="text-sm text-slate-600 mb-6">{{ group.description }}</p>
+        <p class="text-sm text-slate-600 mb-6 relative z-10">{{ group.description }}</p>
 
         <!-- Members in Group -->
-        <div class="space-y-4 min-h-[50px]">
+        <div class="space-y-4 min-h-[50px] relative z-10">
           <article 
             v-for="member in getMembersByGroup(group.id)" 
             :key="member.id" 
@@ -184,38 +190,17 @@ const taskCount = (memberId, status) => tasks.value.filter((task) => task.assign
         </div>
 
         <!-- Add member to group button -->
-        <div class="relative mt-4">
+        <div class="relative mt-4 z-10">
           <button 
-            @click="toggleDropdown(group.id)"
-            class="w-full py-3 border-2 border-dashed border-slate-200 rounded-2xl text-slate-500 font-medium hover:text-violet-600 hover:border-violet-300 hover:bg-violet-50 transition-colors flex items-center justify-center gap-2"
+            @click="openAddMemberModal(group.id)"
+            :class="[
+              'w-full py-3 border-2 border-dashed rounded-2xl font-medium transition-all flex items-center justify-center gap-2',
+              `border-${group.color}-200/80 text-${group.color}-600 hover:border-${group.color}-400 hover:bg-${group.color}-50/50 hover:shadow-sm`
+            ]"
           >
             <UserPlus class="w-4 h-4" /> Thêm người / Kéo thả
           </button>
           
-          <div v-if="activeDropdownGroupId === group.id" class="absolute z-20 w-full mt-2 bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-2">
-            <div class="px-3 py-2 border-b border-slate-100 bg-slate-50 text-xs font-semibold text-slate-500">
-              Thành viên rảnh (Chưa phân nhóm)
-            </div>
-            <div v-if="getUnassignedMembers().length > 0" class="max-h-48 overflow-y-auto custom-scrollbar">
-              <button 
-                v-for="m in getUnassignedMembers()" 
-                :key="m.id" 
-                @click="assignMemberToGroup(m.id, group.id); activeDropdownGroupId = null" 
-                class="w-full flex items-center gap-3 p-3 hover:bg-slate-50 border-b border-slate-50 last:border-0 text-left transition-colors"
-              >
-                <div :class="['w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold text-white shadow-sm shrink-0', `bg-gradient-to-br from-${m.color}-400 to-${m.color}-600`]">
-                  {{ m.initials }}
-                </div>
-                <div class="min-w-0">
-                  <p class="text-sm font-semibold text-slate-800 truncate">{{ m.name }}</p>
-                  <p class="text-xs text-slate-500 truncate">{{ m.role }}</p>
-                </div>
-              </button>
-            </div>
-            <div v-else class="p-6 text-center">
-              <p class="text-sm font-medium text-slate-600">Tất cả nhân sự đã có nhóm!</p>
-            </div>
-          </div>
         </div>
       </div>
     </div>

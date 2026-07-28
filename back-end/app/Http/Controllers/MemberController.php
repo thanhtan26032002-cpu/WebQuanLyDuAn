@@ -13,7 +13,7 @@ class MemberController extends Controller
     // Lấy danh sách toàn bộ thành viên
     public function index()
     {
-        $members = Member::select('member_code', 'member_name', 'member_email', 'member_avatar', 'member_role', 'member_phone', 'member_department', 'member_join_date', 'member_bio', 'member_online')->get();
+        $members = Member::select('member_code', 'member_name', 'member_email', 'member_avatar', 'member_color', 'member_role', 'member_phone', 'member_department', 'member_join_date', 'member_bio', 'member_online')->get();
 
         return response()->json($members);
     }
@@ -28,6 +28,7 @@ class MemberController extends Controller
             'phone' => 'nullable|string|regex:/^[0-9\+\-\(\)\s]{7,20}$/',
             'department' => 'nullable|string|max:255',
             'bio' => 'nullable|string|max:1000',
+            'color' => 'nullable|string|max:30',
             'group_code' => 'nullable|exists:groups,group_code',
         ]);
 
@@ -42,6 +43,7 @@ class MemberController extends Controller
             $member->member_phone = $validated['phone'] ?? null;
             $member->member_department = $validated['department'] ?? null;
             $member->member_bio = $validated['bio'] ?? null;
+            $member->member_color = $validated['color'] ?? 'blue';
             $member->member_join_date = now()->toDateString();
             $member->save();
 
@@ -67,6 +69,7 @@ class MemberController extends Controller
             'phone' => 'nullable|string|regex:/^[0-9\+\-\(\)\s]{7,20}$/',
             'department' => 'nullable|string|max:255',
             'bio' => 'nullable|string|max:1000',
+            'color' => 'nullable|string|max:30',
             'online' => 'nullable|boolean',
             'group_code' => 'sometimes|nullable|exists:groups,group_code',
         ]);

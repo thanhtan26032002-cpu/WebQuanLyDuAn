@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS `members` (
   `member_name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   `member_email` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   `member_avatar` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `member_color` varchar(30) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'blue',
   `member_role` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'member',
   `member_phone` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `member_department` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
