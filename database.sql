@@ -57,6 +57,7 @@ CREATE TABLE IF NOT EXISTS `projects` (
   `project_code` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
   `project_name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   `project_description` text COLLATE utf8mb4_unicode_ci,
+  `project_color` varchar(30) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'indigo',
   `project_status` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'planning',
   `project_start_date` date DEFAULT NULL,
   `project_due_date` date DEFAULT NULL,

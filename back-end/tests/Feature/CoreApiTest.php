@@ -7,6 +7,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -30,6 +31,7 @@ class CoreApiTest extends TestCase
 
         $projectResponse = $this->postJson('/api/projects', [
             'name' => 'Dự án kiểm thử',
+            'color' => 'rose',
             'status' => 'active',
             'due_date' => now()->toDateString(),
             'user_code' => $user->user_code,
@@ -38,6 +40,7 @@ class CoreApiTest extends TestCase
         $projectResponse
             ->assertCreated()
             ->assertJsonPath('project.code', 'PJ0001')
+            ->assertJsonPath('project.color', 'rose')
             ->assertJsonPath('project.due_date', now()->toDateString());
 
         $taskResponse = $this->postJson('/api/tasks', [
@@ -67,6 +70,7 @@ class CoreApiTest extends TestCase
 
         $this->getJson('/api/projects/PJ0001')
             ->assertOk()
+            ->assertJsonPath('color', 'rose')
             ->assertJsonCount(1, 'tasks');
 
         $this->putJson('/api/projects/PJ0001/members', [
@@ -75,7 +79,9 @@ class CoreApiTest extends TestCase
 
         $this->getJson('/api/activities')
             ->assertOk()
-            ->assertJsonCount(4);
+            ->assertJsonCount(4)
+            ->assertJsonPath('0.user.code', $user->user_code)
+            ->assertJsonPath('0.user.name', 'Quản trị viên');
 
         $this->assertDatabaseHas('tasks', [
             'task_code' => 'TK0001',
@@ -145,10 +151,42 @@ class CoreApiTest extends TestCase
             'user_code' => $user->user_code,
         ])->assertCreated()->assertJsonPath('project.due_date', null);
 
+        $this->postJson('/api/projects', [
+            'name' => 'Hạn chót để trống',
+            'due_date' => '',
+            'user_code' => $user->user_code,
+        ])->assertCreated()->assertJsonPath('project.due_date', null);
+
+        $this->putJson('/api/projects/PJ0002', [
+            'due_date' => '',
+        ])->assertOk()->assertJsonPath('project.due_date', null);
+
         $this->postJson('/api/tasks', [
             'title' => 'Hạn chót đã qua',
             'due_date' => now()->subDay()->toDateString(),
             'user_code' => $user->user_code,
         ])->assertUnprocessable()->assertJsonValidationErrors('due_date');
+    }
+
+    public function test_project_creation_remains_compatible_before_color_migration_is_applied(): void
+    {
+        User::create([
+            'user_name' => 'Quản trị viên',
+            'user_email' => 'admin@example.com',
+            'user_password' => Hash::make('test-password'),
+        ]);
+
+        Schema::table('projects', function ($table) {
+            $table->dropColumn('project_color');
+        });
+
+        $this->postJson('/api/projects', [
+            'name' => 'Dự án trên schema cũ',
+            'color' => 'rose',
+            'due_date' => '',
+            'user_code' => 'US0001',
+        ])->assertCreated()
+            ->assertJsonPath('project.due_date', null)
+            ->assertJsonMissingPath('project.color');
     }
 }

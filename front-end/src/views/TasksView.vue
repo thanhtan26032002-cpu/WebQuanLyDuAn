@@ -1,6 +1,7 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { Plus, Search, List, KanbanSquare, MoreHorizontal, Check, CheckSquare } from '@lucide/vue'
+import draggable from 'vuedraggable'
 import TaskCard from '../components/common/TaskCard.vue'
 import UserAvatar from '../components/common/UserAvatar.vue'
 import { useProjectWorkspace } from '../composables/useProjectWorkspace'
@@ -8,7 +9,7 @@ import { useProjectWorkspace } from '../composables/useProjectWorkspace'
 const statusFilter = ref('all')
 const priorityFilter = ref('all')
 const viewMode = ref('kanban')
-const { tasks, globalSearch, taskModalOpen, priorityMap, taskStatusMap, findMember, findProject, formatDate, getTaskDeadlineState, toggleTaskComplete, activeTaskId, updateTask } = useProjectWorkspace()
+const { tasks, globalSearch, taskModalOpen, priorityMap, taskStatusMap, findMember, findProject, formatDate, getTaskDeadlineState, toggleTaskComplete, activeTaskId, moveTask } = useProjectWorkspace()
 
 const deadlineDateClass = (task) => {
   const state = getTaskDeadlineState(task.dueDate, task.status)
@@ -34,7 +35,13 @@ const openTask = (task) => {
 }
 
 const moveTaskStatus = (task, newStatus) => {
-  updateTask(task.id, { ...task, status: newStatus })
+  moveTask(task.id, newStatus)
+}
+
+const onTaskChange = (event, newStatus) => {
+  if (event.added) {
+    moveTask(event.added.element.id, newStatus)
+  }
 }
 
 const columns = [
@@ -204,49 +211,58 @@ const getTasksByStatus = (statusId) => {
           </div>
 
           <!-- Column Tasks -->
-          <div class="flex-1 space-y-3">
-            <div 
-              v-for="task in getTasksByStatus(col.id)" 
-              :key="task.id" 
-              class="relative group"
-            >
-              <div @click="openTask(task)" class="cursor-pointer hover:ring-2 hover:ring-violet-400 hover:ring-offset-2 hover:ring-offset-slate-50 rounded-xl transition-all">
-                <TaskCard :task="task" :show-status="false" />
+          <draggable
+            :list="getTasksByStatus(col.id)"
+            group="all-tasks"
+            item-key="id"
+            ghost-class="opacity-40"
+            chosen-class="ring-2"
+            drag-class="rotate-1"
+            class="flex-1 space-y-3 min-h-[140px]"
+            @change="onTaskChange($event, col.id)"
+          >
+            <template #item="{ element: task }">
+              <div class="relative group cursor-grab active:cursor-grabbing">
+                <div @click="openTask(task)" class="hover:ring-2 hover:ring-violet-400 hover:ring-offset-2 hover:ring-offset-slate-50 rounded-xl transition-all">
+                  <TaskCard :task="task" :show-status="false" />
+                </div>
+
+                <!-- Quick Move Actions -->
+                <div class="absolute -right-3 -bottom-3 opacity-0 group-hover:opacity-100 transition-opacity bg-white border border-slate-200 shadow-lg rounded-xl p-1 flex gap-1 z-10">
+                  <button
+                    v-if="col.id !== 'todo'"
+                    @click.stop="moveTaskStatus(task, 'todo')"
+                    class="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
+                    title="Chuyển sang Cần làm"
+                  >
+                    <div class="w-3 h-3 rounded-sm bg-slate-300"></div>
+                  </button>
+                  <button
+                    v-if="col.id !== 'in_progress'"
+                    @click.stop="moveTaskStatus(task, 'in_progress')"
+                    class="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                    title="Chuyển sang Đang làm"
+                  >
+                    <div class="w-3 h-3 rounded-sm bg-blue-400"></div>
+                  </button>
+                  <button
+                    v-if="col.id !== 'done'"
+                    @click.stop="moveTaskStatus(task, 'done')"
+                    class="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                    title="Chuyển sang Hoàn thành"
+                  >
+                    <div class="w-3 h-3 rounded-sm bg-emerald-400"></div>
+                  </button>
+                </div>
               </div>
-              
-              <!-- Quick Move Actions -->
-              <div class="absolute -right-3 -bottom-3 opacity-0 group-hover:opacity-100 transition-opacity bg-white border border-slate-200 shadow-lg rounded-xl p-1 flex gap-1 z-10">
-                <button 
-                  v-if="col.id !== 'todo'" 
-                  @click.stop="moveTaskStatus(task, 'todo')"
-                  class="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
-                  title="Chuyển sang Cần làm"
-                >
-                  <div class="w-3 h-3 rounded-sm bg-slate-300"></div>
-                </button>
-                <button 
-                  v-if="col.id !== 'in_progress'" 
-                  @click.stop="moveTaskStatus(task, 'in_progress')"
-                  class="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                  title="Chuyển sang Đang làm"
-                >
-                  <div class="w-3 h-3 rounded-sm bg-blue-400"></div>
-                </button>
-                <button 
-                  v-if="col.id !== 'done'" 
-                  @click.stop="moveTaskStatus(task, 'done')"
-                  class="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
-                  title="Chuyển sang Hoàn thành"
-                >
-                  <div class="w-3 h-3 rounded-sm bg-emerald-400"></div>
-                </button>
+            </template>
+
+            <template #footer>
+              <div v-if="getTasksByStatus(col.id).length === 0" class="border-2 border-dashed border-slate-200 rounded-xl p-6 text-center text-slate-400 text-sm font-medium">
+                Kéo thả nhiệm vụ vào đây
               </div>
-            </div>
-            
-            <div v-if="getTasksByStatus(col.id).length === 0" class="border-2 border-dashed border-slate-200 rounded-xl p-6 text-center text-slate-400 text-sm font-medium">
-              Kéo thả nhiệm vụ vào đây
-            </div>
-          </div>
+            </template>
+          </draggable>
         </div>
       </div>
       

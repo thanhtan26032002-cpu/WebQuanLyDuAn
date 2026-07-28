@@ -25,6 +25,7 @@ const handleEdit = () => {
 
 const gradientMap = {
   purple: "from-violet-500 to-indigo-600",
+  violet: "from-violet-500 to-indigo-600",
   indigo: "from-indigo-500 to-violet-600",
   emerald: "from-emerald-500 to-teal-600",
   amber: "from-amber-500 to-orange-600",
@@ -38,6 +39,7 @@ const gradientMap = {
 
 const progressBgMap = {
   purple: "bg-violet-500",
+  violet: "bg-violet-500",
   indigo: "bg-indigo-500",
   emerald: "bg-emerald-500",
   amber: "bg-amber-500",

@@ -37,7 +37,6 @@ const {
   projectModalOpen,
   taskModalOpen,
   activities,
-  findMember,
   findProject,
   formatDate,
   moveTask,
@@ -510,7 +509,7 @@ const timeAgo = (dateStr) => {
 
           <div class="p-5 flex-1 overflow-y-auto custom-scrollbar">
             <div
-              v-if="false"
+              v-if="activities.length"
               class="relative border-l border-slate-200 ml-4 space-y-6 pb-4"
             >
               <div
@@ -523,17 +522,17 @@ const timeAgo = (dateStr) => {
                   <div
                     :class="[
                       'w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold text-white shadow-sm ring-4 ring-white',
-                      `bg-${findMember(activity.memberId).color}-500`,
+                      `bg-${activity.actor?.color || 'slate'}-500`,
                     ]"
                   >
-                    {{ findMember(activity.memberId).initials }}
+                    {{ activity.actor?.initials || "HT" }}
                   </div>
                 </div>
 
                 <div class="bg-slate-50 rounded-xl p-3 border border-slate-100">
                   <p class="text-sm text-slate-600 leading-snug">
                     <span class="font-bold text-slate-900">{{
-                      findMember(activity.memberId).name
+                      activity.actor?.name || "Người dùng hệ thống"
                     }}</span>
                     {{ activity.action }}
                     <span class="font-medium text-slate-900">{{

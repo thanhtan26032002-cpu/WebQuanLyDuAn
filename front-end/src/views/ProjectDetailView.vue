@@ -4,7 +4,6 @@ import { useRoute, useRouter } from 'vue-router'
 import { FolderKanban, Calendar, Clock, ArrowLeft, Plus, MoreVertical, ListTodo, Paperclip, MoreHorizontal, Check, Settings, ShieldAlert, LogOut, CheckCircle2, Users, CalendarDays, Tag, LayoutGrid, List } from '@lucide/vue'
 import draggable from 'vuedraggable'
 import { useProjectWorkspace } from '../composables/useProjectWorkspace'
-import UserAvatar from '../components/common/UserAvatar.vue'
 import TaskCard from '../components/common/TaskCard.vue'
 import { ref } from 'vue'
 import DownloadArchiveModal from '../components/modals/DownloadArchiveModal.vue'
@@ -100,6 +99,7 @@ const stats = computed(() => [
 
 const gradientMap = {
   purple: 'from-violet-500 to-indigo-600',
+  violet: 'from-violet-500 to-indigo-600',
   indigo: 'from-indigo-500 to-violet-600',
   emerald: 'from-emerald-500 to-teal-600',
   amber: 'from-amber-500 to-orange-600',
@@ -293,18 +293,23 @@ const projectStatusClasses = {
       <div class="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 flex flex-col md:col-span-2 lg:col-span-3">
         <h2 class="text-lg font-bold text-slate-900 mb-6">Nhật ký hoạt động</h2>
         
-        <div v-if="false" class="relative">
+        <div v-if="projectActivities.length" class="relative">
           <div class="absolute top-2 bottom-2 left-[19px] w-px bg-slate-200"></div>
           <div class="space-y-6 relative">
             <div v-for="activity in projectActivities" :key="activity.id" class="flex gap-4">
               <!-- Avatar Node -->
-              <div class="relative z-10 rounded-full bg-white flex items-center justify-center shrink-0 border-4 border-white shadow-sm ring-1 ring-slate-100">
-                <UserAvatar :member-id="activity.memberId" size="md" />
+              <div
+                :class="[
+                  'relative z-10 w-10 h-10 rounded-full flex items-center justify-center shrink-0 border-4 border-white shadow-sm ring-1 ring-slate-100 text-xs font-bold text-white',
+                  `bg-${activity.actor?.color || 'slate'}-500`
+                ]"
+              >
+                {{ activity.actor?.initials || 'HT' }}
               </div>
               <!-- Content -->
               <div class="pt-2">
                 <p class="text-sm text-slate-900">
-                  <span class="font-semibold">{{ findMember(activity.memberId).name }}</span>
+                  <span class="font-semibold">{{ activity.actor?.name || 'Người dùng hệ thống' }}</span>
                   <span class="text-slate-500"> {{ activity.action }} </span>
                   <span class="font-medium text-slate-800">{{ activity.target }}</span>
                 </p>

@@ -19,7 +19,7 @@ class Project extends Model
     const UPDATED_AT = 'project_updated_at';
 
     protected $fillable = [
-        'project_name', 'project_description', 'project_status', 
+        'project_name', 'project_description', 'project_color', 'project_status',
         'project_start_date', 'project_due_date', 'project_created_by', 'project_progress'
     ];
 
@@ -34,6 +34,7 @@ class Project extends Model
             'project_code' => 'code',
             'project_name' => 'name',
             'project_description' => 'description',
+            'project_color' => 'color',
             'project_status' => 'status',
             'project_start_date' => 'start_date',
             'project_due_date' => 'due_date',

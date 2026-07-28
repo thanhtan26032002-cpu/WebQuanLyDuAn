@@ -1,5 +1,5 @@
 <script setup>
-import { ref, reactive, onMounted, onUnmounted, watch, computed } from 'vue'
+import { ref, reactive, onMounted, onUnmounted, watch, computed, nextTick } from 'vue'
 import { X, Settings, Check, Trash2, AlertTriangle } from '@lucide/vue'
 import { useRouter } from 'vue-router'
 import { useProjectWorkspace } from '../../composables/useProjectWorkspace'
@@ -18,6 +18,13 @@ const form = reactive({
 
 const isDeleting = ref(false)
 const errors = ref({})
+const modalBody = ref(null)
+const errorMessages = computed(() => [...new Set(Object.values(errors.value).filter(Boolean))])
+
+function showErrors(nextErrors) {
+  errors.value = nextErrors
+  nextTick(() => modalBody.value?.scrollTo({ top: 0, behavior: 'smooth' }))
+}
 
 const project = computed(() => projects.value.find(p => p.id === editingProjectId.value))
 
@@ -46,14 +53,18 @@ const colors = [
   { id: 'orange', bg: 'bg-orange-500', ring: 'ring-orange-500' }
 ]
 
-function submit() {
+async function submit() {
   errors.value = {}
   if (!form.name.trim()) {
-    errors.value.name = 'Vui lòng nhập tên dự án.'
+    showErrors({ name: 'Vui lòng nhập tên dự án.' })
     return
   }
-  updateProject(editingProjectId.value, { ...form, name: form.name.trim() })
-  projectSettingsModalOpen.value = false
+  const result = await updateProject(editingProjectId.value, { ...form, name: form.name.trim() })
+  if (result?.success) {
+    projectSettingsModalOpen.value = false
+  } else {
+    showErrors(result?.errors || { _general: 'Không thể cập nhật dự án.' })
+  }
 }
 
 function confirmDelete() {
@@ -97,7 +108,13 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
         </header>
 
         <!-- Body -->
-        <div class="p-6 overflow-y-auto space-y-8 custom-scrollbar flex-1">
+        <div ref="modalBody" class="p-6 overflow-y-auto space-y-8 custom-scrollbar flex-1">
+          <div v-if="errorMessages.length" role="alert" class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            <p class="font-semibold">Không thể lưu thay đổi. Vui lòng kiểm tra:</p>
+            <ul class="mt-1 list-disc space-y-0.5 pl-5">
+              <li v-for="message in errorMessages" :key="message">{{ message }}</li>
+            </ul>
+          </div>
           <!-- Basic Info -->
           <form id="project-settings-form" @submit.prevent="submit" class="space-y-5">
             <div class="space-y-2">
@@ -145,7 +162,8 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
               </div>
               <div class="space-y-2">
                 <label class="block text-sm font-semibold text-slate-700">Hạn chót</label>
-                <input v-model="form.dueDate" type="date" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 focus:bg-white focus:border-violet-300 focus:ring-4 focus:ring-violet-500/10 transition-all outline-none cursor-pointer" />
+                <input v-model="form.dueDate" type="date" @input="errors.due_date = ''" :class="['w-full bg-slate-50 border rounded-xl px-4 py-2.5 text-slate-900 focus:bg-white focus:ring-4 transition-all outline-none cursor-pointer', errors.due_date ? 'border-red-300 focus:border-red-300 focus:ring-red-500/10' : 'border-slate-200 focus:border-violet-300 focus:ring-violet-500/10']" />
+                <p v-if="errors.due_date" class="text-xs font-medium text-red-500">{{ errors.due_date }}</p>
               </div>
             </div>
 

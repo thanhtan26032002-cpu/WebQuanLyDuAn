@@ -92,13 +92,36 @@ function mapTask(t) {
 }
 
 function mapActivity(a) {
+  const actorCode = a.user?.code || a.user_code || a.memberId || null
+  const actorName = a.user?.name || 'Người dùng hệ thống'
+  const actorColors = ['purple', 'blue', 'pink', 'orange', 'green', 'sky']
+  const colorIndex = actorCode
+    ? actorCode.charCodeAt(actorCode.length - 1) % actorColors.length
+    : 0
+
   return {
     ...a,
     id: a.code,
-    memberId: a.user_code || a.memberId,
+    userId: actorCode,
     targetType: a.target_type || a.targetType,
     targetId: a.target_code || a.targetId,
+    projectId: (a.target_type || a.targetType)?.toLowerCase() === 'project'
+      ? (a.target_code || a.targetId)
+      : null,
     createdAt: a.created_at || a.createdAt,
+    actor: {
+      id: actorCode,
+      name: actorName,
+      initials: actorName
+        .split(' ')
+        .filter(Boolean)
+        .map(part => part[0])
+        .join('')
+        .toUpperCase()
+        .slice(0, 2) || 'HT',
+      avatar: a.user?.avatar || null,
+      color: a.user?.color || actorColors[colorIndex],
+    },
   }
 }
 
@@ -261,6 +284,7 @@ let toastTimer
 // Helper: Dịch lỗi xác thực từ Backend sang tiếng Việt
 function translateValidationMessage(msg, field = '') {
   if (!msg || typeof msg !== 'string') return 'Dữ liệu không hợp lệ.'
+  const normalizedMessage = msg.toLowerCase()
   
   const fieldNames = {
     name: 'Tên',
@@ -279,19 +303,24 @@ function translateValidationMessage(msg, field = '') {
   }
   const fieldName = fieldNames[field] || 'Trường này'
 
-  if (msg.includes('is required') || msg.includes('required')) {
+  if (normalizedMessage.includes('is required') || normalizedMessage.includes('required')) {
     return `Vui lòng nhập ${fieldName.toLowerCase()}.`
   }
-  if (msg.includes('already been taken') || msg.includes('taken')) {
+  if (normalizedMessage.includes('already been taken') || normalizedMessage.includes('taken')) {
     return `${fieldName} này đã tồn tại trong hệ thống.`
   }
-  if (msg.includes('valid email address') || msg.includes('email') && msg.includes('valid')) {
+  if (normalizedMessage.includes('valid email address') || normalizedMessage.includes('email') && normalizedMessage.includes('valid')) {
     return 'Vui lòng nhập địa chỉ email hợp lệ.'
   }
-  if (msg.includes('after or equal to today') || msg.includes('after_or_equal')) {
+  if (normalizedMessage.includes('after or equal to today') || normalizedMessage.includes('after_or_equal')) {
     return 'Hạn chót phải từ ngày hôm nay trở đi.'
   }
-  if (msg.includes('must be a date') || msg.includes('date') || msg.includes('invalid date')) {
+  if (
+    normalizedMessage.includes('must be a date') ||
+    normalizedMessage.includes('must be a valid date') ||
+    normalizedMessage.includes('invalid date') ||
+    normalizedMessage.includes('date format')
+  ) {
     return 'Ngày tháng không hợp lệ.'
   }
   if (msg.includes('must not be greater than') || msg.includes('max')) {
@@ -323,6 +352,10 @@ async function parseValidationErrors(response) {
         result[field] = translateValidationMessage(messages[0], field) // Lấy lỗi đầu tiên và dịch sang tiếng Việt
       }
       return result
+    }
+    if (response.status >= 500) {
+      console.error('Lỗi máy chủ:', data.message || data)
+      return { _general: 'Máy chủ gặp lỗi khi lưu dữ liệu. Vui lòng kiểm tra migration và nhật ký máy chủ.' }
     }
     return { _general: translateValidationMessage(data.message || 'Đã xảy ra lỗi.') }
   } catch {
@@ -403,6 +436,7 @@ export function useProjectWorkspace() {
         body: JSON.stringify({
           name: payload.name,
           description: payload.description || '',
+          color: payload.color || 'indigo',
           status: payload.status || 'planning',
           start_date: payload.startDate || new Date().toISOString().split('T')[0],
           due_date: payload.dueDate || null,
@@ -440,10 +474,27 @@ export function useProjectWorkspace() {
 
   async function updateProject(projectId, updates) {
     try {
+      const payload = {}
+      if (updates.name !== undefined) payload.name = updates.name
+      if (updates.description !== undefined) payload.description = updates.description
+      if (updates.color !== undefined) payload.color = updates.color
+      if (updates.status !== undefined) payload.status = updates.status
+      if (updates.progress !== undefined) payload.progress = Number(updates.progress)
+      if (updates.startDate !== undefined || updates.start_date !== undefined) {
+        payload.start_date = updates.start_date !== undefined
+          ? (updates.start_date || null)
+          : (updates.startDate || null)
+      }
+      if (updates.dueDate !== undefined || updates.due_date !== undefined) {
+        payload.due_date = updates.due_date !== undefined
+          ? (updates.due_date || null)
+          : (updates.dueDate || null)
+      }
+
       const res = await fetch(`${API_URL}/projects/${projectId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-        body: JSON.stringify(updates)
+        body: JSON.stringify(payload)
       })
       if (res.ok) {
         const data = await res.json()
@@ -451,9 +502,13 @@ export function useProjectWorkspace() {
         if (idx >= 0) Object.assign(projects.value[idx], mapProject(data.project))
         //refreshActivitiesAndNotifications()
         notify('Đã cập nhật thông tin dự án')
+        return { success: true, project: idx >= 0 ? projects.value[idx] : mapProject(data.project) }
       }
+      const errors = await parseValidationErrors(res)
+      return { success: false, errors }
     } catch (e) {
       notify('Lỗi kết nối: Không thể cập nhật dự án')
+      return { success: false, errors: { _general: 'Không thể kết nối tới máy chủ.' } }
     }
   }
 

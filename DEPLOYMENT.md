@@ -24,6 +24,8 @@
 
    Không import `database.sql` rồi chạy migration trên cùng database. File SQL chỉ dành cho cách cài đặt thủ công cũ.
 
+   Nếu hosting đang dùng database đã import từ `database.sql` của phiên bản cũ, không chạy toàn bộ migration. Hãy import riêng file `database-upgrade-2026-07-28.sql` để bổ sung cột màu dự án.
+
 5. Tạo liên kết file upload và cache cấu hình:
 
    `php artisan storage:link`

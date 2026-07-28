@@ -1,5 +1,5 @@
 <script setup>
-import { reactive, ref, onMounted, onUnmounted } from 'vue'
+import { computed, nextTick, reactive, ref, onMounted, onUnmounted } from 'vue'
 import { X, FolderKanban, Plus, Check, Paperclip, UploadCloud } from '@lucide/vue'
 import { useProjectWorkspace } from '../../composables/useProjectWorkspace'
 
@@ -28,6 +28,13 @@ const colors = [
 ]
 
 const errors = ref({})
+const modalBody = ref(null)
+const errorMessages = computed(() => [...new Set(Object.values(errors.value).filter(Boolean))])
+
+function showErrors(nextErrors) {
+  errors.value = nextErrors
+  nextTick(() => modalBody.value?.scrollTo({ top: 0, behavior: 'smooth' }))
+}
 
 function toggleMember(memberId) {
   const index = form.memberIds.indexOf(memberId)
@@ -38,13 +45,13 @@ function toggleMember(memberId) {
 async function submit() {
   errors.value = {}
   if (!form.name.trim()) {
-    errors.value.name = 'Vui lòng nhập tên dự án.'
+    showErrors({ name: 'Vui lòng nhập tên dự án.' })
     return
   }
   
   const res = await addProject({ ...form, name: form.name.trim(), memberIds: [...form.memberIds], files: [...selectedFiles.value] })
   if (res && res.success === false && res.errors) {
-    errors.value = res.errors
+    showErrors(res.errors)
   } else if (res && res.success) {
     // modal is closed in useProjectWorkspace
     form.name = ''
@@ -99,7 +106,13 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
         </header>
 
         <!-- Body -->
-        <div class="p-6 overflow-y-auto space-y-5 custom-scrollbar flex-1">
+        <div ref="modalBody" class="p-6 overflow-y-auto space-y-5 custom-scrollbar flex-1">
+          <div v-if="errorMessages.length" role="alert" class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            <p class="font-semibold">Không thể tạo dự án. Vui lòng kiểm tra:</p>
+            <ul class="mt-1 list-disc space-y-0.5 pl-5">
+              <li v-for="message in errorMessages" :key="message">{{ message }}</li>
+            </ul>
+          </div>
           <div class="space-y-2">
             <label class="block text-sm font-semibold text-slate-700">Tên dự án *</label>
             <input v-model="form.name" autofocus placeholder="Ví dụ: Thiết kế lại website" @input="errors.name = ''" :class="['w-full bg-slate-50 border rounded-xl px-4 py-2.5 text-slate-900 focus:bg-white focus:ring-4 transition-all outline-none', errors.name ? 'border-red-300 focus:border-red-300 focus:ring-red-500/10' : 'border-slate-200 focus:border-violet-300 focus:ring-violet-500/10']" />
@@ -147,7 +160,7 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
             </div>
             <div class="space-y-2">
               <label class="block text-sm font-semibold text-slate-700">Hạn chót</label>
-              <input v-model="form.dueDate" type="date" :class="['w-full bg-slate-50 border rounded-xl px-4 py-2.5 text-slate-900 focus:bg-white focus:ring-4 transition-all outline-none cursor-pointer', errors.due_date ? 'border-red-300 focus:border-red-300 focus:ring-red-500/10' : 'border-slate-200 focus:border-violet-300 focus:ring-violet-500/10']" />
+              <input v-model="form.dueDate" type="date" @input="errors.due_date = ''" :class="['w-full bg-slate-50 border rounded-xl px-4 py-2.5 text-slate-900 focus:bg-white focus:ring-4 transition-all outline-none cursor-pointer', errors.due_date ? 'border-red-300 focus:border-red-300 focus:ring-red-500/10' : 'border-slate-200 focus:border-violet-300 focus:ring-violet-500/10']" />
               <p v-if="errors.due_date" class="text-xs font-medium text-red-500">{{ errors.due_date }}</p>
             </div>
           </div>

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Project;
 use App\Services\ActivityService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 
 class ProjectController extends Controller
 {
@@ -39,14 +40,18 @@ class ProjectController extends Controller
     // Tạo dự án mới
     public function store(Request $request)
     {
+        $this->normalizeOptionalDates($request);
+
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
+            'color' => 'sometimes|string|in:indigo,emerald,amber,rose,sky,violet,orange,purple,green,pink,blue',
             'status' => 'nullable|string|in:planning,active,on_hold,completed',
             'start_date' => 'nullable|date',
             'due_date' => 'nullable|date|after_or_equal:today',
             'progress' => 'nullable|integer|min:0|max:100',
         ]);
+        $validated = $this->discardFieldsMissingFromLegacySchema($validated);
 
         $dbData = Project::mapToDbAttributes($validated);
         $dbData['project_created_by'] = $request->input('user_code', 'US0001');
@@ -73,15 +78,18 @@ class ProjectController extends Controller
     public function update(Request $request, $code)
     {
         $project = Project::findOrFail($code);
+        $this->normalizeOptionalDates($request);
 
         $validated = $request->validate([
             'name' => 'nullable|string|max:255',
             'description' => 'nullable|string',
+            'color' => 'sometimes|string|in:indigo,emerald,amber,rose,sky,violet,orange,purple,green,pink,blue',
             'status' => 'nullable|string|in:planning,active,on_hold,completed',
             'start_date' => 'nullable|date',
             'due_date' => 'nullable|date',
             'progress' => 'nullable|integer|min:0|max:100',
         ]);
+        $validated = $this->discardFieldsMissingFromLegacySchema($validated);
 
         $project->update(Project::mapToDbAttributes($validated));
 
@@ -138,5 +146,23 @@ class ProjectController extends Controller
             'message' => 'Đã cập nhật thành viên dự án',
             'project' => $project,
         ]);
+    }
+
+    private function normalizeOptionalDates(Request $request): void
+    {
+        foreach (['start_date', 'due_date'] as $field) {
+            if (array_key_exists($field, $request->all()) && trim((string) $request->input($field)) === '') {
+                $request->merge([$field => null]);
+            }
+        }
+    }
+
+    private function discardFieldsMissingFromLegacySchema(array $validated): array
+    {
+        if (! Schema::hasColumn('projects', 'project_color')) {
+            unset($validated['color']);
+        }
+
+        return $validated;
     }
 }
