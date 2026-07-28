@@ -35,14 +35,14 @@ const close = () => {
   errors.value = {}
 }
 
-const submit = () => {
+const submit = async () => {
   errors.value = {}
   if (!formData.value.name.trim()) {
     errors.value.name = 'Vui lòng nhập tên nhóm.'
     return
   }
-  addGroup({ ...formData.value })
-  close()
+  const result = await addGroup({ ...formData.value })
+  if (result?.success) close()
 }
 </script>
 

@@ -18,7 +18,7 @@ import MemberDetailModal from "./components/common/MemberDetailModal.vue";
 import { useProjectWorkspace } from "./composables/useProjectWorkspace";
 
 const route = useRoute();
-const { projectModalOpen, taskModalOpen, toastMessage, sidebarOpen } =
+const { projectModalOpen, taskModalOpen, toastMessage, sidebarOpen, apiConnectionError } =
   useProjectWorkspace();
 </script>
 
@@ -50,6 +50,14 @@ const { projectModalOpen, taskModalOpen, toastMessage, sidebarOpen } =
     <div class="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
       <!-- Topbar -->
       <AppTopbar />
+
+      <div
+        v-if="apiConnectionError"
+        class="mx-4 mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800 sm:mx-6 lg:mx-8"
+        role="alert"
+      >
+        {{ apiConnectionError }}
+      </div>
 
       <!-- Main Scrollable Content -->
       <main

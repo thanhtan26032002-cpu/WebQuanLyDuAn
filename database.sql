@@ -11,13 +11,17 @@ CREATE TABLE IF NOT EXISTS `users` (
   `user_email` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   `user_avatar` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `user_role` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'admin',
+  `user_phone` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `user_department` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `user_email_verified_at` timestamp NULL DEFAULT NULL,
   `user_password` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `user_api_token` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `user_remember_token` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `user_created_at` timestamp NULL DEFAULT NULL,
   `user_updated_at` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`user_code`),
-  UNIQUE KEY `users_email_unique` (`user_email`)
+  UNIQUE KEY `users_email_unique` (`user_email`),
+  UNIQUE KEY `users_api_token_unique` (`user_api_token`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `members` (
@@ -41,6 +45,9 @@ CREATE TABLE IF NOT EXISTS `groups` (
   `group_code` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
   `group_name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   `group_description` text COLLATE utf8mb4_unicode_ci,
+  `group_icon` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `group_color` varchar(30) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'violet',
+  `group_member_ids` json DEFAULT NULL,
   `group_created_at` timestamp NULL DEFAULT NULL,
   `group_updated_at` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`group_code`)
@@ -147,4 +154,4 @@ CREATE TABLE IF NOT EXISTS `notifications` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 INSERT INTO `users` (`user_code`, `user_name`, `user_email`, `user_role`, `user_password`, `user_created_at`, `user_updated_at`) VALUES
-('US0001', 'Quản trị viên', 'admin@example.com', 'admin', '$2y$12$N9Z/...', '2026-07-23 00:00:00', '2026-07-23 00:00:00');
+('US0001', 'Quản trị viên', 'admin@example.com', 'admin', '$2y$12$zSmAfCk/CeIQ8ydoDry2yuDu2n3P0Fa3NaLOnMM6uXMlNOjnx2kxy', '2026-07-23 00:00:00', '2026-07-23 00:00:00');

@@ -30,7 +30,7 @@ const close = () => {
   errors.value = {}
 }
 
-const save = () => {
+const save = async () => {
   errors.value = {}
   if (!member.value) return
   if (!editedMember.value.name?.trim()) {
@@ -45,7 +45,7 @@ const save = () => {
     errors.value.email = 'Vui lòng nhập địa chỉ email hợp lệ.'
     return
   }
-  updateMember(member.value.id, {
+  const result = await updateMember(member.value.id, {
     name: editedMember.value.name.trim(),
     email: editedMember.value.email.trim(),
     phone: editedMember.value.phone,
@@ -53,7 +53,7 @@ const save = () => {
     department: editedMember.value.department,
     bio: editedMember.value.bio
   })
-  isEditing.value = false
+  if (result?.success) isEditing.value = false
 }
 </script>
 

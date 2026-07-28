@@ -9,15 +9,21 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('attachments', function (Blueprint $table) {
-            $table->id();
-            $table->string('file_name');
-            $table->string('file_path');
-            $table->string('mime_type')->nullable();
-            $table->integer('size_bytes')->nullable();
-            $table->string('target_type'); // 'project', 'task'
-            $table->unsignedBigInteger('target_id');
-            $table->foreignId('uploaded_by')->constrained('users')->onDelete('cascade');
-            $table->timestamps();
+            $table->string('attachment_code', 50)->primary();
+            $table->string('attachment_file_name');
+            $table->string('attachment_file_path');
+            $table->string('attachment_mime_type')->nullable();
+            $table->unsignedBigInteger('attachment_size_bytes')->nullable();
+            $table->string('attachment_target_type');
+            $table->string('attachment_target_code', 50);
+            $table->string('attachment_uploaded_by', 50);
+            $table->timestamp('attachment_created_at')->nullable();
+            $table->timestamp('attachment_updated_at')->nullable();
+
+            $table->foreign('attachment_uploaded_by')
+                ->references('user_code')
+                ->on('users')
+                ->cascadeOnDelete();
         });
     }
 

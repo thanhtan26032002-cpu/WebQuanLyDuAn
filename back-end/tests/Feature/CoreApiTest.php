@@ -1,0 +1,154 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\Member;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
+use Tests\TestCase;
+
+class CoreApiTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_project_and_task_workflow_uses_the_deployment_schema(): void
+    {
+        $user = User::create([
+            'user_name' => 'Quản trị viên',
+            'user_email' => 'admin@example.com',
+            'user_password' => Hash::make('test-password'),
+            'user_role' => 'admin',
+        ]);
+
+        $member = Member::create([
+            'member_name' => 'Thành viên kiểm thử',
+            'member_email' => 'member@example.com',
+        ]);
+
+        $projectResponse = $this->postJson('/api/projects', [
+            'name' => 'Dự án kiểm thử',
+            'status' => 'active',
+            'due_date' => now()->toDateString(),
+            'user_code' => $user->user_code,
+        ]);
+
+        $projectResponse
+            ->assertCreated()
+            ->assertJsonPath('project.code', 'PJ0001')
+            ->assertJsonPath('project.due_date', now()->toDateString());
+
+        $taskResponse = $this->postJson('/api/tasks', [
+            'project_code' => 'PJ0001',
+            'title' => 'Nhiệm vụ kiểm thử',
+            'status' => 'todo',
+            'priority' => 'high',
+            'due_date' => now()->toDateString(),
+            'assignee_code' => $member->member_code,
+            'user_code' => $user->user_code,
+        ]);
+
+        $taskResponse
+            ->assertCreated()
+            ->assertJsonPath('task.code', 'TK0001')
+            ->assertJsonPath('task.project_code', 'PJ0001')
+            ->assertJsonPath('task.assignee.code', 'MB0001');
+
+        $this->patchJson('/api/tasks/TK0001/status', ['status' => 'done'])
+            ->assertOk()
+            ->assertJsonPath('task.status', 'done');
+
+        $this->postJson('/api/tasks/TK0001/comments', [
+            'text' => 'Đã hoàn tất',
+            'user_code' => $user->user_code,
+        ])->assertCreated();
+
+        $this->getJson('/api/projects/PJ0001')
+            ->assertOk()
+            ->assertJsonCount(1, 'tasks');
+
+        $this->putJson('/api/projects/PJ0001/members', [
+            'member_ids' => [$member->member_code],
+        ])->assertOk()->assertJsonPath('project.members.0.code', 'MB0001');
+
+        $this->getJson('/api/activities')
+            ->assertOk()
+            ->assertJsonCount(4);
+
+        $this->assertDatabaseHas('tasks', [
+            'task_code' => 'TK0001',
+            'task_status' => 'done',
+        ]);
+    }
+
+    public function test_team_and_attachment_changes_are_persisted(): void
+    {
+        Storage::fake('public');
+
+        User::create([
+            'user_name' => 'Quản trị viên',
+            'user_email' => 'admin@example.com',
+            'user_password' => Hash::make('test-password'),
+        ]);
+        $member = Member::create([
+            'member_name' => 'Thành viên',
+            'member_email' => 'member@example.com',
+        ]);
+
+        $this->putJson('/api/members/'.$member->member_code, [
+            'name' => 'Thành viên đã sửa',
+            'email' => 'member@example.com',
+            'role' => 'developer',
+        ])->assertOk()->assertJsonPath('member.name', 'Thành viên đã sửa');
+
+        $group = $this->postJson('/api/groups', [
+            'name' => 'Nhóm phát triển',
+            'icon' => '🚀',
+            'color' => 'violet',
+        ])->assertCreated()->json('group');
+
+        $this->putJson('/api/groups/members/'.$member->member_code, [
+            'group_code' => $group['code'],
+        ])->assertOk()->assertJsonPath('0.member_ids.0', $member->member_code);
+
+        $this->postJson('/api/projects', [
+            'name' => 'Dự án có tệp',
+            'user_code' => 'US0001',
+        ])->assertCreated();
+
+        $upload = $this->post('/api/upload', [
+            'file' => UploadedFile::fake()->create('tai-lieu.txt', 10, 'text/plain'),
+            'target_type' => 'Project',
+            'target_code' => 'PJ0001',
+        ])->assertCreated();
+
+        $attachmentCode = $upload->json('attachment.code');
+        $storedPath = ltrim(str_replace('/storage/', '', $upload->json('attachment.file_path')), '/');
+        Storage::disk('public')->assertExists($storedPath);
+
+        $this->deleteJson('/api/attachments/'.$attachmentCode)->assertOk();
+        Storage::disk('public')->assertMissing($storedPath);
+    }
+
+    public function test_deadline_is_optional_but_past_deadline_is_rejected(): void
+    {
+        $user = User::create([
+            'user_name' => 'Quản trị viên',
+            'user_email' => 'admin@example.com',
+            'user_password' => Hash::make('test-password'),
+        ]);
+
+        $this->postJson('/api/projects', [
+            'name' => 'Không có hạn chót',
+            'user_code' => $user->user_code,
+        ])->assertCreated()->assertJsonPath('project.due_date', null);
+
+        $this->postJson('/api/tasks', [
+            'title' => 'Hạn chót đã qua',
+            'due_date' => now()->subDay()->toDateString(),
+            'user_code' => $user->user_code,
+        ])->assertUnprocessable()->assertJsonValidationErrors('due_date');
+    }
+}

@@ -9,13 +9,19 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('activities', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
-            $table->string('action'); // created, updated, deleted, etc.
-            $table->string('target_type'); // project, task, etc.
-            $table->unsignedBigInteger('target_id');
-            $table->text('detail')->nullable(); // detail description
-            $table->timestamps();
+            $table->string('activity_code', 50)->primary();
+            $table->string('activity_user_code', 50);
+            $table->string('activity_action');
+            $table->string('activity_target_type');
+            $table->string('activity_target_code', 50);
+            $table->text('activity_detail')->nullable();
+            $table->timestamp('activity_created_at')->nullable();
+            $table->timestamp('activity_updated_at')->nullable();
+
+            $table->foreign('activity_user_code')
+                ->references('user_code')
+                ->on('users')
+                ->cascadeOnDelete();
         });
     }
 

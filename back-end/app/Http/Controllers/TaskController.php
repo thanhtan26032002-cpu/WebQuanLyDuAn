@@ -2,10 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Member;
 use App\Models\Task;
 use App\Models\TaskComment;
+use App\Models\User;
 use App\Services\ActivityService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
 
 class TaskController extends Controller
 {
@@ -13,6 +16,7 @@ class TaskController extends Controller
     public function index()
     {
         $tasks = Task::with(['assignee:member_code,member_name,member_avatar', 'attachments'])->get();
+
         return response()->json($tasks);
     }
 
@@ -20,12 +24,20 @@ class TaskController extends Controller
     public function store(Request $request)
     {
         $input = $request->all();
-        if (isset($input['project_code']) && $input['project_code'] === '') $input['project_code'] = null;
-        if (isset($input['assignee_code']) && $input['assignee_code'] === '') $input['assignee_code'] = null;
-        if (isset($input['due_date']) && $input['due_date'] === '') $input['due_date'] = null;
-        if (isset($input['tags']) && $input['tags'] === '') $input['tags'] = null;
+        if (isset($input['project_code']) && $input['project_code'] === '') {
+            $input['project_code'] = null;
+        }
+        if (isset($input['assignee_code']) && $input['assignee_code'] === '') {
+            $input['assignee_code'] = null;
+        }
+        if (isset($input['due_date']) && $input['due_date'] === '') {
+            $input['due_date'] = null;
+        }
+        if (isset($input['tags']) && $input['tags'] === '') {
+            $input['tags'] = null;
+        }
 
-        $validator = \Illuminate\Support\Facades\Validator::make($input, [
+        $validator = Validator::make($input, [
             'project_code' => 'nullable|exists:projects,project_code',
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
@@ -48,25 +60,32 @@ class TaskController extends Controller
 
         $userCode = $request->input('user_code', 'US0001');
         ActivityService::log(
-            $userCode, 
-            'tạo nhiệm vụ', 
-            'Task', 
-            $task->task_code, 
+            $userCode,
+            'tạo nhiệm vụ',
+            'Task',
+            $task->task_code,
             "Đã tạo nhiệm vụ mới: {$task->task_title}"
         );
 
         if ($task->task_assignee_code) {
-            ActivityService::notify(
-                $userCode, 
-                'Nhiệm vụ mới', 
-                "Bạn đã được phân công nhiệm vụ: {$task->task_title}",
-                'info'
-            );
+            $assigneeEmail = Member::whereKey($task->task_assignee_code)->value('member_email');
+            $recipientCode = $assigneeEmail
+                ? User::where('user_email', $assigneeEmail)->value('user_code')
+                : null;
+
+            if ($recipientCode) {
+                ActivityService::notify(
+                    $recipientCode,
+                    'Nhiệm vụ mới',
+                    'Bạn đã được phân công nhiệm vụ: '.$task->task_title,
+                    'info'
+                );
+            }
         }
 
         return response()->json([
             'message' => 'Tạo nhiệm vụ thành công',
-            'task' => $task
+            'task' => $task,
         ], 201);
     }
 
@@ -76,12 +95,20 @@ class TaskController extends Controller
         $task = Task::findOrFail($code);
 
         $input = $request->all();
-        if (isset($input['project_code']) && $input['project_code'] === '') $input['project_code'] = null;
-        if (isset($input['assignee_code']) && $input['assignee_code'] === '') $input['assignee_code'] = null;
-        if (isset($input['due_date']) && $input['due_date'] === '') $input['due_date'] = null;
-        if (isset($input['tags']) && $input['tags'] === '') $input['tags'] = null;
+        if (isset($input['project_code']) && $input['project_code'] === '') {
+            $input['project_code'] = null;
+        }
+        if (isset($input['assignee_code']) && $input['assignee_code'] === '') {
+            $input['assignee_code'] = null;
+        }
+        if (isset($input['due_date']) && $input['due_date'] === '') {
+            $input['due_date'] = null;
+        }
+        if (isset($input['tags']) && $input['tags'] === '') {
+            $input['tags'] = null;
+        }
 
-        $validator = \Illuminate\Support\Facades\Validator::make($input, [
+        $validator = Validator::make($input, [
             'title' => 'nullable|string|max:255',
             'description' => 'nullable|string',
             'status' => 'nullable|string|in:todo,in_progress,done',
@@ -104,16 +131,16 @@ class TaskController extends Controller
 
         $userCode = $request->input('user_code', 'US0001');
         ActivityService::log(
-            $userCode, 
-            'cập nhật nhiệm vụ', 
-            'Task', 
-            $task->task_code, 
+            $userCode,
+            'cập nhật nhiệm vụ',
+            'Task',
+            $task->task_code,
             "Đã cập nhật nhiệm vụ: {$task->task_title}"
         );
 
         return response()->json([
             'message' => 'Đã cập nhật nhiệm vụ',
-            'task' => $task
+            'task' => $task,
         ]);
     }
 
@@ -121,7 +148,7 @@ class TaskController extends Controller
     public function updateStatus(Request $request, $code)
     {
         $validated = $request->validate([
-            'status' => 'required|string|in:todo,in_progress,done'
+            'status' => 'required|string|in:todo,in_progress,done',
         ]);
 
         $task = Task::findOrFail($code);
@@ -129,16 +156,16 @@ class TaskController extends Controller
 
         $userCode = $request->input('user_code', 'US0001');
         ActivityService::log(
-            $userCode, 
-            'chuyển trạng thái', 
-            'Task', 
-            $task->task_code, 
+            $userCode,
+            'chuyển trạng thái',
+            'Task',
+            $task->task_code,
             "Đã chuyển nhiệm vụ {$task->task_title} sang trạng thái: {$validated['status']}"
         );
 
         return response()->json([
             'message' => 'Đã cập nhật trạng thái',
-            'task' => $task
+            'task' => $task,
         ]);
     }
 
@@ -148,20 +175,20 @@ class TaskController extends Controller
         $task = Task::findOrFail($code);
         $taskTitle = $task->task_title;
         $taskCode = $task->task_code;
-        
+
         $task->delete();
 
         $userCode = $request->input('user_code', 'US0001');
         ActivityService::log(
-            $userCode, 
-            'xóa nhiệm vụ', 
-            'Task', 
-            $taskCode, 
+            $userCode,
+            'xóa nhiệm vụ',
+            'Task',
+            $taskCode,
             "Đã xóa nhiệm vụ: {$taskTitle}"
         );
 
         return response()->json([
-            'message' => 'Đã xóa nhiệm vụ'
+            'message' => 'Đã xóa nhiệm vụ',
         ]);
     }
 
@@ -172,7 +199,7 @@ class TaskController extends Controller
             ->with('user:user_code,user_name,user_avatar')
             ->orderBy('comment_created_at', 'desc')
             ->get();
-            
+
         return response()->json($comments);
     }
 
@@ -191,7 +218,7 @@ class TaskController extends Controller
         $fileUrl = $validated['file_url'] ?? null;
         if (empty(trim($text)) && empty($fileUrl)) {
             return response()->json([
-                'message' => 'Vui lòng nhập nội dung hoặc đính kèm tệp.'
+                'message' => 'Vui lòng nhập nội dung hoặc đính kèm tệp.',
             ], 422);
         }
 
@@ -208,16 +235,16 @@ class TaskController extends Controller
         $comment->load('user:user_code,user_name,user_avatar');
 
         ActivityService::log(
-            $userCode, 
-            'bình luận', 
-            'Task', 
-            $taskCode, 
-            "Đã thêm bình luận vào nhiệm vụ"
+            $userCode,
+            'bình luận',
+            'Task',
+            $taskCode,
+            'Đã thêm bình luận vào nhiệm vụ'
         );
 
         return response()->json([
             'message' => 'Đã gửi bình luận',
-            'comment' => $comment
+            'comment' => $comment,
         ], 201);
     }
 }

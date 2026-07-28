@@ -11,6 +11,7 @@ class MemberController extends Controller
     public function index()
     {
         $members = Member::select('member_code', 'member_name', 'member_email', 'member_avatar', 'member_role', 'member_phone', 'member_department', 'member_join_date', 'member_bio', 'member_online')->get();
+
         return response()->json($members);
     }
 
@@ -26,7 +27,7 @@ class MemberController extends Controller
             'bio' => 'nullable|string|max:1000',
         ]);
 
-        $member = new Member();
+        $member = new Member;
         $member->member_name = $validated['name'];
         $member->member_email = $validated['email'];
         $member->member_role = $validated['role'] ?? 'member';
@@ -38,7 +39,25 @@ class MemberController extends Controller
 
         return response()->json([
             'message' => 'Thêm thành viên thành công',
-            'user' => $member
+            'user' => $member,
         ], 201);
+    }
+
+    public function update(Request $request, string $code)
+    {
+        $member = Member::findOrFail($code);
+        $validated = $request->validate([
+            'name' => 'sometimes|required|string|max:255',
+            'email' => 'sometimes|required|email|max:255|unique:members,member_email,'.$code.',member_code',
+            'role' => 'nullable|string|max:100',
+            'phone' => 'nullable|string|regex:/^[0-9\+\-\(\)\s]{7,20}$/',
+            'department' => 'nullable|string|max:255',
+            'bio' => 'nullable|string|max:1000',
+            'online' => 'nullable|boolean',
+        ]);
+
+        $member->update(Member::mapToDbAttributes($validated));
+
+        return response()->json(['member' => $member->fresh()]);
     }
 }

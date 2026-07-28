@@ -45,21 +45,21 @@ const close = () => {
   error.value = ''
 }
 
-const submit = () => {
+const submit = async () => {
   error.value = ''
   if (!formData.value.name?.trim()) {
     error.value = 'Vui lòng nhập tên nhóm.'
     return
   }
   if (!activeEditGroupId.value) return
-  updateGroup(activeEditGroupId.value, { ...formData.value, name: formData.value.name.trim() })
-  close()
+  const result = await updateGroup(activeEditGroupId.value, { ...formData.value, name: formData.value.name.trim() })
+  if (result?.success) close()
 }
 
-const handleDelete = () => {
+const handleDelete = async () => {
   if (confirm('Bạn có chắc chắn muốn xóa nhóm này không? Toàn bộ thành viên sẽ bị đẩy ra ngoài nhóm.')) {
-    deleteGroup(activeEditGroupId.value)
-    close()
+    const deleted = await deleteGroup(activeEditGroupId.value)
+    if (deleted) close()
   }
 }
 </script>

@@ -5,7 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
@@ -24,11 +24,12 @@ class AuthController extends Controller
             'user_password' => Hash::make($validated['password']),
         ]);
 
-        // Trả về response JSON
+        $token = $this->issueToken($user);
+
         return response()->json([
             'message' => 'Đăng ký thành công',
             'user' => $user,
-            'token' => method_exists($user, 'createToken') ? $user->createToken('auth_token')->plainTextToken : 'mock_token_' . $user->user_code,
+            'token' => $token,
         ], 201);
     }
 
@@ -41,16 +42,18 @@ class AuthController extends Controller
 
         $user = User::where('user_email', $validated['email'])->first();
 
-        if (!$user || !Hash::check($validated['password'], $user->user_password)) {
+        if (! $user || ! Hash::check($validated['password'], $user->user_password)) {
             throw ValidationException::withMessages([
                 'email' => ['Thông tin đăng nhập không chính xác.'],
             ]);
         }
 
+        $token = $this->issueToken($user);
+
         return response()->json([
             'message' => 'Đăng nhập thành công',
             'user' => $user,
-            'token' => method_exists($user, 'createToken') ? $user->createToken('auth_token')->plainTextToken : 'mock_token_' . $user->user_code,
+            'token' => $token,
         ]);
     }
 
@@ -61,12 +64,20 @@ class AuthController extends Controller
 
     public function logout(Request $request)
     {
-        if ($request->user() && method_exists($request->user(), 'currentAccessToken') && $request->user()->currentAccessToken()) {
-            $request->user()->currentAccessToken()->delete();
-        }
+        $request->user()->forceFill(['user_api_token' => null])->save();
 
         return response()->json([
-            'message' => 'Đăng xuất thành công'
+            'message' => 'Đăng xuất thành công',
         ]);
+    }
+
+    private function issueToken(User $user): string
+    {
+        $plainTextToken = Str::random(80);
+        $user->forceFill([
+            'user_api_token' => hash('sha256', $plainTextToken),
+        ])->save();
+
+        return $plainTextToken;
     }
 }

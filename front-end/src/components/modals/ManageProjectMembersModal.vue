@@ -42,11 +42,11 @@ const deselectAll = () => {
   selectedMemberIds.value = []
 }
 
-const submit = () => {
+const submit = async () => {
   if (editingProjectId.value) {
-    updateProjectMembers(editingProjectId.value, selectedMemberIds.value)
+    const saved = await updateProjectMembers(editingProjectId.value, selectedMemberIds.value)
+    if (saved) manageMembersModalOpen.value = false
   }
-  manageMembersModalOpen.value = false
 }
 
 // Close on escape

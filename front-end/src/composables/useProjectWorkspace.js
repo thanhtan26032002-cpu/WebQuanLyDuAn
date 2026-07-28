@@ -28,7 +28,9 @@ const priorityMap = {
   low: { label: 'Thấp', className: 'priority-low' },
 }
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
+// Dùng URL tương đối để bản production hoạt động trên mọi tên miền.
+// Khi API nằm ở tên miền khác, cấu hình VITE_API_URL lúc build.
+const API_URL = (import.meta.env.VITE_API_URL || '/api').replace(/\/$/, '')
 const BASE_URL = import.meta.env.VITE_BASE_URL || API_URL.replace(/\/api\/?$/, '')
 
 // ========== CHUYỂN ĐỔI DỮ LIỆU API → FRONTEND ==========
@@ -112,6 +114,16 @@ function mapMember(m) {
   }
 }
 
+function mapGroup(g) {
+  return {
+    ...g,
+    id: g.code,
+    memberIds: g.member_ids || g.memberIds || [],
+    icon: g.icon || '🚀',
+    color: g.color || 'violet',
+  }
+}
+
 // ========== STATE (Khởi tạo rỗng, dữ liệu sẽ được tải từ DB) ==========
 const projects = ref([])
 const tasks = ref([])
@@ -120,18 +132,25 @@ const groups = ref([])
 const comments = ref([])
 const activities = ref([])
 const users = ref([])
+const apiConnectionError = ref('')
 
 // ========== FETCH DỮ LIỆU TỪ DATABASE ==========
 const loadDataFromAPI = async () => {
   try {
-    const [resProjects, resMembers, resTasks, resActivities, resNotifications, resUsers] = await Promise.all([
+    const [resProjects, resMembers, resGroups, resTasks, resActivities, resNotifications, resUsers] = await Promise.all([
       fetch(`${API_URL}/projects`).catch(() => null),
       fetch(`${API_URL}/members`).catch(() => null),
+      fetch(`${API_URL}/groups`).catch(() => null),
       fetch(`${API_URL}/tasks`).catch(() => null),
       fetch(`${API_URL}/activities`).catch(() => null),
       fetch(`${API_URL}/notifications`).catch(() => null),
       fetch(`${API_URL}/users`).catch(() => null)
     ])
+
+    const responses = [resProjects, resMembers, resGroups, resTasks, resActivities, resNotifications, resUsers]
+    apiConnectionError.value = responses.some(response => !response?.ok)
+      ? 'Không thể tải đầy đủ dữ liệu từ máy chủ. Vui lòng kiểm tra kết nối API.'
+      : ''
 
     if (resUsers && resUsers.ok) {
       const rawUsers = await resUsers.json()
@@ -151,6 +170,10 @@ const loadDataFromAPI = async () => {
       const raw = await resMembers.json()
       members.value = raw.map(mapMember)
     }
+    if (resGroups && resGroups.ok) {
+      const raw = await resGroups.json()
+      groups.value = raw.map(mapGroup)
+    }
     if (resTasks && resTasks.ok) {
       const raw = await resTasks.json()
       tasks.value = raw.map(mapTask)
@@ -163,8 +186,11 @@ const loadDataFromAPI = async () => {
       notifications.value = await resNotifications.json()
     }
 
-    console.log('✅ Đã tải dữ liệu từ Database thành công')
+    if (!apiConnectionError.value) {
+      console.log('✅ Đã tải dữ liệu từ Database thành công')
+    }
   } catch (error) {
+    apiConnectionError.value = 'Không thể kết nối máy chủ. Vui lòng thử lại sau.'
     console.error('❌ Lỗi kết nối Database:', error)
   }
 }
@@ -626,9 +652,9 @@ export function useProjectWorkspace() {
         users.value[userIndex] = { ...users.value[userIndex], ...result.user }
       }
       
-      const memberIndex = teamMembers.value.findIndex(m => m.code === code)
+      const memberIndex = members.value.findIndex(m => m.code === code || m.id === code)
       if (memberIndex !== -1) {
-        teamMembers.value[memberIndex] = { ...teamMembers.value[memberIndex], ...result.user }
+        members.value[memberIndex] = mapMember({ ...members.value[memberIndex], ...result.user })
       }
       
       return { success: true, user: result.user }
@@ -664,6 +690,7 @@ export function useProjectWorkspace() {
     formData.append('file', file)
     formData.append('target_type', targetType)
     formData.append('target_code', targetCode)
+    formData.append('user_code', currentUser.value.code)
     try {
       const res = await fetch(`${API_URL}/upload`, {
         method: 'POST',
@@ -762,63 +789,99 @@ export function useProjectWorkspace() {
     }
   }
 
-  function updateMember(memberId, updates) {
-    const member = members.value.find(m => m.id === memberId)
-    if (member) {
-      Object.assign(member, updates)
+  async function updateMember(memberId, updates) {
+    try {
+      const res = await fetch(`${API_URL}/members/${memberId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify(updates)
+      })
+      if (!res.ok) {
+        const errors = await parseValidationErrors(res)
+        notify('Lỗi: ' + (errors._general || Object.values(errors)[0]))
+        return { success: false, errors }
+      }
+
+      const data = await res.json()
+      const index = members.value.findIndex(m => m.id === memberId)
+      if (index !== -1) members.value[index] = mapMember(data.member)
       notify('Đã cập nhật thông tin thành viên')
+      return { success: true }
+    } catch {
+      notify('Lỗi kết nối: Không thể cập nhật thành viên')
+      return { success: false }
     }
   }
 
-  // ========== NHÓM (Groups) - Tạm lưu local ==========
+  // ========== NHÓM (Groups) ==========
 
-  function addGroup(payload) {
-    groups.value.push({
-      id: Date.now(),
-      name: payload.name,
-      icon: payload.icon || '🚀',
-      description: payload.description || 'Nhóm mới',
-      color: payload.color || 'violet',
-      memberIds: []
-    })
-    addGroupModalOpen.value = false
-    notify('Đã tạo nhóm mới thành công')
+  async function addGroup(payload) {
+    try {
+      const res = await fetch(`${API_URL}/groups`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+      if (!res.ok) return { success: false, errors: await parseValidationErrors(res) }
+      const data = await res.json()
+      groups.value.push(mapGroup(data.group))
+      addGroupModalOpen.value = false
+      notify('Đã tạo nhóm mới thành công')
+      return { success: true }
+    } catch {
+      notify('Lỗi kết nối: Không thể tạo nhóm')
+      return { success: false }
+    }
   }
 
-  function updateGroup(groupId, payload) {
-    const group = groups.value.find(g => g.id === groupId)
-    if (group) {
-      group.name = payload.name
-      group.icon = payload.icon || group.icon
-      group.description = payload.description || group.description
-      group.color = payload.color || group.color
+  async function updateGroup(groupId, payload) {
+    try {
+      const res = await fetch(`${API_URL}/groups/${groupId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+      if (!res.ok) return { success: false, errors: await parseValidationErrors(res) }
+      const data = await res.json()
+      const index = groups.value.findIndex(g => g.id === groupId)
+      if (index !== -1) groups.value[index] = mapGroup(data.group)
       editGroupModalOpen.value = false
       notify('Đã cập nhật thông tin nhóm')
+      return { success: true }
+    } catch {
+      notify('Lỗi kết nối: Không thể cập nhật nhóm')
+      return { success: false }
     }
   }
 
-  function deleteGroup(groupId) {
-    const idx = groups.value.findIndex(g => g.id === groupId)
-    if (idx !== -1) {
-      groups.value.splice(idx, 1)
+  async function deleteGroup(groupId) {
+    try {
+      const res = await fetch(`${API_URL}/groups/${groupId}`, { method: 'DELETE', headers: { 'Accept': 'application/json' } })
+      if (!res.ok) return false
+      groups.value = groups.value.filter(g => g.id !== groupId)
       editGroupModalOpen.value = false
       notify('Đã xóa nhóm')
+      return true
+    } catch {
+      notify('Lỗi kết nối: Không thể xóa nhóm')
+      return false
     }
   }
 
-  function assignMemberToGroup(memberId, targetGroupId) {
-    groups.value.forEach(group => {
-      group.memberIds = group.memberIds.filter(id => id !== memberId)
-    })
-    
-    if (targetGroupId) {
-      const targetGroup = groups.value.find(g => g.id === targetGroupId)
-      if (targetGroup && !targetGroup.memberIds.includes(memberId)) {
-        targetGroup.memberIds.push(memberId)
-      }
-      notify('Đã đưa thành viên vào nhóm')
-    } else {
-      notify('Đã loại thành viên khỏi nhóm')
+  async function assignMemberToGroup(memberId, targetGroupId) {
+    try {
+      const res = await fetch(`${API_URL}/groups/members/${memberId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({ group_code: targetGroupId || null })
+      })
+      if (!res.ok) return false
+      groups.value = (await res.json()).map(mapGroup)
+      notify(targetGroupId ? 'Đã đưa thành viên vào nhóm' : 'Đã loại thành viên khỏi nhóm')
+      return true
+    } catch {
+      notify('Lỗi kết nối: Không thể phân nhóm thành viên')
+      return false
     }
   }
 
@@ -833,28 +896,51 @@ export function useProjectWorkspace() {
     }
   }
 
-  function removeFileFromProject(projectId, fileIndex) {
+  async function removeFileFromProject(projectId, fileIndex) {
     const project = projects.value.find(p => p.id === projectId)
-    if (project && project.files) {
+    const file = project?.files?.[fileIndex]
+    if (!file?.code) return false
+
+    try {
+      const res = await fetch(`${API_URL}/attachments/${file.code}`, {
+        method: 'DELETE',
+        headers: { 'Accept': 'application/json' }
+      })
+      if (!res.ok) return false
       project.files.splice(fileIndex, 1)
       notify('Đã xóa tệp đính kèm')
+      return true
+    } catch {
+      notify('Lỗi kết nối: Không thể xóa tệp')
+      return false
     }
   }
 
-  function updateProjectMembers(projectId, memberIds) {
+  async function updateProjectMembers(projectId, memberIds) {
     const project = projects.value.find(p => p.id === projectId)
-    if (project) {
-      project.memberIds = [...memberIds]
+    if (!project) return false
+
+    try {
+      const res = await fetch(`${API_URL}/projects/${projectId}/members`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({ member_ids: memberIds })
+      })
+      if (!res.ok) return false
+      const data = await res.json()
+      Object.assign(project, mapProject(data.project))
       notify('Đã cập nhật thành viên dự án')
+      return true
+    } catch {
+      notify('Lỗi kết nối: Không thể cập nhật thành viên dự án')
+      return false
     }
   }
 
-  function removeMemberFromProject(projectId, memberId) {
+  async function removeMemberFromProject(projectId, memberId) {
     const project = projects.value.find(p => p.id === projectId)
-    if (project) {
-      project.memberIds = project.memberIds.filter(id => id !== memberId)
-      notify('Đã xóa thành viên khỏi dự án')
-    }
+    if (!project) return false
+    return updateProjectMembers(projectId, project.memberIds.filter(id => id !== memberId))
   }
 
   function setTheme(isDark) {
@@ -907,6 +993,7 @@ export function useProjectWorkspace() {
     groups,
     comments,
     activities,
+    apiConnectionError,
     currentUser,
     navigationItems,
     projectStatusMap,

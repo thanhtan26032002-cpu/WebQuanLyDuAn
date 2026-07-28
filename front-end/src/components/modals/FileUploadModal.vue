@@ -150,7 +150,7 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
             </div>
             <h3 class="text-lg font-bold text-slate-900 mb-1">Kéo thả tệp vào đây</h3>
             <p class="text-sm text-slate-500 mb-4">hoặc nhấn để duyệt tệp từ thiết bị của bạn</p>
-            <span class="text-xs font-medium text-slate-400 bg-slate-200/50 px-3 py-1 rounded-full">Hỗ trợ mọi định dạng (Tối đa 50MB)</span>
+            <span class="text-xs font-medium text-slate-400 bg-slate-200/50 px-3 py-1 rounded-full">Hỗ trợ mọi định dạng (Tối đa 10MB mỗi tệp)</span>
           </div>
 
           <!-- Selected Files List -->

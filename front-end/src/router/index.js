@@ -1,22 +1,13 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import DashboardView from '../views/DashboardView.vue'
-import ProjectsView from '../views/ProjectsView.vue'
-import ProjectDetailView from '../views/ProjectDetailView.vue'
-import TasksView from '../views/TasksView.vue'
-import TeamView from '../views/TeamView.vue'
-import CalendarView from '../views/CalendarView.vue'
-import SettingsView from '../views/SettingsView.vue'
-import NotFoundView from '../views/NotFoundView.vue'
-
 const routes = [
-  { path: '/', name: 'dashboard', component: DashboardView, meta: { title: 'Tổng quan' } },
-  { path: '/projects', name: 'projects', component: ProjectsView, meta: { title: 'Dự án' } },
-  { path: '/projects/:id', name: 'project-detail', component: ProjectDetailView, meta: { title: 'Chi tiết dự án' } },
-  { path: '/tasks', name: 'tasks', component: TasksView, meta: { title: 'Nhiệm vụ' } },
-  { path: '/team', name: 'team', component: TeamView, meta: { title: 'Nhóm' } },
-  { path: '/calendar', name: 'calendar', component: CalendarView, meta: { title: 'Lịch' } },
-  { path: '/settings', name: 'settings', component: SettingsView, meta: { title: 'Cài đặt' } },
-  { path: '/:pathMatch(.*)*', name: 'not-found', component: NotFoundView, meta: { title: 'Không tìm thấy' } },
+  { path: '/', name: 'dashboard', component: () => import('../views/DashboardView.vue'), meta: { title: 'Tổng quan' } },
+  { path: '/projects', name: 'projects', component: () => import('../views/ProjectsView.vue'), meta: { title: 'Dự án' } },
+  { path: '/projects/:id', name: 'project-detail', component: () => import('../views/ProjectDetailView.vue'), meta: { title: 'Chi tiết dự án' } },
+  { path: '/tasks', name: 'tasks', component: () => import('../views/TasksView.vue'), meta: { title: 'Nhiệm vụ' } },
+  { path: '/team', name: 'team', component: () => import('../views/TeamView.vue'), meta: { title: 'Nhóm' } },
+  { path: '/calendar', name: 'calendar', component: () => import('../views/CalendarView.vue'), meta: { title: 'Lịch' } },
+  { path: '/settings', name: 'settings', component: () => import('../views/SettingsView.vue'), meta: { title: 'Cài đặt' } },
+  { path: '/:pathMatch(.*)*', name: 'not-found', component: () => import('../views/NotFoundView.vue'), meta: { title: 'Không tìm thấy' } },
 ]
 
 const router = createRouter({

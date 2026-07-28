@@ -13,10 +13,10 @@ class ProjectController extends Controller
     {
         $projects = Project::withCount('tasks')
             ->with([
-                'members' => function($q) {
+                'members' => function ($q) {
                     $q->select('members.member_code', 'members.member_name', 'members.member_avatar');
                 },
-                'attachments'
+                'attachments',
             ])
             ->orderBy('project_created_at', 'desc')
             ->get();
@@ -30,7 +30,7 @@ class ProjectController extends Controller
         $project = Project::with([
             'tasks.assignee',
             'members',
-            'attachments'
+            'attachments',
         ])->findOrFail($code);
 
         return response()->json($project);
@@ -65,7 +65,7 @@ class ProjectController extends Controller
 
         return response()->json([
             'message' => 'Tạo dự án thành công',
-            'project' => $project
+            'project' => $project,
         ], 201);
     }
 
@@ -96,7 +96,7 @@ class ProjectController extends Controller
 
         return response()->json([
             'message' => 'Đã cập nhật dự án',
-            'project' => $project
+            'project' => $project,
         ]);
     }
 
@@ -119,7 +119,24 @@ class ProjectController extends Controller
         );
 
         return response()->json([
-            'message' => 'Đã xóa dự án thành công'
+            'message' => 'Đã xóa dự án thành công',
+        ]);
+    }
+
+    public function syncMembers(Request $request, string $code)
+    {
+        $project = Project::findOrFail($code);
+        $validated = $request->validate([
+            'member_ids' => 'present|array',
+            'member_ids.*' => 'string|distinct|exists:members,member_code',
+        ]);
+
+        $project->members()->sync($validated['member_ids']);
+        $project->load('members');
+
+        return response()->json([
+            'message' => 'Đã cập nhật thành viên dự án',
+            'project' => $project,
         ]);
     }
 }
