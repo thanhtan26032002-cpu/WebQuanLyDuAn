@@ -1,10 +1,12 @@
 <script setup>
 import { ref } from 'vue'
+import { useRoute } from 'vue-router'
 import { Search, Menu, X, Plus } from '@lucide/vue'
 import { useProjectWorkspace } from '../../composables/useProjectWorkspace'
 import NotificationDropdown from './NotificationDropdown.vue'
 
-const { sidebarOpen, globalSearchModalOpen, taskModalOpen, toastMessage } = useProjectWorkspace()
+const route = useRoute()
+const { sidebarOpen, globalSearchModalOpen, taskModalOpen, openTaskModal, toastMessage } = useProjectWorkspace()
 const searchFocused = ref(false)
 </script>
 
@@ -40,7 +42,7 @@ const searchFocused = ref(false)
     <div class="flex items-center gap-2 sm:gap-3 shrink-0">
       <!-- Quick add task -->
       <button 
-        @click="taskModalOpen = true"
+        @click="openTaskModal(route.name === 'project-detail' ? route.params.id : '')"
         class="hidden sm:flex items-center gap-1.5 text-xs font-semibold bg-violet-50 text-violet-700 border border-violet-100 px-3 py-2 rounded-lg hover:bg-violet-100 transition-colors"
       >
         <Plus class="w-3.5 h-3.5" /> Nhiệm vụ

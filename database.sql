@@ -83,6 +83,7 @@ CREATE TABLE IF NOT EXISTS `tasks` (
   `task_due_date` date DEFAULT NULL,
   `task_progress` int(11) DEFAULT 0,
   `task_assignee_code` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `task_tags` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `task_created_at` timestamp NULL DEFAULT NULL,
   `task_updated_at` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`task_code`),

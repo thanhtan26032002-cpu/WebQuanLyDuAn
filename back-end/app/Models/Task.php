@@ -20,7 +20,7 @@ class Task extends Model
 
     protected $fillable = [
         'task_project_code', 'task_title', 'task_description', 'task_status', 
-        'task_priority', 'task_due_date', 'task_assignee_code', 'task_progress'
+        'task_priority', 'task_due_date', 'task_assignee_code', 'task_progress', 'task_tags'
     ];
 
     public function getCodePrefix()
@@ -39,6 +39,7 @@ class Task extends Model
             'task_priority' => 'priority',
             'task_due_date' => 'due_date',
             'task_assignee_code' => 'assignee_code',
+            'task_tags' => 'tags',
             'task_progress' => 'progress',
             'task_created_at' => 'created_at',
             'task_updated_at' => 'updated_at',

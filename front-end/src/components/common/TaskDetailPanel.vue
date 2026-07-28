@@ -31,10 +31,20 @@ const newComment = ref('')
 const isEditing = ref(false)
 const editedTask = ref({})
 
+const startEditing = () => {
+  if (!task.value) return
+  editedTask.value = JSON.parse(JSON.stringify(task.value))
+  editedTask.value.tagsInput = Array.isArray(task.value?.tags) ? task.value.tags.join(', ') : (task.value?.tags || '')
+  isEditing.value = true
+}
+
 watch(activeTaskId, async (newVal) => {
   if (newVal) {
     isEditing.value = false
-    editedTask.value = JSON.parse(JSON.stringify(task.value))
+    if (task.value) {
+      editedTask.value = JSON.parse(JSON.stringify(task.value))
+      editedTask.value.tagsInput = Array.isArray(task.value?.tags) ? task.value.tags.join(', ') : (task.value?.tags || '')
+    }
     await loadComments(newVal)
   }
 })
@@ -45,12 +55,20 @@ const closePanel = () => {
 }
 
 const handleSave = () => {
+  const tagsArray = editedTask.value.tagsInput 
+    ? editedTask.value.tagsInput.split(',').map(s => s.trim()).filter(Boolean) 
+    : []
+
   updateTask(task.value.id, {
     title: editedTask.value.title,
     description: editedTask.value.description,
     status: editedTask.value.status,
     priority: editedTask.value.priority,
-    progress: Number(editedTask.value.progress)
+    progress: Number(editedTask.value.progress),
+    projectId: editedTask.value.projectId || null,
+    assigneeId: editedTask.value.assigneeId || null,
+    dueDate: editedTask.value.dueDate || null,
+    tags: tagsArray
   })
   isEditing.value = false
 }
@@ -260,12 +278,20 @@ const formatDateTime = (isoStr) => {
           <div :class="['w-8 h-8 flex items-center justify-center rounded-lg', task.status === 'done' ? 'bg-emerald-100 text-emerald-600' : 'bg-violet-100 text-violet-600']">
             <CheckCircle2 class="w-5 h-5" />
           </div>
-          <p class="text-sm font-medium text-slate-500">{{ project?.name || 'Không có dự án' }}</p>
+          <select 
+            v-if="isEditing" 
+            v-model="editedTask.projectId"
+            class="text-sm font-semibold text-slate-700 bg-slate-100 border-none rounded-lg px-2.5 py-1.5 focus:ring-2 focus:ring-violet-500 max-w-[240px] cursor-pointer"
+          >
+            <option :value="null">— Không có dự án —</option>
+            <option v-for="p in projects" :key="p.id" :value="p.id">{{ p.name }}</option>
+          </select>
+          <p v-else class="text-sm font-medium text-slate-500">{{ project?.name || 'Không có dự án' }}</p>
         </div>
         <div class="flex items-center gap-2">
           <button 
             v-if="!isEditing"
-            @click="isEditing = true"
+            @click="startEditing"
             class="p-2 text-slate-400 hover:text-violet-600 hover:bg-violet-50 rounded-xl transition-colors"
           >
             <Edit2 class="w-5 h-5" />
@@ -516,13 +542,19 @@ const formatDateTime = (isoStr) => {
           <!-- Assignee -->
           <div class="bg-white border border-slate-100 rounded-xl p-4 shadow-sm">
             <span class="text-xs font-medium text-slate-500 uppercase tracking-wide block mb-2">Người phụ trách</span>
-            <div class="flex items-center gap-3">
-              <div :class="['w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white shadow-sm', `bg-${assignee.color}-500`]">
-                {{ assignee.initials }}
+            <div v-if="isEditing" class="mt-1">
+              <select v-model="editedTask.assigneeId" class="w-full text-sm font-semibold bg-slate-100 border-none rounded-lg px-3 py-2 focus:ring-2 focus:ring-violet-500 cursor-pointer text-slate-800">
+                <option :value="null">— Chưa phân công —</option>
+                <option v-for="m in members" :key="m.id" :value="m.id">{{ m.name }}</option>
+              </select>
+            </div>
+            <div v-else class="flex items-center gap-3">
+              <div :class="['w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white shadow-sm', `bg-${assignee?.color || 'slate'}-500`]">
+                {{ assignee?.initials || '?' }}
               </div>
               <div>
-                <p class="text-sm font-semibold text-slate-900">{{ assignee.name }}</p>
-                <p class="text-xs text-slate-500">{{ assignee.role }}</p>
+                <p class="text-sm font-semibold text-slate-900">{{ assignee?.name || 'Chưa giao' }}</p>
+                <p class="text-xs text-slate-500">{{ assignee?.role || 'Thành viên' }}</p>
               </div>
             </div>
           </div>
@@ -530,18 +562,40 @@ const formatDateTime = (isoStr) => {
           <!-- Due Date -->
           <div class="bg-white border border-slate-100 rounded-xl p-4 shadow-sm">
             <span class="text-xs font-medium text-slate-500 uppercase tracking-wide block mb-2">Hạn chót</span>
-            <div class="flex items-center gap-3">
+            <div v-if="isEditing" class="mt-1">
+              <input type="date" v-model="editedTask.dueDate" class="w-full text-sm font-semibold bg-slate-100 border-none rounded-lg px-3 py-2 focus:ring-2 focus:ring-violet-500 cursor-pointer text-slate-800" />
+            </div>
+            <div v-else class="flex items-center gap-3">
               <div class="w-8 h-8 rounded-full bg-slate-50 text-slate-500 flex items-center justify-center border border-slate-100">
                 <CalendarDays class="w-4 h-4" />
               </div>
               <div>
-                <p class="text-sm font-semibold text-slate-900">{{ formatDate(task.dueDate) }}</p>
-                <p class="text-xs text-slate-500">
+                <p class="text-sm font-semibold text-slate-900">{{ formatDate(task.dueDate) || 'Chưa thiết lập' }}</p>
+                <p v-if="task.dueDate" class="text-xs text-slate-500">
                   <span v-if="new Date(task.dueDate) < new Date() && task.status !== 'done'" class="text-rose-500 font-medium">Quá hạn!</span>
                   <span v-else class="text-emerald-500 font-medium">Đúng tiến độ</span>
                 </p>
               </div>
             </div>
+          </div>
+        </div>
+
+        <!-- Tags / Labels -->
+        <div class="bg-white border border-slate-100 rounded-xl p-4 shadow-sm mb-8">
+          <span class="text-xs font-medium text-slate-500 uppercase tracking-wide block mb-2">Nhãn nhiệm vụ</span>
+          <div v-if="isEditing">
+            <input 
+              v-model="editedTask.tagsInput" 
+              placeholder="Nhập nhãn, ngăn cách bằng dấu phẩy (Ví dụ: Frontend, UI/UX, Bug)" 
+              class="w-full text-sm font-semibold bg-slate-100 border-none rounded-lg px-3 py-2 focus:ring-2 focus:ring-violet-500 text-slate-800" 
+            />
+            <p class="text-[11px] text-slate-400 mt-1.5">Ngăn cách nhiều nhãn bằng dấu phẩy (,)</p>
+          </div>
+          <div v-else class="flex flex-wrap gap-1.5">
+            <span v-for="tag in task.tags" :key="tag" class="px-2.5 py-1 bg-violet-50 text-violet-700 border border-violet-100 rounded-lg text-xs font-semibold uppercase tracking-wide">
+              {{ tag }}
+            </span>
+            <span v-if="!task.tags || !task.tags.length" class="text-sm text-slate-400 italic">Chưa có nhãn nhiệm vụ</span>
           </div>
         </div>
 

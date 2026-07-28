@@ -19,7 +19,13 @@ class TaskController extends Controller
     // Tạo Task mới
     public function store(Request $request)
     {
-        $validated = $request->validate([
+        $input = $request->all();
+        if (isset($input['project_code']) && $input['project_code'] === '') $input['project_code'] = null;
+        if (isset($input['assignee_code']) && $input['assignee_code'] === '') $input['assignee_code'] = null;
+        if (isset($input['due_date']) && $input['due_date'] === '') $input['due_date'] = null;
+        if (isset($input['tags']) && $input['tags'] === '') $input['tags'] = null;
+
+        $validator = \Illuminate\Support\Facades\Validator::make($input, [
             'project_code' => 'nullable|exists:projects,project_code',
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
@@ -28,7 +34,14 @@ class TaskController extends Controller
             'due_date' => 'nullable|date|after_or_equal:today',
             'progress' => 'nullable|integer|min:0|max:100',
             'assignee_code' => 'nullable|exists:members,member_code',
+            'tags' => 'nullable|string|max:500',
         ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $validated = $validator->validated();
 
         $task = Task::create(Task::mapToDbAttributes($validated));
         $task->load(['assignee:member_code,member_name,member_avatar', 'attachments']);
@@ -62,7 +75,13 @@ class TaskController extends Controller
     {
         $task = Task::findOrFail($code);
 
-        $validated = $request->validate([
+        $input = $request->all();
+        if (isset($input['project_code']) && $input['project_code'] === '') $input['project_code'] = null;
+        if (isset($input['assignee_code']) && $input['assignee_code'] === '') $input['assignee_code'] = null;
+        if (isset($input['due_date']) && $input['due_date'] === '') $input['due_date'] = null;
+        if (isset($input['tags']) && $input['tags'] === '') $input['tags'] = null;
+
+        $validator = \Illuminate\Support\Facades\Validator::make($input, [
             'title' => 'nullable|string|max:255',
             'description' => 'nullable|string',
             'status' => 'nullable|string|in:todo,in_progress,done',
@@ -70,7 +89,15 @@ class TaskController extends Controller
             'due_date' => 'nullable|date',
             'progress' => 'nullable|integer|min:0|max:100',
             'assignee_code' => 'nullable|exists:members,member_code',
+            'project_code' => 'nullable|exists:projects,project_code',
+            'tags' => 'nullable|string|max:500',
         ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $validated = $validator->validated();
 
         $task->update(Task::mapToDbAttributes($validated));
         $task->load(['assignee:member_code,member_name,member_avatar', 'attachments']);

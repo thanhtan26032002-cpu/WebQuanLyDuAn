@@ -3,13 +3,13 @@ import { reactive, ref, onMounted, onUnmounted } from 'vue'
 import { X, CheckSquare, Plus } from '@lucide/vue'
 import { useProjectWorkspace } from '../../composables/useProjectWorkspace'
 
-const { projects, members, taskModalOpen, addTask } = useProjectWorkspace()
+const { projects, members, taskModalOpen, addTask, newTaskProjectId, closeTaskModal } = useProjectWorkspace()
 const form = reactive({
   title: '',
   description: '',
   status: 'todo',
   priority: 'medium',
-  projectId: '',
+  projectId: newTaskProjectId.value || '',
   assigneeId: '',
   dueDate: '',
   tags: '',
@@ -40,7 +40,7 @@ async function submit() {
 
 // Close on escape
 const onKeydown = (e) => {
-  if (e.key === 'Escape') taskModalOpen.value = false
+  if (e.key === 'Escape') closeTaskModal()
 }
 onMounted(() => document.addEventListener('keydown', onKeydown))
 onUnmounted(() => document.removeEventListener('keydown', onKeydown))
@@ -50,7 +50,7 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
   <Teleport to="body">
     <div class="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-200">
       <!-- Backdrop -->
-      <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" @click="taskModalOpen = false"></div>
+      <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" @click="closeTaskModal"></div>
       
       <!-- Modal Content -->
       <form @submit.prevent="submit" class="relative bg-white rounded-2xl shadow-2xl w-full max-w-xl flex flex-col max-h-full overflow-hidden animate-in zoom-in-95 duration-200">
@@ -66,7 +66,7 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
               <p class="text-sm text-slate-500">Thêm đầy đủ thông tin để đội ngũ bắt đầu nhanh chóng.</p>
             </div>
           </div>
-          <button type="button" @click="taskModalOpen = false" class="text-slate-400 hover:text-slate-700 p-2 rounded-xl hover:bg-slate-100 transition-colors">
+          <button type="button" @click="closeTaskModal" class="text-slate-400 hover:text-slate-700 p-2 rounded-xl hover:bg-slate-100 transition-colors">
             <X class="w-5 h-5" />
           </button>
         </header>
@@ -148,7 +148,7 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
 
         <!-- Footer -->
         <footer class="p-5 border-t border-slate-100 flex justify-end gap-3 bg-slate-50/50">
-          <button type="button" @click="taskModalOpen = false" class="px-5 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors">
+          <button type="button" @click="closeTaskModal" class="px-5 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors">
             Hủy
           </button>
           <button type="submit" class="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-violet-500 to-indigo-600 text-white rounded-xl text-sm font-medium shadow-md shadow-violet-500/25 hover:shadow-premium transition-all">

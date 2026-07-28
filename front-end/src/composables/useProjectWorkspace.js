@@ -67,6 +67,12 @@ function mapProject(p) {
 }
 
 function mapTask(t) {
+  let parsedTags = []
+  if (Array.isArray(t.tags)) {
+    parsedTags = t.tags
+  } else if (typeof t.tags === 'string' && t.tags.trim()) {
+    parsedTags = t.tags.split(',').map(s => s.trim()).filter(Boolean)
+  }
   return {
     ...t,
     id: t.code,
@@ -74,7 +80,7 @@ function mapTask(t) {
     assigneeId: t.assignee_code || t.assigneeId,
     dueDate: t.due_date || t.dueDate,
     createdAt: t.created_at || t.createdAt,
-    tags: t.tags || [],
+    tags: parsedTags,
     progress: t.progress || 0,
     files: t.attachments ? t.attachments.map(mapAttachment) : (t.files || []),
     checklists: t.checklists || [],
@@ -191,7 +197,18 @@ const notificationDropdownOpen = ref(false)
 const globalSearchModalOpen = ref(false)
 const projectModalOpen = ref(false)
 const taskModalOpen = ref(false)
+const newTaskProjectId = ref('')
 const toastMessage = ref('')
+
+function openTaskModal(projectId = '') {
+  newTaskProjectId.value = projectId || ''
+  taskModalOpen.value = true
+}
+
+function closeTaskModal() {
+  newTaskProjectId.value = ''
+  taskModalOpen.value = false
+}
 
 // New states for v2.0
 const activeTaskId = ref(null)
@@ -424,13 +441,14 @@ export function useProjectWorkspace() {
           priority: payload.priority || 'medium',
           due_date: payload.dueDate || null,
           assignee_code: payload.assigneeId || null,
+          tags: payload.tags !== undefined ? (Array.isArray(payload.tags) ? payload.tags.join(', ') : payload.tags) : null,
           user_code: currentUser.value.code,
         })
       })
       if (res.ok) {
         const data = await res.json()
         tasks.value.unshift(mapTask(data.task))
-        taskModalOpen.value = false
+        closeTaskModal()
         notify('Đã tạo nhiệm vụ mới thành công')
         return { success: true }
       } else {
@@ -475,10 +493,29 @@ export function useProjectWorkspace() {
 
   async function updateTask(taskId, updates) {
     try {
+      const payload = {}
+      if (updates.title !== undefined) payload.title = updates.title
+      if (updates.description !== undefined) payload.description = updates.description
+      if (updates.status !== undefined) payload.status = updates.status
+      if (updates.priority !== undefined) payload.priority = updates.priority
+      if (updates.progress !== undefined) payload.progress = Number(updates.progress)
+      if (updates.projectId !== undefined || updates.project_code !== undefined) {
+        payload.project_code = updates.project_code !== undefined ? updates.project_code : (updates.projectId || null)
+      }
+      if (updates.assigneeId !== undefined || updates.assignee_code !== undefined) {
+        payload.assignee_code = updates.assignee_code !== undefined ? updates.assignee_code : (updates.assigneeId || null)
+      }
+      if (updates.dueDate !== undefined || updates.due_date !== undefined) {
+        payload.due_date = updates.due_date !== undefined ? updates.due_date : (updates.dueDate || null)
+      }
+      if (updates.tags !== undefined) {
+        payload.tags = Array.isArray(updates.tags) ? updates.tags.join(', ') : (updates.tags || null)
+      }
+
       const res = await fetch(`${API_URL}/tasks/${taskId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-        body: JSON.stringify(updates)
+        body: JSON.stringify(payload)
       })
       if (res.ok) {
         const data = await res.json()
@@ -876,6 +913,9 @@ export function useProjectWorkspace() {
     globalSearchModalOpen,
     projectModalOpen,
     taskModalOpen,
+    newTaskProjectId,
+    openTaskModal,
+    closeTaskModal,
     toastMessage,
     activeTaskId,
     editingProjectId,
