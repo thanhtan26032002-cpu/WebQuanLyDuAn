@@ -16,7 +16,7 @@ const {
   tasks, projects, members, comments, 
   projectStatusMap, priorityMap, taskStatusMap, 
   taskModalOpen, activeTaskId, 
-  findMember, findProject, formatDate, updateTask, loadComments, addComment, uploadFile,
+  findMember, findProject, formatDate, getTaskDeadlineState, updateTask, loadComments, addComment, uploadFile,
   downloadArchive, downloadSingleFile
 } = useProjectWorkspace()
 
@@ -26,6 +26,37 @@ const task = computed(() => tasks.value.find(t => t.id === activeTaskId.value))
 const project = computed(() => findProject(task.value?.projectId))
 const assignee = computed(() => findMember(task.value?.assigneeId))
 const taskComments = computed(() => comments.value.filter(c => c.taskId === activeTaskId.value).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)))
+
+const deadlineInfo = computed(() => {
+  const state = getTaskDeadlineState(task.value?.dueDate, task.value?.status)
+
+  if (state === 'overdue') {
+    return {
+      label: 'Quá hạn',
+      textClass: 'text-rose-600',
+      iconClass: 'bg-rose-50 text-rose-600 border-rose-200',
+    }
+  }
+  if (state === 'due') {
+    return {
+      label: 'Đến hạn',
+      textClass: 'text-amber-700',
+      iconClass: 'bg-amber-50 text-amber-600 border-amber-200',
+    }
+  }
+  if (task.value?.status === 'done') {
+    return {
+      label: 'Đã hoàn thành',
+      textClass: 'text-emerald-600',
+      iconClass: 'bg-emerald-50 text-emerald-600 border-emerald-200',
+    }
+  }
+  return {
+    label: 'Đúng tiến độ',
+    textClass: 'text-emerald-600',
+    iconClass: 'bg-slate-50 text-slate-500 border-slate-100',
+  }
+})
 
 const newComment = ref('')
 const isEditing = ref(false)
@@ -566,14 +597,13 @@ const formatDateTime = (isoStr) => {
               <input type="date" v-model="editedTask.dueDate" class="w-full text-sm font-semibold bg-slate-100 border-none rounded-lg px-3 py-2 focus:ring-2 focus:ring-violet-500 cursor-pointer text-slate-800" />
             </div>
             <div v-else class="flex items-center gap-3">
-              <div class="w-8 h-8 rounded-full bg-slate-50 text-slate-500 flex items-center justify-center border border-slate-100">
+              <div :class="['w-8 h-8 rounded-full flex items-center justify-center border', deadlineInfo.iconClass]">
                 <CalendarDays class="w-4 h-4" />
               </div>
               <div>
-                <p class="text-sm font-semibold text-slate-900">{{ formatDate(task.dueDate) || 'Chưa thiết lập' }}</p>
-                <p v-if="task.dueDate" class="text-xs text-slate-500">
-                  <span v-if="new Date(task.dueDate) < new Date() && task.status !== 'done'" class="text-rose-500 font-medium">Quá hạn!</span>
-                  <span v-else class="text-emerald-500 font-medium">Đúng tiến độ</span>
+                <p :class="['text-sm font-semibold', task.dueDate ? deadlineInfo.textClass : 'text-slate-900']">{{ formatDate(task.dueDate) || 'Chưa thiết lập' }}</p>
+                <p v-if="task.dueDate" class="text-xs">
+                  <span :class="['font-semibold', deadlineInfo.textClass]">{{ deadlineInfo.label }}</span>
                 </p>
               </div>
             </div>

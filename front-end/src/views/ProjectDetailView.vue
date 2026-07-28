@@ -11,7 +11,14 @@ import DownloadArchiveModal from '../components/modals/DownloadArchiveModal.vue'
 
 const route = useRoute()
 const router = useRouter()
-const { projects, tasks, members, activities, projectStatusMap, priorityMap, taskStatusMap, findMember, formatDate, taskModalOpen, openTaskModal, projectSettingsModalOpen, fileUploadModalOpen, manageMembersModalOpen, editingProjectId, removeFileFromProject, removeMemberFromProject, moveTask, activeTaskId, downloadArchive, downloadSingleFile } = useProjectWorkspace()
+const { projects, tasks, members, activities, projectStatusMap, priorityMap, taskStatusMap, findMember, formatDate, getTaskDeadlineState, taskModalOpen, openTaskModal, projectSettingsModalOpen, fileUploadModalOpen, manageMembersModalOpen, editingProjectId, removeFileFromProject, removeMemberFromProject, moveTask, activeTaskId, downloadArchive, downloadSingleFile } = useProjectWorkspace()
+
+const deadlineDateClass = (task) => {
+  const state = getTaskDeadlineState(task.dueDate, task.status)
+  if (state === 'overdue') return 'text-rose-600 bg-rose-50 border-rose-200'
+  if (state === 'due') return 'text-amber-700 bg-amber-50 border-amber-200'
+  return 'text-slate-400 border-transparent'
+}
 
 const projectId = computed(() => route.params.id)
 const isDownloadModalOpen = ref(false)
@@ -393,7 +400,7 @@ const projectStatusClasses = {
             </span>
 
             <!-- Due date -->
-            <div class="hidden sm:flex items-center gap-1 text-xs text-slate-400 shrink-0">
+            <div :class="['hidden sm:flex items-center gap-1 text-xs font-semibold shrink-0 rounded-lg border px-2 py-1', deadlineDateClass(task)]">
               <CalendarDays class="w-3.5 h-3.5" />
               {{ formatDate(task.dueDate) }}
             </div>

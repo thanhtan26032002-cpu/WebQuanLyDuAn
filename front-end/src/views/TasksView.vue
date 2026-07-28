@@ -8,7 +8,14 @@ import { useProjectWorkspace } from '../composables/useProjectWorkspace'
 const statusFilter = ref('all')
 const priorityFilter = ref('all')
 const viewMode = ref('kanban')
-const { tasks, globalSearch, taskModalOpen, priorityMap, taskStatusMap, findMember, findProject, formatDate, toggleTaskComplete, activeTaskId, updateTask } = useProjectWorkspace()
+const { tasks, globalSearch, taskModalOpen, priorityMap, taskStatusMap, findMember, findProject, formatDate, getTaskDeadlineState, toggleTaskComplete, activeTaskId, updateTask } = useProjectWorkspace()
+
+const deadlineDateClass = (task) => {
+  const state = getTaskDeadlineState(task.dueDate, task.status)
+  if (state === 'overdue') return 'text-rose-600 bg-rose-50 border-rose-200'
+  if (state === 'due') return 'text-amber-700 bg-amber-50 border-amber-200'
+  return 'text-slate-600 border-transparent'
+}
 
 const filteredTasks = computed(() => tasks.value.filter((task) => {
   const project = findProject(task.projectId)
@@ -149,7 +156,7 @@ const getTasksByStatus = (statusId) => {
                 </span>
               </td>
               <td class="p-4 text-sm text-slate-600 whitespace-nowrap">
-                <span :class="{ 'text-rose-500 font-semibold': new Date(task.dueDate) < new Date() && task.status !== 'done' }">
+                <span :class="['inline-flex rounded-lg border px-2 py-1 font-semibold', deadlineDateClass(task)]">
                   {{ formatDate(task.dueDate) }}
                 </span>
               </td>

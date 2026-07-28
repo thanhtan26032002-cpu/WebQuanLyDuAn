@@ -9,14 +9,23 @@ const props = defineProps({
   showStatus: Boolean,
 });
 
-const { priorityMap, taskStatusMap, findProject, findMember, formatDate } =
+const { priorityMap, taskStatusMap, findProject, findMember, formatDate, getTaskDeadlineState } =
   useProjectWorkspace();
 const project = computed(() => findProject(props.task.projectId));
 const assignee = computed(() => findMember(props.task.assigneeId));
 
-const isOverdue = computed(() => {
-  if (!props.task.dueDate || props.task.status === "done") return false;
-  return new Date(props.task.dueDate) < new Date();
+const deadlineState = computed(() =>
+  getTaskDeadlineState(props.task.dueDate, props.task.status),
+);
+
+const deadlineClass = computed(() => {
+  if (deadlineState.value === "overdue") {
+    return "text-rose-600 bg-rose-50 border-rose-200";
+  }
+  if (deadlineState.value === "due") {
+    return "text-amber-700 bg-amber-50 border-amber-200";
+  }
+  return "text-slate-400 bg-transparent border-transparent";
 });
 
 const priorityDotMap = {
@@ -105,8 +114,8 @@ const statusBadgeMap = {
     >
       <div
         :class="[
-          'flex items-center text-xs font-medium gap-1',
-          isOverdue ? 'text-rose-500' : 'text-slate-400',
+          'flex items-center text-xs font-semibold gap-1 rounded-lg border px-2 py-1',
+          deadlineClass,
         ]"
       >
         <CalendarDays class="w-3.5 h-3.5" />

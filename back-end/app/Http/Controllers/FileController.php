@@ -17,7 +17,7 @@ class FileController extends Controller
     {
         $validated = $request->validate([
             'file' => 'required|file|max:10240', // Max 10MB
-            'target_type' => 'required|string|in:Project,Task',
+            'target_type' => 'required|string|in:Project,Task,TaskComment',
             'target_code' => 'required|string',
             'user_code' => 'nullable|exists:users,user_code',
         ]);

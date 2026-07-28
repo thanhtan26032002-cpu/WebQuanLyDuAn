@@ -369,6 +369,24 @@ export function useProjectWorkspace() {
     return `${hours}:${minutes} - ${day}/${month}/${year}`
   }
 
+  function getTaskDeadlineState(dueDate, status) {
+    if (!dueDate || status === 'done') return 'normal'
+
+    const dueDateKey = String(dueDate).split('T')[0]
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dueDateKey)) return 'normal'
+
+    const now = new Date()
+    const todayKey = [
+      now.getFullYear(),
+      String(now.getMonth() + 1).padStart(2, '0'),
+      String(now.getDate()).padStart(2, '0'),
+    ].join('-')
+
+    if (dueDateKey === todayKey) return 'due'
+    if (dueDateKey < todayKey) return 'overdue'
+    return 'upcoming'
+  }
+
   function notify(message) {
     toastMessage.value = message
     clearTimeout(toastTimer)
@@ -1034,6 +1052,7 @@ export function useProjectWorkspace() {
     findProject,
     formatDate,
     formatDateTime,
+    getTaskDeadlineState,
     formatBytes,
     notify,
     addProject,
