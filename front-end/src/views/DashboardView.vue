@@ -63,7 +63,8 @@ const todayTasks = computed(() =>
   tasks.value.filter(
     (task) =>
       Boolean(task.dueDate) &&
-      getLocalDateKey(task.dueDate) === todayKey && task.status !== "done",
+      getLocalDateKey(task.dueDate) === todayKey &&
+      task.status !== "done",
   ),
 );
 const todayProjects = computed(() =>
@@ -173,7 +174,9 @@ const timeAgo = (dateStr) => {
             </strong>
             đến hạn
           </template>
-          <template v-else>Hôm nay không có dự án hay nhiệm vụ đến hạn</template>
+          <template v-else
+            >Hôm nay không có dự án hay nhiệm vụ đến hạn</template
+          >
         </p>
       </div>
       <div class="flex items-center gap-3 shrink-0">
@@ -300,7 +303,9 @@ const timeAgo = (dateStr) => {
           <div class="flex items-end justify-between mb-4">
             <div>
               <h2 class="text-lg font-bold text-slate-900">Dự án gần đây</h2>
-              <p class="text-sm text-slate-500">Các dự án bạn đang tham gia</p>
+              <p class="text-sm text-slate-500">
+                Các dự án gần đây đang hoạt động
+              </p>
             </div>
             <button
               @click="router.push('/projects')"
@@ -459,7 +464,9 @@ const timeAgo = (dateStr) => {
                         >
                           {{ task.title }}
                         </span>
-                        <span class="block text-xs text-slate-500 mt-1 truncate">
+                        <span
+                          class="block text-xs text-slate-500 mt-1 truncate"
+                        >
                           {{
                             findProject(task.projectId)?.name ||
                             "Không thuộc dự án"
