@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { FolderKanban, Calendar, Clock, ArrowLeft, Plus, MoreVertical, ListTodo, Paperclip, MoreHorizontal, Check, Settings, ShieldAlert, LogOut, CheckCircle2, Users, CalendarDays, Tag, LayoutGrid, List } from '@lucide/vue'
+import { FolderKanban, Calendar, Clock, ArrowLeft, Plus, MoreVertical, ListTodo, Paperclip, MoreHorizontal, Check, Settings, ShieldAlert, LogOut, CheckCircle2, Users, CalendarDays, Tag, LayoutGrid, List, Activity } from '@lucide/vue'
 import draggable from 'vuedraggable'
 import { useProjectWorkspace } from '../composables/useProjectWorkspace'
 import TaskCard from '../components/common/TaskCard.vue'
@@ -80,6 +80,7 @@ const confirmRemoveMember = (memberId) => {
 const projectMembers = computed(() => project.value ? project.value.memberIds.map(id => findMember(id)) : [])
 const projectFiles = computed(() => project.value?.files || [])
 const projectActivities = computed(() => activities.value.filter(a => a.projectId === projectId.value).slice(0, 5))
+const showProjectActivities = ref(false)
 
 // Calculate time ago string
 const timeAgo = (dateStr) => {
@@ -291,9 +292,19 @@ const projectStatusClasses = {
       
       <!-- Activity Timeline -->
       <div class="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 flex flex-col md:col-span-2 lg:col-span-3">
-        <h2 class="text-lg font-bold text-slate-900 mb-6">Nhật ký hoạt động</h2>
+        <div class="flex items-center justify-between mb-6">
+          <h2 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+            <Activity class="w-5 h-5 text-violet-500" /> Nhật ký hoạt động
+          </h2>
+          <button
+            @click="showProjectActivities = !showProjectActivities"
+            class="text-xs font-semibold text-violet-600 hover:text-violet-700 bg-violet-50 hover:bg-violet-100 px-2.5 py-1 rounded-lg transition-colors cursor-pointer shadow-2xs"
+          >
+            {{ showProjectActivities ? 'Ẩn' : 'Xem' }}
+          </button>
+        </div>
         
-        <div v-if="projectActivities.length" class="relative">
+        <div v-if="showProjectActivities && projectActivities.length" class="relative">
           <div class="absolute top-2 bottom-2 left-[19px] w-px bg-slate-200"></div>
           <div class="space-y-6 relative">
             <div v-for="activity in projectActivities" :key="activity.id" class="flex gap-4">
@@ -322,7 +333,7 @@ const projectStatusClasses = {
           </div>
         </div>
         <div v-else class="text-center py-8 text-slate-400 text-sm font-medium">
-          Chưa có hoạt động nào trong dự án này.
+          Chưa có hoạt động nào (hoặc đang ẩn).
         </div>
       </div>
 

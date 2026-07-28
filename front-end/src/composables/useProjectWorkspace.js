@@ -414,7 +414,7 @@ export function useProjectWorkspace() {
   }
 
   function getTaskDeadlineState(dueDate, status) {
-    if (!dueDate || status === 'done') return 'normal'
+    if (!dueDate || status === 'done' || status === 'completed') return 'normal'
 
     const dueDateKey = String(dueDate).split('T')[0]
     if (!/^\d{4}-\d{2}-\d{2}$/.test(dueDateKey)) return 'normal'

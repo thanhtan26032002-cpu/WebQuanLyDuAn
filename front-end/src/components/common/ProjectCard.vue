@@ -14,6 +14,7 @@ const {
   projectStatusMap,
   findMember,
   formatDate,
+  getTaskDeadlineState,
   projectSettingsModalOpen,
   editingProjectId,
 } = useProjectWorkspace();
@@ -22,6 +23,20 @@ const handleEdit = () => {
   editingProjectId.value = props.project.id;
   projectSettingsModalOpen.value = true;
 };
+
+const deadlineState = computed(() =>
+  getTaskDeadlineState(props.project.dueDate, props.project.status)
+);
+
+const deadlineClass = computed(() => {
+  if (deadlineState.value === "overdue") {
+    return "text-red-600 bg-red-50 border-red-200 font-semibold px-2 py-0.5 rounded-lg border";
+  }
+  if (deadlineState.value === "due") {
+    return "text-amber-700 bg-amber-50 border-amber-200 font-semibold px-2 py-0.5 rounded-lg border";
+  }
+  return "text-slate-400 bg-transparent border-transparent";
+});
 
 const gradientMap = {
   purple: "from-violet-500 to-indigo-600",
@@ -156,7 +171,12 @@ const statusBadge = computed(() => {
         </div>
 
         <!-- Due date / Arrow -->
-        <div class="flex items-center gap-1 text-xs text-slate-400">
+        <div
+          :class="[
+            'flex items-center gap-1 text-xs transition-colors',
+            deadlineClass,
+          ]"
+        >
           <CalendarDays class="w-3.5 h-3.5" />
           {{ formatDate(project.dueDate) }}
         </div>

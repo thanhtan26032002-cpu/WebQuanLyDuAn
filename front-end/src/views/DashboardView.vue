@@ -149,6 +149,8 @@ const timeAgo = (dateStr) => {
   if (diff < 86400) return `${Math.floor(diff / 3600)} giờ trước`;
   return formatDate(dateStr);
 };
+
+const showRecentActivities = ref(false);
 </script>
 
 <template>
@@ -501,15 +503,21 @@ const timeAgo = (dateStr) => {
         <div
           class="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden flex flex-col h-[500px]"
         >
-          <div class="px-5 py-4 border-b border-slate-100 bg-slate-50/50">
+          <div class="px-5 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
             <h2 class="font-bold text-slate-900 flex items-center gap-2">
               <Activity class="w-5 h-5 text-violet-500" /> Hoạt động gần đây
             </h2>
+            <button
+              @click="showRecentActivities = !showRecentActivities"
+              class="text-xs font-semibold text-violet-600 hover:text-violet-700 bg-violet-50 hover:bg-violet-100 px-2.5 py-1 rounded-lg transition-colors cursor-pointer shadow-2xs"
+            >
+              {{ showRecentActivities ? 'Ẩn' : 'Xem' }}
+            </button>
           </div>
 
           <div class="p-5 flex-1 overflow-y-auto custom-scrollbar">
             <div
-              v-if="activities.length"
+              v-if="showRecentActivities && activities.length"
               class="relative border-l border-slate-200 ml-4 space-y-6 pb-4"
             >
               <div
