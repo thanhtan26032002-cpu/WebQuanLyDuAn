@@ -102,7 +102,7 @@ const simulateUpload = () => {
           status: 'planning',
           color: 'indigo',
           dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // +30 days
-          memberIds: [1],
+          memberIds: [],
           files: selectedSource.value === 'file' ? selectedFiles.value : []
         })
         notify('Đã tải và nhập dữ liệu dự án thành công!')

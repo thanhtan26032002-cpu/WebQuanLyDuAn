@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Group;
 use App\Models\Member;
+use App\Services\GroupMembershipService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -59,20 +60,7 @@ class GroupController extends Controller
         ]);
 
         DB::transaction(function () use ($memberCode, $validated) {
-            $groups = Group::lockForUpdate()->get();
-            foreach ($groups as $group) {
-                $memberIds = array_values(array_filter(
-                    $group->group_member_ids ?? [],
-                    fn ($id) => $id !== $memberCode,
-                ));
-
-                if (($validated['group_code'] ?? null) === $group->group_code) {
-                    $memberIds[] = $memberCode;
-                }
-
-                $group->group_member_ids = array_values(array_unique($memberIds));
-                $group->save();
-            }
+            GroupMembershipService::assign($memberCode, $validated['group_code'] ?? null);
         });
 
         return response()->json(Group::orderBy('group_created_at')->get());

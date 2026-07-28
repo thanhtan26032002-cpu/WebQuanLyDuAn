@@ -2,8 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Group;
 use App\Models\Member;
+use App\Services\GroupMembershipService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class MemberController extends Controller
 {
@@ -25,21 +28,32 @@ class MemberController extends Controller
             'phone' => 'nullable|string|regex:/^[0-9\+\-\(\)\s]{7,20}$/',
             'department' => 'nullable|string|max:255',
             'bio' => 'nullable|string|max:1000',
+            'group_code' => 'nullable|exists:groups,group_code',
         ]);
 
-        $member = new Member;
-        $member->member_name = $validated['name'];
-        $member->member_email = $validated['email'];
-        $member->member_role = $validated['role'] ?? 'member';
-        $member->member_phone = $validated['phone'] ?? null;
-        $member->member_department = $validated['department'] ?? null;
-        $member->member_bio = $validated['bio'] ?? null;
-        $member->member_join_date = now()->toDateString();
-        $member->save();
+        $groupCode = $validated['group_code'] ?? null;
+        unset($validated['group_code']);
+
+        $member = DB::transaction(function () use ($validated, $groupCode) {
+            $member = new Member;
+            $member->member_name = $validated['name'];
+            $member->member_email = $validated['email'];
+            $member->member_role = $validated['role'] ?? 'member';
+            $member->member_phone = $validated['phone'] ?? null;
+            $member->member_department = $validated['department'] ?? null;
+            $member->member_bio = $validated['bio'] ?? null;
+            $member->member_join_date = now()->toDateString();
+            $member->save();
+
+            GroupMembershipService::assign($member->member_code, $groupCode);
+
+            return $member;
+        });
 
         return response()->json([
             'message' => 'Thêm thành viên thành công',
             'user' => $member,
+            'groups' => Group::orderBy('group_created_at')->get(),
         ], 201);
     }
 
@@ -54,10 +68,23 @@ class MemberController extends Controller
             'department' => 'nullable|string|max:255',
             'bio' => 'nullable|string|max:1000',
             'online' => 'nullable|boolean',
+            'group_code' => 'sometimes|nullable|exists:groups,group_code',
         ]);
 
-        $member->update(Member::mapToDbAttributes($validated));
+        $shouldUpdateGroup = array_key_exists('group_code', $validated);
+        $groupCode = $validated['group_code'] ?? null;
+        unset($validated['group_code']);
 
-        return response()->json(['member' => $member->fresh()]);
+        DB::transaction(function () use ($member, $validated, $shouldUpdateGroup, $groupCode) {
+            $member->update(Member::mapToDbAttributes($validated));
+            if ($shouldUpdateGroup) {
+                GroupMembershipService::assign($member->member_code, $groupCode);
+            }
+        });
+
+        return response()->json([
+            'member' => $member->fresh(),
+            'groups' => Group::orderBy('group_created_at')->get(),
+        ]);
     }
 }

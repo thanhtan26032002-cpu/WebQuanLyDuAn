@@ -22,19 +22,43 @@ const onDragStart = (e, memberId) => {
   }
 }
 
-const onDrop = (e, targetGroupId) => {
+const resetDragState = () => {
+  draggedMemberId.value = null
   dragOverGroupId.value = null
-  if (draggedMemberId.value) {
-    assignMemberToGroup(draggedMemberId.value, targetGroupId)
-    draggedMemberId.value = null
+  dragOverUnassigned.value = false
+}
+
+const getDraggedMemberId = (e) => {
+  return draggedMemberId.value || e.dataTransfer?.getData('text/plain') || null
+}
+
+const onDrop = async (e, targetGroupId) => {
+  e.preventDefault()
+  const memberId = getDraggedMemberId(e)
+  if (memberId) {
+    await assignMemberToGroup(memberId, targetGroupId)
+  }
+  resetDragState()
+}
+
+const onDropUnassigned = async (e) => {
+  e.preventDefault()
+  const memberId = getDraggedMemberId(e)
+  if (memberId) {
+    await assignMemberToGroup(memberId, null)
+  }
+  resetDragState()
+}
+
+const onDragLeaveGroup = (e, groupId) => {
+  if (!e.currentTarget.contains(e.relatedTarget) && dragOverGroupId.value === groupId) {
+    dragOverGroupId.value = null
   }
 }
 
-const onDropUnassigned = (e) => {
-  dragOverUnassigned.value = false
-  if (draggedMemberId.value) {
-    assignMemberToGroup(draggedMemberId.value, null)
-    draggedMemberId.value = null
+const onDragLeaveUnassigned = (e) => {
+  if (!e.currentTarget.contains(e.relatedTarget)) {
+    dragOverUnassigned.value = false
   }
 }
 
@@ -101,8 +125,8 @@ const taskCount = (memberId, status) => tasks.value.filter((task) => task.assign
         class="rounded-3xl p-6 border transition-all duration-200"
         :class="dragOverGroupId === group.id ? 'bg-violet-50/50 border-violet-400 shadow-md ring-2 ring-violet-500 ring-offset-2' : 'bg-slate-50/50 border-slate-100'"
         @dragover.prevent
-        @dragenter="dragOverGroupId = group.id"
-        @dragleave="dragOverGroupId = null"
+        @dragenter.prevent="dragOverGroupId = group.id"
+        @dragleave="onDragLeaveGroup($event, group.id)"
         @drop="onDrop($event, group.id)"
       >
         <!-- Group Header -->
@@ -130,6 +154,7 @@ const taskCount = (memberId, status) => tasks.value.filter((task) => task.assign
             :key="member.id" 
             draggable="true"
             @dragstart="onDragStart($event, member.id)"
+            @dragend="resetDragState"
             class="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 hover:shadow-md transition-shadow group/card cursor-grab active:cursor-grabbing"
             @click="openMemberDetail(member.id)"
           >
@@ -200,8 +225,8 @@ const taskCount = (memberId, status) => tasks.value.filter((task) => task.assign
       class="pt-8 transition-all duration-200 rounded-3xl p-6 mt-4 border-2 border-transparent"
       :class="{ 'bg-slate-100/80 border-slate-300 border-dashed': dragOverUnassigned }"
       @dragover.prevent
-      @dragenter="dragOverUnassigned = true"
-      @dragleave="dragOverUnassigned = false"
+      @dragenter.prevent="dragOverUnassigned = true"
+      @dragleave="onDragLeaveUnassigned"
       @drop="onDropUnassigned"
     >
       <h3 class="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
@@ -214,6 +239,7 @@ const taskCount = (memberId, status) => tasks.value.filter((task) => task.assign
           :key="member.id" 
           draggable="true"
           @dragstart="onDragStart($event, member.id)"
+          @dragend="resetDragState"
           class="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 hover:shadow-md transition-shadow cursor-grab active:cursor-grabbing flex items-center gap-3"
           @click="openMemberDetail(member.id)"
         >
@@ -225,6 +251,9 @@ const taskCount = (memberId, status) => tasks.value.filter((task) => task.assign
             <p class="text-xs text-slate-500 truncate">{{ member.role }}</p>
           </div>
         </article>
+      </div>
+      <div v-else class="min-h-[90px] rounded-2xl border-2 border-dashed border-slate-200 bg-white/60 px-4 py-6 text-center text-sm font-medium text-slate-400">
+        Thả thành viên từ một nhóm vào đây để chuyển về chưa phân nhóm.
       </div>
     </div>
 

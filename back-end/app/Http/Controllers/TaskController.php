@@ -23,19 +23,7 @@ class TaskController extends Controller
     // Tạo Task mới
     public function store(Request $request)
     {
-        $input = $request->all();
-        if (isset($input['project_code']) && $input['project_code'] === '') {
-            $input['project_code'] = null;
-        }
-        if (isset($input['assignee_code']) && $input['assignee_code'] === '') {
-            $input['assignee_code'] = null;
-        }
-        if (isset($input['due_date']) && $input['due_date'] === '') {
-            $input['due_date'] = null;
-        }
-        if (isset($input['tags']) && $input['tags'] === '') {
-            $input['tags'] = null;
-        }
+        $input = $this->normalizeOptionalFields($request->all());
 
         $validator = Validator::make($input, [
             'project_code' => 'nullable|exists:projects,project_code',
@@ -94,19 +82,7 @@ class TaskController extends Controller
     {
         $task = Task::findOrFail($code);
 
-        $input = $request->all();
-        if (isset($input['project_code']) && $input['project_code'] === '') {
-            $input['project_code'] = null;
-        }
-        if (isset($input['assignee_code']) && $input['assignee_code'] === '') {
-            $input['assignee_code'] = null;
-        }
-        if (isset($input['due_date']) && $input['due_date'] === '') {
-            $input['due_date'] = null;
-        }
-        if (isset($input['tags']) && $input['tags'] === '') {
-            $input['tags'] = null;
-        }
+        $input = $this->normalizeOptionalFields($request->all());
 
         $validator = Validator::make($input, [
             'title' => 'nullable|string|max:255',
@@ -246,5 +222,16 @@ class TaskController extends Controller
             'message' => 'Đã gửi bình luận',
             'comment' => $comment,
         ], 201);
+    }
+
+    private function normalizeOptionalFields(array $input): array
+    {
+        foreach (['project_code', 'assignee_code', 'due_date', 'tags'] as $field) {
+            if (array_key_exists($field, $input) && trim((string) ($input[$field] ?? '')) === '') {
+                $input[$field] = null;
+            }
+        }
+
+        return $input;
     }
 }

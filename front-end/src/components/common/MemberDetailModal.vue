@@ -12,7 +12,10 @@ const editedMember = ref({})
 watch(activeMemberId, (newVal) => {
   if (newVal && member.value) {
     isEditing.value = false
-    editedMember.value = JSON.parse(JSON.stringify(member.value))
+    editedMember.value = {
+      ...JSON.parse(JSON.stringify(member.value)),
+      groupId: groups.value.find(group => group.memberIds.includes(member.value.id))?.id || null,
+    }
   }
 })
 
@@ -22,6 +25,16 @@ const memberGroups = computed(() => {
 })
 
 const errors = ref({})
+
+const startEditing = () => {
+  if (!member.value) return
+  editedMember.value = {
+    ...JSON.parse(JSON.stringify(member.value)),
+    groupId: memberGroups.value[0]?.id || null,
+  }
+  errors.value = {}
+  isEditing.value = true
+}
 
 const close = () => {
   memberDetailModalOpen.value = false
@@ -51,9 +64,14 @@ const save = async () => {
     phone: editedMember.value.phone,
     role: editedMember.value.role,
     department: editedMember.value.department,
-    bio: editedMember.value.bio
+    bio: editedMember.value.bio,
+    groupId: editedMember.value.groupId || null,
   })
-  if (result?.success) isEditing.value = false
+  if (result?.success) {
+    isEditing.value = false
+  } else if (result?.errors) {
+    errors.value = result.errors
+  }
 }
 </script>
 
@@ -79,7 +97,7 @@ const save = async () => {
         <div class="absolute bottom-4 right-6 flex gap-2">
           <button 
             v-if="!isEditing"
-            @click="isEditing = true"
+            @click="startEditing"
             class="flex items-center gap-1.5 px-3 py-1.5 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white font-medium text-sm rounded-lg transition-colors shadow-sm"
           >
             <Edit2 class="w-4 h-4" /> Chỉnh sửa
@@ -185,6 +203,15 @@ const save = async () => {
             <div>
               <label class="block text-sm font-semibold text-slate-700 mb-1">Phòng ban</label>
               <input v-model="editedMember.department" type="text" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500" />
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-1">Thuộc nhóm</label>
+              <select v-model="editedMember.groupId" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 appearance-none">
+                <option :value="null">Không thuộc nhóm nào</option>
+                <option v-for="group in groups" :key="group.id" :value="group.id">
+                  {{ group.icon }} {{ group.name }}
+                </option>
+              </select>
             </div>
             <div>
               <label class="block text-sm font-semibold text-slate-700 mb-1">Tiểu sử ngắn</label>

@@ -18,3 +18,8 @@ SET @project_color_sql = IF(
 PREPARE project_color_statement FROM @project_color_sql;
 EXECUTE project_color_statement;
 DEALLOCATE PREPARE project_color_statement;
+
+-- Một số database hosting cũ đã tạo cột người phụ trách dưới dạng NOT NULL.
+-- Chuẩn hiện tại cho phép nhiệm vụ chưa được phân công.
+ALTER TABLE `tasks`
+  MODIFY COLUMN `task_assignee_code` varchar(50) NULL;

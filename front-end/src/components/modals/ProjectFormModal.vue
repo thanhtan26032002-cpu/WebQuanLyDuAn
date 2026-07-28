@@ -14,7 +14,7 @@ const form = reactive({
   status: 'planning',
   dueDate: '',
   progress: 0,
-  memberIds: [1],
+  memberIds: [],
 })
 
 const colors = [
@@ -58,6 +58,7 @@ async function submit() {
     form.description = ''
     form.dueDate = ''
     form.progress = 0
+    form.memberIds = []
     selectedFiles.value = []
   }
 }

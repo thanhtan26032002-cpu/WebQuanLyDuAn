@@ -34,6 +34,7 @@ class CoreApiTest extends TestCase
             'color' => 'rose',
             'status' => 'active',
             'due_date' => now()->toDateString(),
+            'member_ids' => [$member->member_code],
             'user_code' => $user->user_code,
         ]);
 
@@ -41,6 +42,7 @@ class CoreApiTest extends TestCase
             ->assertCreated()
             ->assertJsonPath('project.code', 'PJ0001')
             ->assertJsonPath('project.color', 'rose')
+            ->assertJsonPath('project.members.0.code', $member->member_code)
             ->assertJsonPath('project.due_date', now()->toDateString());
 
         $taskResponse = $this->postJson('/api/tasks', [
@@ -188,5 +190,70 @@ class CoreApiTest extends TestCase
         ])->assertCreated()
             ->assertJsonPath('project.due_date', null)
             ->assertJsonMissingPath('project.color');
+    }
+
+    public function test_task_can_be_created_and_updated_without_an_assignee(): void
+    {
+        $user = User::create([
+            'user_name' => 'Quản trị viên',
+            'user_email' => 'admin@example.com',
+            'user_password' => Hash::make('test-password'),
+        ]);
+
+        $this->postJson('/api/tasks', [
+            'title' => 'Nhiệm vụ chưa phân công',
+            'assignee_code' => null,
+            'due_date' => '',
+            'user_code' => $user->user_code,
+        ])->assertCreated()
+            ->assertJsonPath('task.assignee_code', null)
+            ->assertJsonPath('task.assignee', null);
+
+        $this->putJson('/api/tasks/TK0001', [
+            'assignee_code' => '',
+        ])->assertOk()
+            ->assertJsonPath('task.assignee_code', null)
+            ->assertJsonPath('task.assignee', null);
+
+        $this->assertDatabaseHas('tasks', [
+            'task_code' => 'TK0001',
+            'task_assignee_code' => null,
+        ]);
+    }
+
+    public function test_member_group_can_be_selected_in_forms_and_removed_by_drag_api(): void
+    {
+        $firstGroup = $this->postJson('/api/groups', [
+            'name' => 'Nhóm thứ nhất',
+        ])->assertCreated()->json('group');
+
+        $secondGroup = $this->postJson('/api/groups', [
+            'name' => 'Nhóm thứ hai',
+        ])->assertCreated()->json('group');
+
+        $memberResponse = $this->postJson('/api/members', [
+            'name' => 'Thành viên có nhóm',
+            'email' => 'grouped@example.com',
+            'group_code' => $firstGroup['code'],
+        ])->assertCreated()
+            ->assertJsonPath('groups.0.member_ids.0', 'MB0001');
+
+        $memberCode = $memberResponse->json('user.code');
+
+        $this->putJson('/api/members/'.$memberCode, [
+            'group_code' => $secondGroup['code'],
+        ])->assertOk()
+            ->assertJsonCount(0, 'groups.0.member_ids')
+            ->assertJsonPath('groups.1.member_ids.0', $memberCode);
+
+        $this->putJson('/api/groups/members/'.$memberCode, [
+            'group_code' => null,
+        ])->assertOk()
+            ->assertJsonCount(0, '0.member_ids')
+            ->assertJsonCount(0, '1.member_ids');
+
+        $this->getJson('/api/groups')->assertOk()
+            ->assertJsonCount(0, '0.member_ids')
+            ->assertJsonCount(0, '1.member_ids');
     }
 }

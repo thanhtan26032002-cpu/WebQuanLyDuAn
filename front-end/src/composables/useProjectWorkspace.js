@@ -440,6 +440,8 @@ export function useProjectWorkspace() {
           status: payload.status || 'planning',
           start_date: payload.startDate || new Date().toISOString().split('T')[0],
           due_date: payload.dueDate || null,
+          progress: Number(payload.progress || 0),
+          member_ids: Array.isArray(payload.memberIds) ? payload.memberIds : [],
           user_code: currentUser.value.code,
         })
       })
@@ -840,14 +842,17 @@ export function useProjectWorkspace() {
 
   async function addMember(payload) {
     try {
+      const requestPayload = { ...payload, group_code: payload.groupId || null }
+      delete requestPayload.groupId
       const res = await fetch(`${API_URL}/members`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(requestPayload)
       })
       if (res.ok) {
         const data = await res.json()
         members.value.push(mapMember(data.user))
+        if (Array.isArray(data.groups)) groups.value = data.groups.map(mapGroup)
         addMemberModalOpen.value = false
         notify('Đã thêm thành viên mới')
         return { success: true }
@@ -864,10 +869,15 @@ export function useProjectWorkspace() {
 
   async function updateMember(memberId, updates) {
     try {
+      const requestPayload = { ...updates }
+      if (updates.groupId !== undefined) {
+        requestPayload.group_code = updates.groupId || null
+        delete requestPayload.groupId
+      }
       const res = await fetch(`${API_URL}/members/${memberId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-        body: JSON.stringify(updates)
+        body: JSON.stringify(requestPayload)
       })
       if (!res.ok) {
         const errors = await parseValidationErrors(res)
@@ -878,6 +888,7 @@ export function useProjectWorkspace() {
       const data = await res.json()
       const index = members.value.findIndex(m => m.id === memberId)
       if (index !== -1) members.value[index] = mapMember(data.member)
+      if (Array.isArray(data.groups)) groups.value = data.groups.map(mapGroup)
       notify('Đã cập nhật thông tin thành viên')
       return { success: true }
     } catch {

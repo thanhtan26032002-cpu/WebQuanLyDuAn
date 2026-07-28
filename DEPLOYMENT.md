@@ -2,7 +2,7 @@
 
 ## Yêu cầu máy chủ
 
-- PHP 8.3 trở lên cùng các extension: PDO MySQL, Fileinfo, OpenSSL, Mbstring và Zip.
+- PHP 8.3 trở lên cùng các extension: PDO MySQL, Fileinfo, OpenSSL, Mbstring, Intl và Zip.
 - MySQL 8 hoặc MariaDB tương thích.
 - Node.js chỉ cần trên máy build frontend; không bắt buộc trên máy chạy production.
 - Document root của backend phải trỏ vào thư mục `back-end/public`, không trỏ vào `back-end`.
@@ -24,7 +24,7 @@
 
    Không import `database.sql` rồi chạy migration trên cùng database. File SQL chỉ dành cho cách cài đặt thủ công cũ.
 
-   Nếu hosting đang dùng database đã import từ `database.sql` của phiên bản cũ, không chạy toàn bộ migration. Hãy import riêng file `database-upgrade-2026-07-28.sql` để bổ sung cột màu dự án.
+   Nếu hosting đang dùng database đã import từ `database.sql` của phiên bản cũ, không chạy toàn bộ migration. Hãy import riêng file `database-upgrade-2026-07-28.sql` để bổ sung cột màu dự án và cho phép nhiệm vụ không có người phụ trách.
 
 5. Tạo liên kết file upload và cache cấu hình:
 
@@ -49,8 +49,8 @@
 
 - Truy cập `/up` của Laravel và xác nhận HTTP 200.
 - Tạo thử một dự án không có hạn chót và một dự án có hạn hôm nay.
-- Tạo, kéo trạng thái và xóa một nhiệm vụ thử.
-- Thêm thành viên, tạo nhóm, phân nhóm rồi tải lại trang để xác nhận dữ liệu vẫn còn.
+- Tạo một nhiệm vụ có người phụ trách và một nhiệm vụ không có người phụ trách; kéo đổi trạng thái, tải lại trang rồi xóa nhiệm vụ thử.
+- Thêm thành viên, chọn nhóm trong biểu mẫu chỉnh sửa, kéo thành viên sang nhóm khác và kéo về khu vực chưa phân nhóm; tải lại trang để xác nhận dữ liệu vẫn còn.
 - Upload rồi xóa một tệp thử; xác nhận URL `/storage/...` truy cập được.
 
 ## Lưu ý bảo mật của bản hiện tại

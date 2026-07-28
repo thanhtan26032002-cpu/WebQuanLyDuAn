@@ -50,13 +50,19 @@ class ProjectController extends Controller
             'start_date' => 'nullable|date',
             'due_date' => 'nullable|date|after_or_equal:today',
             'progress' => 'nullable|integer|min:0|max:100',
+            'member_ids' => 'sometimes|array',
+            'member_ids.*' => 'string|distinct|exists:members,member_code',
         ]);
         $validated = $this->discardFieldsMissingFromLegacySchema($validated);
+
+        $memberIds = $validated['member_ids'] ?? [];
+        unset($validated['member_ids']);
 
         $dbData = Project::mapToDbAttributes($validated);
         $dbData['project_created_by'] = $request->input('user_code', 'US0001');
 
         $project = Project::create($dbData);
+        $project->members()->sync($memberIds);
 
         ActivityService::log(
             $dbData['project_created_by'],
@@ -92,6 +98,7 @@ class ProjectController extends Controller
         $validated = $this->discardFieldsMissingFromLegacySchema($validated);
 
         $project->update(Project::mapToDbAttributes($validated));
+        $project->load('members', 'attachments');
 
         $userCode = $request->input('user_code', 'US0001');
         ActivityService::log(
