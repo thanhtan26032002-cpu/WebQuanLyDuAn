@@ -32,8 +32,8 @@ class DownloadController extends Controller
         $fileName .= $format;
 
         // Fetch attachments
-        $attachments = Attachment::where('target_type', $targetType)
-            ->where('target_code', $targetCode)
+        $attachments = Attachment::where('attachment_target_type', $targetType)
+            ->where('attachment_target_code', $targetCode)
             ->get();
 
         if ($attachments->isEmpty()) {

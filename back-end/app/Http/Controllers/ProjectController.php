@@ -14,11 +14,11 @@ class ProjectController extends Controller
         $projects = Project::withCount('tasks')
             ->with([
                 'members' => function($q) {
-                    $q->select('members.code', 'members.name', 'members.avatar');
+                    $q->select('members.member_code', 'members.member_name', 'members.member_avatar');
                 },
                 'attachments'
             ])
-            ->orderBy('created_at', 'desc')
+            ->orderBy('project_created_at', 'desc')
             ->get();
 
         return response()->json($projects);
@@ -48,16 +48,17 @@ class ProjectController extends Controller
             'progress' => 'nullable|integer|min:0|max:100',
         ]);
 
-        $validated['created_by'] = $request->input('user_code', 'US0001');
+        $dbData = Project::mapToDbAttributes($validated);
+        $dbData['project_created_by'] = $request->input('user_code', 'US0001');
 
-        $project = Project::create($validated);
+        $project = Project::create($dbData);
 
         ActivityService::log(
-            $validated['created_by'],
+            $dbData['project_created_by'],
             'tạo dự án',
             'Project',
-            $project->code,
-            "Đã tạo dự án mới: {$project->name}"
+            $project->project_code,
+            "Đã tạo dự án mới: {$project->project_name}"
         );
 
         $project->load('members', 'attachments');
@@ -82,15 +83,15 @@ class ProjectController extends Controller
             'progress' => 'nullable|integer|min:0|max:100',
         ]);
 
-        $project->update($validated);
+        $project->update(Project::mapToDbAttributes($validated));
 
         $userCode = $request->input('user_code', 'US0001');
         ActivityService::log(
             $userCode,
             'cập nhật dự án',
             'Project',
-            $project->code,
-            "Đã cập nhật thông tin dự án: {$project->name}"
+            $project->project_code,
+            "Đã cập nhật thông tin dự án: {$project->project_name}"
         );
 
         return response()->json([
@@ -103,8 +104,8 @@ class ProjectController extends Controller
     public function destroy(Request $request, $code)
     {
         $project = Project::findOrFail($code);
-        $projectName = $project->name;
-        $projectCode = $project->code;
+        $projectName = $project->project_name;
+        $projectCode = $project->project_code;
 
         $project->delete();
 
@@ -122,5 +123,3 @@ class ProjectController extends Controller
         ]);
     }
 }
-
-

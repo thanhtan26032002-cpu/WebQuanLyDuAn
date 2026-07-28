@@ -3,27 +3,31 @@
 namespace App\Models;
 
 use App\Traits\GeneratesCode;
+use App\Traits\MapsAttributes;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Notification extends Model
 {
-    use HasFactory, GeneratesCode;
+    use HasFactory, GeneratesCode, MapsAttributes;
 
-    protected $primaryKey = 'code';
+    protected $primaryKey = 'notif_code';
     public $incrementing = false;
     protected $keyType = 'string';
 
+    const CREATED_AT = 'notif_created_at';
+    const UPDATED_AT = 'notif_updated_at';
+
     protected $fillable = [
-        'user_code',
-        'title',
-        'message',
-        'type',
-        'is_read'
+        'notif_user_code',
+        'notif_title',
+        'notif_message',
+        'notif_type',
+        'notif_is_read'
     ];
 
     protected $casts = [
-        'is_read' => 'boolean'
+        'notif_is_read' => 'boolean'
     ];
 
     public function getCodePrefix()
@@ -31,8 +35,22 @@ class Notification extends Model
         return 'NO';
     }
 
+    public function getAttributeMapping(): array
+    {
+        return [
+            'notif_code' => 'code',
+            'notif_user_code' => 'user_code',
+            'notif_title' => 'title',
+            'notif_message' => 'message',
+            'notif_type' => 'type',
+            'notif_is_read' => 'is_read',
+            'notif_created_at' => 'created_at',
+            'notif_updated_at' => 'updated_at',
+        ];
+    }
+
     public function user()
     {
-        return $this->belongsTo(User::class, 'user_code', 'code');
+        return $this->belongsTo(User::class, 'notif_user_code', 'user_code');
     }
 }

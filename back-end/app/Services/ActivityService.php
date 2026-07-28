@@ -14,11 +14,11 @@ class ActivityService
     public static function log($userCode, $action, $targetType, $targetCode, $detail = null)
     {
         return Activity::create([
-            'user_code'   => $userCode ?? 'US0001',
-            'action'      => $action,
-            'target_type' => $targetType,
-            'target_code' => $targetCode,
-            'detail'      => $detail,
+            'activity_user_code'   => $userCode ?? 'US0001',
+            'activity_action'      => $action,
+            'activity_target_type' => $targetType,
+            'activity_target_code' => $targetCode,
+            'activity_detail'      => $detail,
         ]);
     }
 
@@ -28,11 +28,11 @@ class ActivityService
     public static function notify($userCode, $title, $message, $type = 'info')
     {
         return Notification::create([
-            'user_code'   => $userCode,
-            'title'       => $title,
-            'message'     => $message,
-            'type'        => $type,
-            'is_read'     => false,
+            'notif_user_code'   => $userCode,
+            'notif_title'       => $title,
+            'notif_message'     => $message,
+            'notif_type'        => $type,
+            'notif_is_read'     => false,
         ]);
     }
 }

@@ -15,19 +15,19 @@ class NotificationController extends Controller
     {
         $userCode = $request->query('user_code', 'US0001');
 
-        $notifications = Notification::where('user_code', $userCode)
-            ->orderBy('created_at', 'desc')
+        $notifications = Notification::where('notif_user_code', $userCode)
+            ->orderBy('notif_created_at', 'desc')
             ->limit(50)
             ->get()
             ->map(function ($notif) {
                 // Map lại để phù hợp với định dạng của frontend (camelCase)
                 return [
-                    'id' => $notif->code,
-                    'title' => $notif->title,
-                    'message' => $notif->message,
-                    'type' => $notif->type,
-                    'read' => $notif->is_read,
-                    'createdAt' => $notif->created_at,
+                    'id' => $notif->notif_code,
+                    'title' => $notif->notif_title,
+                    'message' => $notif->notif_message,
+                    'type' => $notif->notif_type,
+                    'read' => $notif->notif_is_read,
+                    'createdAt' => $notif->notif_created_at,
                 ];
             });
 
@@ -40,7 +40,7 @@ class NotificationController extends Controller
     public function markAsRead($code)
     {
         $notification = Notification::findOrFail($code);
-        $notification->update(['is_read' => true]);
+        $notification->update(['notif_is_read' => true]);
 
         return response()->json(['message' => 'Đã đánh dấu là đã đọc']);
     }
@@ -52,9 +52,9 @@ class NotificationController extends Controller
     {
         $userCode = $request->input('user_code', 'US0001');
         
-        Notification::where('user_code', $userCode)
-            ->where('is_read', false)
-            ->update(['is_read' => true]);
+        Notification::where('notif_user_code', $userCode)
+            ->where('notif_is_read', false)
+            ->update(['notif_is_read' => true]);
 
         return response()->json(['message' => 'Đã đánh dấu tất cả là đã đọc']);
     }

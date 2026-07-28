@@ -10,7 +10,7 @@ class MemberController extends Controller
     // Lấy danh sách toàn bộ thành viên
     public function index()
     {
-        $members = Member::select('code', 'name', 'email', 'avatar', 'role', 'phone', 'department', 'join_date', 'bio', 'online')->get();
+        $members = Member::select('member_code', 'member_name', 'member_email', 'member_avatar', 'member_role', 'member_phone', 'member_department', 'member_join_date', 'member_bio', 'member_online')->get();
         return response()->json($members);
     }
 
@@ -19,7 +19,7 @@ class MemberController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'email' => 'required|string|email|max:255|unique:members',
+            'email' => 'required|string|email|max:255|unique:members,member_email',
             'role' => 'nullable|string|max:100',
             'phone' => 'nullable|string|regex:/^[0-9\+\-\(\)\s]{7,20}$/',
             'department' => 'nullable|string|max:255',
@@ -27,13 +27,13 @@ class MemberController extends Controller
         ]);
 
         $member = new Member();
-        $member->name = $validated['name'];
-        $member->email = $validated['email'];
-        $member->role = $validated['role'] ?? 'member';
-        $member->phone = $validated['phone'] ?? null;
-        $member->department = $validated['department'] ?? null;
-        $member->bio = $validated['bio'] ?? null;
-        $member->join_date = now()->toDateString();
+        $member->member_name = $validated['name'];
+        $member->member_email = $validated['email'];
+        $member->member_role = $validated['role'] ?? 'member';
+        $member->member_phone = $validated['phone'] ?? null;
+        $member->member_department = $validated['department'] ?? null;
+        $member->member_bio = $validated['bio'] ?? null;
+        $member->member_join_date = now()->toDateString();
         $member->save();
 
         return response()->json([

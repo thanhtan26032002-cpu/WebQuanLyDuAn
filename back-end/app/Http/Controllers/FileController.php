@@ -27,18 +27,18 @@ class FileController extends Controller
 
             // Tạo bản ghi trong DB
             $attachment = Attachment::create([
-                'file_name' => $file->getClientOriginalName(),
-                'file_path' => '/storage/' . $path,
-                'mime_type' => $file->getClientMimeType(),
-                'size_bytes' => $file->getSize(),
-                'target_type' => $request->target_type,
-                'target_code' => $request->target_code,
-                'uploaded_by' => 'US0001', 
+                'attachment_file_name' => $file->getClientOriginalName(),
+                'attachment_file_path' => '/storage/' . $path,
+                'attachment_mime_type' => $file->getClientMimeType(),
+                'attachment_size_bytes' => $file->getSize(),
+                'attachment_target_type' => $request->target_type,
+                'attachment_target_code' => $request->target_code,
+                'attachment_uploaded_by' => 'US0001', 
             ]);
 
             ActivityService::log(
                 'US0001',
-                'Đã tải lên tệp: ' . $attachment->file_name,
+                'Đã tải lên tệp: ' . $attachment->attachment_file_name,
                 $request->target_type,
                 $request->target_code
             );
