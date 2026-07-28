@@ -315,7 +315,10 @@ export function useProjectWorkspace() {
   const completionRate = computed(() => tasks.value.length ? Math.round((completedTasks.value.length / tasks.value.length) * 100) : 0)
 
   function findMember(memberId) {
-    return members.value.find((member) => member.id === memberId) || members.value[0] || { id: null, name: 'Khách', initials: '??', color: 'slate', role: '' }
+    if (!memberId) {
+      return { id: null, name: 'Chưa phân công', initials: '--', color: 'slate', role: '', avatar: null }
+    }
+    return members.value.find((member) => member.id === memberId) || { id: null, name: 'Khách', initials: '??', color: 'slate', role: '', avatar: null }
   }
 
   function findProject(projectId) {
