@@ -25,11 +25,14 @@ class MemberController extends Controller
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:members,member_email',
             'role' => 'nullable|string|max:100',
-            'phone' => 'nullable|string|regex:/^[0-9\+\-\(\)\s]{7,20}$/',
+            'phone' => 'required|string|regex:/^\+?[0-9]{9,15}$/',
             'department' => 'nullable|string|max:255',
             'bio' => 'nullable|string|max:1000',
             'color' => 'nullable|string|max:30',
             'group_code' => 'nullable|exists:groups,group_code',
+        ], [
+            'phone.required' => 'Vui lòng nhập số điện thoại.',
+            'phone.regex' => 'Số điện thoại phải gồm từ 9 đến 15 chữ số và chỉ có thể bắt đầu bằng dấu +.',
         ]);
 
         $groupCode = $validated['group_code'] ?? null;
@@ -66,12 +69,15 @@ class MemberController extends Controller
             'name' => 'sometimes|required|string|max:255',
             'email' => 'sometimes|required|email|max:255|unique:members,member_email,'.$code.',member_code',
             'role' => 'nullable|string|max:100',
-            'phone' => 'nullable|string|regex:/^[0-9\+\-\(\)\s]{7,20}$/',
+            'phone' => 'required|string|regex:/^\+?[0-9]{9,15}$/',
             'department' => 'nullable|string|max:255',
             'bio' => 'nullable|string|max:1000',
             'color' => 'nullable|string|max:30',
             'online' => 'nullable|boolean',
             'group_code' => 'sometimes|nullable|exists:groups,group_code',
+        ], [
+            'phone.required' => 'Vui lòng nhập số điện thoại.',
+            'phone.regex' => 'Số điện thoại phải gồm từ 9 đến 15 chữ số và chỉ có thể bắt đầu bằng dấu +.',
         ]);
 
         $shouldUpdateGroup = array_key_exists('group_code', $validated);

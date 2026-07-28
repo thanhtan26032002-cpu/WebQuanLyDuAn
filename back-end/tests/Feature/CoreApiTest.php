@@ -108,6 +108,7 @@ class CoreApiTest extends TestCase
         $this->putJson('/api/members/'.$member->member_code, [
             'name' => 'Thành viên đã sửa',
             'email' => 'member@example.com',
+            'phone' => '0901234567',
             'role' => 'developer',
         ])->assertOk()->assertJsonPath('member.name', 'Thành viên đã sửa');
 
@@ -234,6 +235,7 @@ class CoreApiTest extends TestCase
         $memberResponse = $this->postJson('/api/members', [
             'name' => 'Thành viên có nhóm',
             'email' => 'grouped@example.com',
+            'phone' => '0901234567',
             'group_code' => $firstGroup['code'],
         ])->assertCreated()
             ->assertJsonPath('groups.0.member_ids.0', 'MB0001');
@@ -241,6 +243,7 @@ class CoreApiTest extends TestCase
         $memberCode = $memberResponse->json('user.code');
 
         $this->putJson('/api/members/'.$memberCode, [
+            'phone' => '0901234567',
             'group_code' => $secondGroup['code'],
         ])->assertOk()
             ->assertJsonCount(0, 'groups.0.member_ids')
@@ -255,5 +258,40 @@ class CoreApiTest extends TestCase
         $this->getJson('/api/groups')->assertOk()
             ->assertJsonCount(0, '0.member_ids')
             ->assertJsonCount(0, '1.member_ids');
+    }
+
+    public function test_member_phone_is_required_and_validated_before_saving(): void
+    {
+        $this->postJson('/api/members', [
+            'name' => 'Thiếu số điện thoại',
+            'email' => 'missing-phone@example.com',
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors('phone')
+            ->assertJsonPath('errors.phone.0', 'Vui lòng nhập số điện thoại.');
+
+        $this->postJson('/api/members', [
+            'name' => 'Sai số điện thoại',
+            'email' => 'invalid-phone@example.com',
+            'phone' => '09abc',
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors('phone');
+
+        $memberCode = $this->postJson('/api/members', [
+            'name' => 'Số điện thoại hợp lệ',
+            'email' => 'valid-phone@example.com',
+            'phone' => '+84901234567',
+        ])->assertCreated()->json('user.code');
+
+        $this->putJson('/api/members/'.$memberCode, [
+            'name' => 'Không được lưu',
+            'phone' => '',
+        ])->assertUnprocessable()
+            ->assertJsonPath('errors.phone.0', 'Vui lòng nhập số điện thoại.');
+
+        $this->assertDatabaseHas('members', [
+            'member_code' => $memberCode,
+            'member_name' => 'Số điện thoại hợp lệ',
+            'member_phone' => '+84901234567',
+        ]);
     }
 }

@@ -107,6 +107,7 @@ const displayInitials = computed(() => {
 })
 
 const errors = ref({})
+const phonePattern = /^\+?[0-9]{9,15}$/
 
 const startEditing = () => {
   if (!member.value) return
@@ -128,22 +129,27 @@ const close = () => {
 const save = async () => {
   errors.value = {}
   if (!member.value) return
-  if (!editedMember.value.name?.trim()) {
-    errors.value.name = 'Vui lòng nhập họ tên thành viên.'
-    return
-  }
-  if (!editedMember.value.email?.trim()) {
+  const name = editedMember.value.name?.trim() || ''
+  const email = editedMember.value.email?.trim() || ''
+  const phone = editedMember.value.phone?.trim() || ''
+
+  if (!name) errors.value.name = 'Vui lòng nhập họ tên thành viên.'
+  if (!email) {
     errors.value.email = 'Vui lòng nhập địa chỉ email.'
-    return
-  }
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(editedMember.value.email.trim())) {
+  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     errors.value.email = 'Vui lòng nhập địa chỉ email hợp lệ.'
-    return
   }
+  if (!phone) {
+    errors.value.phone = 'Vui lòng nhập số điện thoại.'
+  } else if (!phonePattern.test(phone)) {
+    errors.value.phone = 'Số điện thoại phải gồm từ 9 đến 15 chữ số và chỉ có thể bắt đầu bằng dấu +.'
+  }
+  if (Object.keys(errors.value).length > 0) return
+
   const result = await updateMember(member.value.id, {
-    name: editedMember.value.name.trim(),
-    email: editedMember.value.email.trim(),
-    phone: editedMember.value.phone,
+    name,
+    email,
+    phone,
     role: editedMember.value.role,
     department: editedMember.value.department,
     bio: editedMember.value.bio,
@@ -292,8 +298,9 @@ const save = async () => {
                 <p v-if="errors.email" class="text-xs font-medium text-red-500 mt-1">{{ errors.email }}</p>
               </div>
               <div>
-                <label class="block text-sm font-semibold text-slate-700 mb-1">Số điện thoại</label>
-                <input v-model="editedMember.phone" type="tel" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500" />
+                <label class="block text-sm font-semibold text-slate-700 mb-1">Số điện thoại *</label>
+                <input v-model="editedMember.phone" type="tel" inputmode="tel" maxlength="16" @input="errors.phone = ''" :class="['w-full bg-slate-50 border rounded-xl px-4 py-2 text-sm focus:outline-none transition-all', errors.phone ? 'border-red-300 focus:border-red-500 focus:ring-1 focus:ring-red-500' : 'border-slate-200 focus:border-violet-500 focus:ring-1 focus:ring-violet-500']" placeholder="0901234567" />
+                <p v-if="errors.phone" class="text-xs font-medium text-red-500 mt-1">{{ errors.phone }}</p>
               </div>
             </div>
             <div>

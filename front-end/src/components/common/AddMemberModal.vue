@@ -28,6 +28,7 @@ const colors = [
 ]
 
 const errors = ref({})
+const phonePattern = /^\+?[0-9]{9,15}$/
 
 watch(addMemberModalOpen, (isOpen) => {
   if (isOpen) {
@@ -46,17 +47,24 @@ const close = () => {
 
 const submit = async () => {
   errors.value = {}
-  if (!formData.value.name?.trim() || !formData.value.email?.trim()) {
-    if (!formData.value.name?.trim()) errors.value.name = 'Vui lòng nhập họ tên.'
-    if (!formData.value.email?.trim()) errors.value.email = 'Vui lòng nhập email.'
-    return
-  }
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.value.email.trim())) {
+  const name = formData.value.name?.trim() || ''
+  const email = formData.value.email?.trim() || ''
+  const phone = formData.value.phone?.trim() || ''
+
+  if (!name) errors.value.name = 'Vui lòng nhập họ tên.'
+  if (!email) {
+    errors.value.email = 'Vui lòng nhập email.'
+  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     errors.value.email = 'Vui lòng nhập địa chỉ email hợp lệ.'
-    return
   }
+  if (!phone) {
+    errors.value.phone = 'Vui lòng nhập số điện thoại.'
+  } else if (!phonePattern.test(phone)) {
+    errors.value.phone = 'Số điện thoại phải gồm từ 9 đến 15 chữ số và chỉ có thể bắt đầu bằng dấu +.'
+  }
+  if (Object.keys(errors.value).length > 0) return
   
-  const res = await addMember(formData.value)
+  const res = await addMember({ ...formData.value, name, email, phone })
   if (res && res.success === false && res.errors) {
     errors.value = res.errors
   } else if (res && res.success) {
@@ -116,12 +124,12 @@ const submit = async () => {
           
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label class="block text-sm font-semibold text-slate-700 mb-1">Số điện thoại</label>
+              <label class="block text-sm font-semibold text-slate-700 mb-1">Số điện thoại *</label>
               <div class="relative">
                 <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <Phone class="h-4 w-4 text-slate-400" />
                 </div>
-                <input v-model="formData.phone" type="text" :class="['w-full bg-slate-50 border rounded-xl pl-9 pr-4 py-2 text-sm focus:outline-none focus:ring-1 transition-all', errors.phone ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : 'border-slate-200 focus:border-violet-500 focus:ring-violet-500']" placeholder="0901234567" />
+                <input v-model="formData.phone" type="tel" inputmode="tel" maxlength="16" @input="errors.phone = ''" :class="['w-full bg-slate-50 border rounded-xl pl-9 pr-4 py-2 text-sm focus:outline-none focus:ring-1 transition-all', errors.phone ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : 'border-slate-200 focus:border-violet-500 focus:ring-violet-500']" placeholder="0901234567" />
               </div>
               <p v-if="errors.phone" class="text-xs font-medium text-red-500 mt-1">{{ errors.phone }}</p>
             </div>
