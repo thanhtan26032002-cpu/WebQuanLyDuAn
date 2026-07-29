@@ -11,7 +11,7 @@ import DownloadArchiveModal from '../components/modals/DownloadArchiveModal.vue'
 
 const route = useRoute()
 const router = useRouter()
-const { projects, tasks, members, activities, projectStatusMap, priorityMap, taskStatusMap, findMember, formatDate, getTaskDeadlineState, taskModalOpen, openTaskModal, projectSettingsModalOpen, fileUploadModalOpen, manageMembersModalOpen, editingProjectId, removeFileFromProject, removeMemberFromProject, moveTask, activeTaskId, downloadArchive, downloadSingleFile } = useProjectWorkspace()
+const { projects, tasks, members, activities, projectStatusMap, priorityMap, taskStatusMap, findMember, formatDate, getTaskDeadlineState, taskModalOpen, openTaskModal, projectSettingsModalOpen, fileUploadModalOpen, manageMembersModalOpen, editingProjectId, removeFileFromProject, removeMemberFromProject, moveTask, activeTaskId, downloadArchive, downloadSingleFile, activeMemberId, memberDetailModalOpen } = useProjectWorkspace()
 
 const deadlineDateClass = (task) => {
   const state = getTaskDeadlineState(task.dueDate, task.status)
@@ -45,6 +45,11 @@ const onTaskChange = (event, newStatus) => {
 
 const openTask = (task) => {
   activeTaskId.value = task.id
+}
+
+const openMemberDetail = (memberId) => {
+  activeMemberId.value = memberId
+  memberDetailModalOpen.value = true
 }
 
 const handleEdit = () => {
@@ -239,19 +244,23 @@ const projectStatusClasses = {
             <Plus class="w-4 h-4" /> Thêm
           </button>
         </div>
-        <div class="flex flex-wrap gap-3 flex-1 content-start">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 flex-1 content-start">
           <div
             v-for="member in projectMembers"
             :key="member.id"
-            class="flex items-center gap-3 pl-3 pr-2 py-2 rounded-xl bg-slate-50 border border-slate-100 group transition-all hover:border-violet-200"
+            @click="openMemberDetail(member.id)"
+            class="flex items-center gap-3 p-3 rounded-2xl bg-white border border-slate-100/80 shadow-sm shadow-slate-200/50 group transition-all duration-300 hover:-translate-y-1 hover:shadow-md hover:shadow-violet-500/10 hover:border-violet-200 relative overflow-hidden cursor-pointer"
           >
-            <UserAvatar :member-id="member.id" size="sm" :show-popover="false" />
-            <div>
-              <p class="text-sm font-semibold text-slate-900 leading-tight">{{ member.name }}</p>
-              <p class="text-xs text-slate-500">{{ member.role }}</p>
+            <div class="absolute inset-0 bg-gradient-to-r from-violet-500/0 via-violet-500/0 to-violet-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
+            <div :class="['w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold text-white shadow-sm shrink-0 relative z-10', `bg-gradient-to-br from-${member.color}-400 to-${member.color}-600`]">
+              {{ member.initials }}
             </div>
-            <button @click="confirmRemoveMember(member.id)" title="Loại khỏi dự án" class="ml-1 text-slate-300 hover:text-rose-500 p-1.5 rounded-lg hover:bg-rose-50 transition-colors opacity-0 group-hover:opacity-100">
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+            <div class="min-w-0 flex-1 relative z-10">
+              <p class="text-sm font-bold text-slate-800 truncate group-hover:text-violet-700 transition-colors">{{ member.name }}</p>
+              <p class="text-xs font-medium text-slate-500 truncate">{{ member.role }}</p>
+            </div>
+            <button @click.stop="confirmRemoveMember(member.id)" title="Loại khỏi dự án" class="relative z-10 shrink-0 text-slate-300 hover:text-rose-500 p-2 rounded-xl hover:bg-rose-50 transition-all opacity-0 group-hover:opacity-100 hover:scale-110">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
             </button>
           </div>
           
