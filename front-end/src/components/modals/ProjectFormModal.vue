@@ -3,7 +3,7 @@ import { computed, nextTick, reactive, ref, onMounted, onUnmounted } from 'vue'
 import { X, FolderKanban, Plus, Check, Paperclip, UploadCloud, Building2 } from '@lucide/vue'
 import { useProjectWorkspace } from '../../composables/useProjectWorkspace'
 
-const { members, customers, projectModalOpen, addProject, addCustomer, formatBytes } = useProjectWorkspace()
+const { members, customers, projectModalOpen, addProject, addCustomer, validateCustomerDraft, formatBytes } = useProjectWorkspace()
 
 const selectedFiles = ref([])
 
@@ -25,10 +25,12 @@ const savingCustomer = ref(false)
 const customerForm = reactive({ name: '', company: '', email: '', phone: '' })
 
 async function createCustomer() {
-  if (!customerForm.name.trim()) {
-    errors.value.customer_name = 'Vui lòng nhập tên khách hàng.'
+  const customerErrors = validateCustomerDraft(customerForm)
+  if (Object.keys(customerErrors).length) {
+    errors.value = { ...errors.value, ...customerErrors }
     return
   }
+  errors.value = { ...errors.value, customer_name: '', email: '', phone: '' }
   savingCustomer.value = true
   const result = await addCustomer({ ...customerForm, name: customerForm.name.trim() })
   savingCustomer.value = false
@@ -162,14 +164,14 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
             </select>
             <div v-else class="space-y-3">
               <div class="grid grid-cols-2 gap-3">
-                <input v-model="customerForm.name" placeholder="Tên người liên hệ *" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-violet-300" />
+                <div><input v-model="customerForm.name" @input="errors.customer_name = ''" placeholder="Tên người liên hệ *" aria-label="Tên khách hàng" :class="['w-full rounded-xl border bg-white px-3 py-2 text-sm outline-none', errors.customer_name ? 'border-red-300 focus:border-red-400' : 'border-slate-200 focus:border-violet-300']" /><p v-if="errors.customer_name" class="mt-1 text-[11px] font-medium text-red-500">{{ errors.customer_name }}</p></div>
                 <input v-model="customerForm.company" placeholder="Công ty / tổ chức" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-violet-300" />
-                <input v-model="customerForm.email" type="email" placeholder="Email" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-violet-300" />
-                <input v-model="customerForm.phone" placeholder="Số điện thoại" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-violet-300" />
+                <div><input v-model="customerForm.email" @input="errors.email = ''" type="email" inputmode="email" autocomplete="email" placeholder="Email" aria-label="Email khách hàng" :class="['w-full rounded-xl border bg-white px-3 py-2 text-sm outline-none', errors.email ? 'border-red-300 focus:border-red-400' : 'border-slate-200 focus:border-violet-300']" /><p v-if="errors.email" class="mt-1 text-[11px] font-medium text-red-500">{{ errors.email }}</p></div>
+                <div><input v-model="customerForm.phone" @input="errors.phone = ''" inputmode="tel" autocomplete="tel" placeholder="Số điện thoại" aria-label="Số điện thoại khách hàng" :class="['w-full rounded-xl border bg-white px-3 py-2 text-sm outline-none', errors.phone ? 'border-red-300 focus:border-red-400' : 'border-slate-200 focus:border-violet-300']" /><p v-if="errors.phone" class="mt-1 text-[11px] font-medium text-red-500">{{ errors.phone }}</p></div>
               </div>
               <button type="button" @click="createCustomer" :disabled="savingCustomer" class="rounded-lg bg-violet-600 px-3 py-2 text-xs font-bold text-white disabled:opacity-50">{{ savingCustomer ? 'Đang lưu...' : 'Lưu và chọn khách hàng' }}</button>
             </div>
-            <p v-if="errors.customer_code || errors.customer_name" class="mt-2 text-xs font-medium text-red-500">{{ errors.customer_code || errors.customer_name }}</p>
+            <p v-if="errors.customer_code" class="mt-2 text-xs font-medium text-red-500">{{ errors.customer_code }}</p>
           </div>
 
           <div class="space-y-2">

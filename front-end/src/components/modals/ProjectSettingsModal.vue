@@ -1,11 +1,11 @@
 <script setup>
 import { ref, reactive, onMounted, onUnmounted, watch, computed, nextTick } from 'vue'
-import { X, Settings, Check, Trash2, AlertTriangle } from '@lucide/vue'
+import { X, Settings, Check, Trash2, AlertTriangle, Building2 } from '@lucide/vue'
 import { useRouter } from 'vue-router'
 import { useProjectWorkspace } from '../../composables/useProjectWorkspace'
 
 const router = useRouter()
-const { projects, members, customers, projectSettingsModalOpen, editingProjectId, updateProject, deleteProject } = useProjectWorkspace()
+const { projects, members, customers, projectSettingsModalOpen, editingProjectId, updateProject, deleteProject, addCustomer, validateCustomerDraft } = useProjectWorkspace()
 
 const form = reactive({
   name: '',
@@ -20,6 +20,9 @@ const form = reactive({
 })
 
 const isDeleting = ref(false)
+const showNewCustomer = ref(false)
+const savingCustomer = ref(false)
+const customerForm = reactive({ name: '', company: '', email: '', phone: '' })
 const errors = ref({})
 const modalBody = ref(null)
 const errorMessages = computed(() => [...new Set(Object.values(errors.value).filter(Boolean))])
@@ -43,11 +46,32 @@ watch(projectSettingsModalOpen, (isOpen) => {
     form.dueDate = project.value.dueDate ? project.value.dueDate.split('T')[0] : ''
     form.progress = project.value.progress
     isDeleting.value = false
+    showNewCustomer.value = false
+    Object.assign(customerForm, { name: '', company: '', email: '', phone: '' })
     errors.value = {}
   } else if (!isOpen) {
     editingProjectId.value = null
   }
 })
+
+async function createCustomer() {
+  const customerErrors = validateCustomerDraft(customerForm)
+  if (Object.keys(customerErrors).length) {
+    errors.value = { ...errors.value, ...customerErrors }
+    return
+  }
+  errors.value = { ...errors.value, customer_name: '', email: '', phone: '' }
+  savingCustomer.value = true
+  const result = await addCustomer({ ...customerForm, name: customerForm.name.trim() })
+  savingCustomer.value = false
+  if (result?.success) {
+    form.customerId = result.customer.id
+    Object.assign(customerForm, { name: '', company: '', email: '', phone: '' })
+    showNewCustomer.value = false
+  } else {
+    showErrors(result?.errors || { _general: 'Không thể tạo khách hàng.' })
+  }
+}
 
 const colors = [
   { id: 'indigo', bg: 'bg-indigo-500', ring: 'ring-indigo-500' },
@@ -135,12 +159,25 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
             </div>
 
             <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
-              <div class="space-y-2 sm:col-span-2">
-                <label class="block text-sm font-semibold text-slate-700">Khách hàng</label>
-                <select v-model="form.customerId" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none focus:border-violet-300">
+              <div class="space-y-3 rounded-2xl border border-violet-100 bg-violet-50/50 p-4 sm:col-span-2">
+                <div class="flex items-center justify-between gap-3">
+                  <label class="flex items-center gap-2 text-sm font-semibold text-slate-700"><Building2 class="h-4 w-4 text-violet-600" />Khách hàng của dự án</label>
+                  <button type="button" @click="showNewCustomer = !showNewCustomer" class="text-xs font-bold text-violet-700 hover:text-violet-900">{{ showNewCustomer ? 'Chọn khách hàng có sẵn' : '+ Tạo khách hàng mới' }}</button>
+                </div>
+                <select v-if="!showNewCustomer" v-model="form.customerId" class="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-violet-300">
                   <option value="">— Chưa gắn khách hàng —</option>
                   <option v-for="customer in customers" :key="customer.id" :value="customer.id">{{ customer.name }}{{ customer.company ? ` · ${customer.company}` : '' }}</option>
                 </select>
+                <div v-else class="space-y-3">
+                  <p class="text-xs text-slate-500">Khách hàng mới sẽ được lưu vào hệ thống và tự động chọn thay cho khách hàng hiện tại.</p>
+                  <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div><input v-model="customerForm.name" @input="errors.customer_name = ''" placeholder="Tên người liên hệ *" aria-label="Tên khách hàng" :class="['w-full rounded-xl border bg-white px-3 py-2 text-sm outline-none', errors.customer_name ? 'border-red-300 focus:border-red-400' : 'border-slate-200 focus:border-violet-300']" /><p v-if="errors.customer_name" class="mt-1 text-[11px] font-medium text-red-500">{{ errors.customer_name }}</p></div>
+                    <input v-model="customerForm.company" placeholder="Công ty / tổ chức" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-violet-300" />
+                    <div><input v-model="customerForm.email" @input="errors.email = ''" type="email" inputmode="email" autocomplete="email" placeholder="Email" aria-label="Email khách hàng" :class="['w-full rounded-xl border bg-white px-3 py-2 text-sm outline-none', errors.email ? 'border-red-300 focus:border-red-400' : 'border-slate-200 focus:border-violet-300']" /><p v-if="errors.email" class="mt-1 text-[11px] font-medium text-red-500">{{ errors.email }}</p></div>
+                    <div><input v-model="customerForm.phone" @input="errors.phone = ''" inputmode="tel" autocomplete="tel" placeholder="Số điện thoại" aria-label="Số điện thoại khách hàng" :class="['w-full rounded-xl border bg-white px-3 py-2 text-sm outline-none', errors.phone ? 'border-red-300 focus:border-red-400' : 'border-slate-200 focus:border-violet-300']" /><p v-if="errors.phone" class="mt-1 text-[11px] font-medium text-red-500">{{ errors.phone }}</p></div>
+                  </div>
+                  <button type="button" @click="createCustomer" :disabled="savingCustomer" class="rounded-lg bg-violet-600 px-3 py-2 text-xs font-bold text-white shadow-sm disabled:opacity-50">{{ savingCustomer ? 'Đang lưu...' : 'Lưu và chọn khách hàng mới' }}</button>
+                </div>
               </div>
               <div class="space-y-2">
                 <label class="block text-sm font-semibold text-slate-700">Quản lý dự án</label>

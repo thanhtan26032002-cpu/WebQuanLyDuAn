@@ -158,6 +158,24 @@ function mapCustomer(customer) {
   return { ...customer, id: customer.code || customer.id }
 }
 
+function validateCustomerDraft(payload) {
+  const errors = {}
+  const name = String(payload.name || '').trim()
+  const email = String(payload.email || '').trim()
+  const phone = String(payload.phone || '').trim()
+  if (!name) errors.customer_name = 'Vui lòng nhập tên khách hàng.'
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    errors.email = 'Email khách hàng không đúng định dạng.'
+  }
+  if (phone) {
+    const digitCount = phone.replace(/\D/g, '').length
+    if (!/^[0-9+\s().-]+$/.test(phone) || digitCount < 8 || digitCount > 15) {
+      errors.phone = 'Số điện thoại phải có từ 8 đến 15 chữ số và chỉ chứa ký tự + ( ) . -.'
+    }
+  }
+  return errors
+}
+
 // ========== STATE (Khởi tạo rỗng, dữ liệu sẽ được tải từ DB) ==========
 const projects = ref([])
 const tasks = ref([])
@@ -1196,6 +1214,7 @@ export function useProjectWorkspace() {
     formatBytes,
     notify,
     addCustomer,
+    validateCustomerDraft,
     addProject,
     updateProject,
     deleteProject,

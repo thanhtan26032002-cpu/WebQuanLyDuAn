@@ -272,6 +272,26 @@ class CoreApiTest extends TestCase
             ->assertJsonCount(1, 'tasks');
     }
 
+    public function test_customer_email_and_phone_are_validated(): void
+    {
+        $this->postJson('/api/customers', [
+            'name' => 'Khách hàng dữ liệu sai',
+            'email' => 'email-khong-hop-le',
+            'phone' => '--------',
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors(['email', 'phone'])
+            ->assertJsonPath('errors.email.0', 'Email khách hàng không đúng định dạng.')
+            ->assertJsonPath('errors.phone.0', 'Số điện thoại phải có từ 8 đến 15 chữ số và chỉ chứa khoảng trắng hoặc các ký tự + ( ) . -.');
+
+        $this->postJson('/api/customers', [
+            'name' => 'Khách hàng hợp lệ',
+            'email' => '  Customer@Example.COM ',
+            'phone' => '+84 (90) 123-4567',
+        ])->assertCreated()
+            ->assertJsonPath('customer.email', 'customer@example.com')
+            ->assertJsonPath('customer.phone', '+84 (90) 123-4567');
+    }
+
     public function test_member_group_can_be_selected_in_forms_and_removed_by_drag_api(): void
     {
         $firstGroup = $this->postJson('/api/groups', [
