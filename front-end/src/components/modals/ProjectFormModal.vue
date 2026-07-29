@@ -1,9 +1,9 @@
 <script setup>
 import { computed, nextTick, reactive, ref, onMounted, onUnmounted } from 'vue'
-import { X, FolderKanban, Plus, Check, Paperclip, UploadCloud } from '@lucide/vue'
+import { X, FolderKanban, Plus, Check, Paperclip, UploadCloud, Building2 } from '@lucide/vue'
 import { useProjectWorkspace } from '../../composables/useProjectWorkspace'
 
-const { members, projectModalOpen, addProject, formatBytes } = useProjectWorkspace()
+const { members, customers, projectModalOpen, addProject, addCustomer, formatBytes } = useProjectWorkspace()
 
 const selectedFiles = ref([])
 
@@ -12,10 +12,34 @@ const form = reactive({
   description: '',
   color: 'indigo',
   status: 'planning',
+  customerId: '',
+  managerId: '',
+  startDate: new Date().toISOString().split('T')[0],
   dueDate: '',
   progress: 0,
   memberIds: [],
 })
+
+const showNewCustomer = ref(false)
+const savingCustomer = ref(false)
+const customerForm = reactive({ name: '', company: '', email: '', phone: '' })
+
+async function createCustomer() {
+  if (!customerForm.name.trim()) {
+    errors.value.customer_name = 'Vui lòng nhập tên khách hàng.'
+    return
+  }
+  savingCustomer.value = true
+  const result = await addCustomer({ ...customerForm, name: customerForm.name.trim() })
+  savingCustomer.value = false
+  if (result?.success) {
+    form.customerId = result.customer.id
+    Object.assign(customerForm, { name: '', company: '', email: '', phone: '' })
+    showNewCustomer.value = false
+  } else {
+    showErrors(result?.errors || { _general: 'Không thể tạo khách hàng.' })
+  }
+}
 
 const colors = [
   { id: 'indigo', bg: 'bg-indigo-500', ring: 'ring-indigo-500' },
@@ -48,6 +72,10 @@ async function submit() {
     showErrors({ name: 'Vui lòng nhập tên dự án.' })
     return
   }
+  if (!form.customerId) {
+    showErrors({ customer_code: 'Vui lòng chọn hoặc tạo khách hàng cho dự án.' })
+    return
+  }
   
   const res = await addProject({ ...form, name: form.name.trim(), memberIds: [...form.memberIds], files: [...selectedFiles.value] })
   if (res && res.success === false && res.errors) {
@@ -56,6 +84,9 @@ async function submit() {
     // modal is closed in useProjectWorkspace
     form.name = ''
     form.description = ''
+    form.customerId = ''
+    form.managerId = ''
+    form.startDate = new Date().toISOString().split('T')[0]
     form.dueDate = ''
     form.progress = 0
     form.memberIds = []
@@ -120,6 +151,27 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
             <p v-if="errors.name" class="text-xs font-medium text-red-500">{{ errors.name }}</p>
           </div>
 
+          <div class="rounded-2xl border border-violet-100 bg-violet-50/50 p-4">
+            <div class="mb-3 flex items-center justify-between gap-3">
+              <label class="flex items-center gap-2 text-sm font-semibold text-slate-700"><Building2 class="h-4 w-4 text-violet-600" /> Khách hàng *</label>
+              <button type="button" @click="showNewCustomer = !showNewCustomer" class="text-xs font-bold text-violet-700 hover:text-violet-900">{{ showNewCustomer ? 'Chọn khách hàng có sẵn' : '+ Tạo khách hàng mới' }}</button>
+            </div>
+            <select v-if="!showNewCustomer" v-model="form.customerId" @change="errors.customer_code = ''" :class="['w-full rounded-xl border bg-white px-3 py-2.5 text-sm outline-none focus:ring-4', errors.customer_code ? 'border-red-300 focus:ring-red-100' : 'border-slate-200 focus:border-violet-300 focus:ring-violet-100']">
+              <option value="">— Chọn khách hàng —</option>
+              <option v-for="customer in customers" :key="customer.id" :value="customer.id">{{ customer.name }}{{ customer.company ? ` · ${customer.company}` : '' }}</option>
+            </select>
+            <div v-else class="space-y-3">
+              <div class="grid grid-cols-2 gap-3">
+                <input v-model="customerForm.name" placeholder="Tên người liên hệ *" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-violet-300" />
+                <input v-model="customerForm.company" placeholder="Công ty / tổ chức" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-violet-300" />
+                <input v-model="customerForm.email" type="email" placeholder="Email" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-violet-300" />
+                <input v-model="customerForm.phone" placeholder="Số điện thoại" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-violet-300" />
+              </div>
+              <button type="button" @click="createCustomer" :disabled="savingCustomer" class="rounded-lg bg-violet-600 px-3 py-2 text-xs font-bold text-white disabled:opacity-50">{{ savingCustomer ? 'Đang lưu...' : 'Lưu và chọn khách hàng' }}</button>
+            </div>
+            <p v-if="errors.customer_code || errors.customer_name" class="mt-2 text-xs font-medium text-red-500">{{ errors.customer_code || errors.customer_name }}</p>
+          </div>
+
           <div class="space-y-2">
             <label class="block text-sm font-semibold text-slate-700">Mô tả</label>
             <textarea v-model="form.description" rows="3" placeholder="Mô tả ngắn về dự án..." class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 focus:bg-white focus:border-violet-300 focus:ring-4 focus:ring-violet-500/10 transition-all outline-none resize-none"></textarea>
@@ -145,6 +197,20 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
                   <Check v-if="form.color === color.id" class="w-4 h-4 text-white" />
                 </div>
               </label>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
+            <div class="space-y-2 sm:col-span-1">
+              <label class="block text-sm font-semibold text-slate-700">Quản lý dự án</label>
+              <select v-model="form.managerId" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-violet-300">
+                <option value="">— Chưa phân công —</option>
+                <option v-for="member in members" :key="member.id" :value="member.id">{{ member.name }}</option>
+              </select>
+            </div>
+            <div class="space-y-2">
+              <label class="block text-sm font-semibold text-slate-700">Ngày bắt đầu</label>
+              <input v-model="form.startDate" type="date" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-violet-300" />
             </div>
           </div>
 

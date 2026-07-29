@@ -14,6 +14,8 @@ class ProjectController extends Controller
     {
         $projects = Project::withCount('tasks')
             ->with([
+                'customer',
+                'manager',
                 'members' => function ($q) {
                     $q->select('members.member_code', 'members.member_name', 'members.member_avatar');
                 },
@@ -29,6 +31,8 @@ class ProjectController extends Controller
     public function show($code)
     {
         $project = Project::with([
+            'customer',
+            'manager',
             'tasks.assignee',
             'members',
             'attachments',
@@ -45,6 +49,8 @@ class ProjectController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
+            'customer_code' => 'nullable|string|exists:customers,customer_code',
+            'manager_code' => 'nullable|string|exists:members,member_code',
             'color' => 'sometimes|string|in:indigo,emerald,amber,rose,sky,violet,orange,purple,green,pink,blue',
             'status' => 'nullable|string|in:planning,active,on_hold,completed',
             'start_date' => 'nullable|date',
@@ -72,7 +78,7 @@ class ProjectController extends Controller
             "Đã tạo dự án mới: {$project->project_name}"
         );
 
-        $project->load('members', 'attachments');
+        $project->load('customer', 'manager', 'members', 'attachments');
 
         return response()->json([
             'message' => 'Tạo dự án thành công',
@@ -89,6 +95,8 @@ class ProjectController extends Controller
         $validated = $request->validate([
             'name' => 'nullable|string|max:255',
             'description' => 'nullable|string',
+            'customer_code' => 'nullable|string|exists:customers,customer_code',
+            'manager_code' => 'nullable|string|exists:members,member_code',
             'color' => 'sometimes|string|in:indigo,emerald,amber,rose,sky,violet,orange,purple,green,pink,blue',
             'status' => 'nullable|string|in:planning,active,on_hold,completed',
             'start_date' => 'nullable|date',
@@ -98,7 +106,7 @@ class ProjectController extends Controller
         $validated = $this->discardFieldsMissingFromLegacySchema($validated);
 
         $project->update(Project::mapToDbAttributes($validated));
-        $project->load('members', 'attachments');
+        $project->load('customer', 'manager', 'members', 'attachments');
 
         $userCode = $request->input('user_code', 'US0001');
         ActivityService::log(
@@ -157,7 +165,7 @@ class ProjectController extends Controller
 
     private function normalizeOptionalDates(Request $request): void
     {
-        foreach (['start_date', 'due_date'] as $field) {
+        foreach (['start_date', 'due_date', 'customer_code', 'manager_code'] as $field) {
             if (array_key_exists($field, $request->all()) && trim((string) $request->input($field)) === '') {
                 $request->merge([$field => null]);
             }

@@ -1,9 +1,10 @@
 <script setup>
 import { computed, ref } from 'vue'
-import { Plus, Search, List, KanbanSquare, MoreHorizontal, Check, CheckSquare } from '@lucide/vue'
+import { Plus, Search, List, KanbanSquare, MoreHorizontal, Check, CheckSquare, CalendarDays } from '@lucide/vue'
 import draggable from 'vuedraggable'
 import TaskCard from '../components/common/TaskCard.vue'
 import UserAvatar from '../components/common/UserAvatar.vue'
+import TaskCalendar from '../components/common/TaskCalendar.vue'
 import { useProjectWorkspace } from '../composables/useProjectWorkspace'
 
 const statusFilter = ref('all')
@@ -46,7 +47,7 @@ const onTaskChange = (event, newStatus) => {
 
 const columns = [
   { id: 'todo', title: 'Cần làm', bg: 'bg-slate-100', text: 'text-slate-700', border: 'border-slate-200' },
-  { id: 'in_progress', title: 'Đang làm', bg: 'bg-blue-100', text: 'text-blue-700', border: 'border-blue-200' },
+  { id: 'in_progress', title: 'Đang làm', bg: 'bg-amber-100', text: 'text-amber-700', border: 'border-amber-200' },
   { id: 'done', title: 'Hoàn thành', bg: 'bg-emerald-100', text: 'text-emerald-700', border: 'border-emerald-200' }
 ]
 
@@ -108,6 +109,13 @@ const getTasksByStatus = (statusId) => {
             :class="['p-1.5 rounded-lg transition-colors', viewMode === 'kanban' ? 'bg-white shadow-sm text-violet-600' : 'text-slate-400 hover:text-slate-600']"
           >
             <KanbanSquare class="w-5 h-5" />
+          </button>
+          <button
+            @click="viewMode = 'calendar'"
+            title="Dạng lịch"
+            :class="['p-1.5 rounded-lg transition-colors', viewMode === 'calendar' ? 'bg-white shadow-sm text-violet-600' : 'text-slate-400 hover:text-slate-600']"
+          >
+            <CalendarDays class="w-5 h-5" />
           </button>
         </div>
       </div>
@@ -193,7 +201,7 @@ const getTasksByStatus = (statusId) => {
     </div>
 
     <!-- Kanban View -->
-    <div v-else>
+    <div v-else-if="viewMode === 'kanban'">
       <div v-if="filteredTasks.length" class="flex flex-col md:flex-row gap-6 overflow-x-auto pb-4">
         <!-- Kanban Columns -->
         <div 
@@ -275,5 +283,7 @@ const getTasksByStatus = (statusId) => {
         <p class="text-slate-500 max-w-sm">Không có nhiệm vụ nào phù hợp với bộ lọc hiện tại.</p>
       </div>
     </div>
+
+    <TaskCalendar v-else :tasks="filteredTasks" @select="openTask" />
   </div>
 </template>

@@ -20,7 +20,8 @@ class Project extends Model
 
     protected $fillable = [
         'project_name', 'project_description', 'project_color', 'project_status',
-        'project_start_date', 'project_due_date', 'project_created_by', 'project_progress'
+        'project_start_date', 'project_due_date', 'project_created_by', 'project_progress',
+        'project_customer_code', 'project_manager_code'
     ];
 
     public function getCodePrefix()
@@ -32,6 +33,7 @@ class Project extends Model
     {
         return [
             'project_code' => 'code',
+            'project_customer_code' => 'customer_code',
             'project_name' => 'name',
             'project_description' => 'description',
             'project_color' => 'color',
@@ -40,6 +42,7 @@ class Project extends Model
             'project_due_date' => 'due_date',
             'project_progress' => 'progress',
             'project_created_by' => 'created_by',
+            'project_manager_code' => 'manager_code',
             'project_created_at' => 'created_at',
             'project_updated_at' => 'updated_at',
         ];
@@ -50,6 +53,16 @@ class Project extends Model
         return $this->belongsToMany(Member::class, 'project_members', 'pm_project_code', 'pm_member_code', 'project_code', 'member_code')
                     ->using(ProjectMember::class)
                     ->withPivot('pm_code', 'pm_role as role');
+    }
+
+    public function customer()
+    {
+        return $this->belongsTo(Customer::class, 'project_customer_code', 'customer_code');
+    }
+
+    public function manager()
+    {
+        return $this->belongsTo(Member::class, 'project_manager_code', 'member_code');
     }
 
     public function tasks()

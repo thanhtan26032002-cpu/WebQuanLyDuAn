@@ -1,23 +1,65 @@
 <script setup>
-import { computed, nextTick, reactive, ref, onMounted, onUnmounted } from 'vue'
+import { computed, nextTick, reactive, ref, onMounted, onUnmounted, watch } from 'vue'
 import { X, CheckSquare, Plus } from '@lucide/vue'
 import { useProjectWorkspace } from '../../composables/useProjectWorkspace'
 
-const { projects, members, taskModalOpen, addTask, newTaskProjectId, closeTaskModal } = useProjectWorkspace()
+const { projects, tasks, members, taskModalOpen, addTask, newTaskProjectId, closeTaskModal } = useProjectWorkspace()
+const taskTypes = [
+  ['task', 'Công việc chung'], ['analysis', 'Phân tích yêu cầu'], ['ui_ux', 'Thiết kế UI/UX'],
+  ['frontend', 'Phát triển Frontend'], ['backend', 'Phát triển Backend'], ['mobile', 'Ứng dụng Mobile'],
+  ['api', 'API / Tích hợp hệ thống'], ['database', 'Cơ sở dữ liệu'], ['devops', 'DevOps / Hạ tầng'],
+  ['testing', 'Kiểm thử / QA'], ['security', 'Bảo mật'], ['documentation', 'Viết tài liệu'],
+  ['research', 'Nghiên cứu kỹ thuật'], ['maintenance', 'Bảo trì / Nâng cấp'], ['feature', 'Tính năng mới'],
+  ['bug', 'Sửa lỗi'], ['milestone', 'Cột mốc'],
+]
+const defaultTags = ['Frontend', 'Backend', 'API', 'Database', 'UI/UX', 'Mobile', 'DevOps', 'QA', 'Security', 'Documentation', 'Research', 'Hotfix', 'Performance', 'Technical debt']
 const form = reactive({
   title: '',
   description: '',
+  type: 'task',
   status: 'todo',
   priority: 'medium',
   projectId: newTaskProjectId.value || '',
   assigneeId: '',
+  startDate: '',
   dueDate: '',
-  tags: '',
+  estimatedHours: '',
+  tags: [],
 })
 
 const errors = ref({})
 const modalBody = ref(null)
+const tagSearch = ref('')
+const tagDropdownOpen = ref(false)
 const errorMessages = computed(() => [...new Set(Object.values(errors.value).filter(Boolean))])
+const availableTags = computed(() => [...new Set([...defaultTags, ...tasks.value.flatMap(task => task.tags || [])])].sort((a, b) => a.localeCompare(b, 'vi')))
+const filteredTags = computed(() => availableTags.value.filter(tag => !form.tags.includes(tag) && (!tagSearch.value || tag.toLowerCase().includes(tagSearch.value.toLowerCase()))))
+
+function addTag(value = tagSearch.value) {
+  const tag = String(value || '').trim().replace(/^,|,$/g, '')
+  if (tag && !form.tags.some(item => item.toLowerCase() === tag.toLowerCase())) form.tags.push(tag)
+  tagSearch.value = ''
+  tagDropdownOpen.value = true
+}
+
+function removeTag(tag) {
+  form.tags = form.tags.filter(item => item !== tag)
+}
+
+function handleTagKeydown(event) {
+  if (event.key === 'Enter' || event.key === ',') {
+    event.preventDefault()
+    addTag()
+  }
+}
+
+function closeTagDropdown() {
+  window.setTimeout(() => { tagDropdownOpen.value = false }, 150)
+}
+
+watch(taskModalOpen, isOpen => {
+  if (isOpen) form.projectId = newTaskProjectId.value || form.projectId || ''
+})
 
 function showErrors(nextErrors) {
   errors.value = nextErrors
@@ -30,6 +72,10 @@ async function submit() {
     showErrors({ title: 'Vui lòng nhập tiêu đề nhiệm vụ.' })
     return
   }
+  if (form.startDate && form.dueDate && form.dueDate < form.startDate) {
+    showErrors({ due_date: 'Hạn chót phải bằng hoặc sau ngày bắt đầu.' })
+    return
+  }
   
   const res = await addTask({ ...form, title: form.title.trim() })
   if (res && res.success === false && res.errors) {
@@ -38,8 +84,11 @@ async function submit() {
     // modal is closed in useProjectWorkspace
     form.title = ''
     form.description = ''
+    form.type = 'task'
+    form.startDate = ''
     form.dueDate = ''
-    form.tags = ''
+    form.estimatedHours = ''
+    form.tags = []
     form.projectId = ''
     form.assigneeId = ''
   }
@@ -98,6 +147,14 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
             <p v-if="errors.description" class="text-xs font-medium text-red-500">{{ errors.description }}</p>
           </div>
 
+          <div class="space-y-2">
+            <label class="block text-sm font-semibold text-slate-700">Loại nhiệm vụ</label>
+            <select v-model="form.type" class="w-full cursor-pointer appearance-none rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-medium text-slate-800 outline-none transition-all focus:border-violet-300 focus:bg-white focus:ring-4 focus:ring-violet-500/10">
+              <option v-for="item in taskTypes" :key="item[0]" :value="item[0]">{{ item[1] }}</option>
+            </select>
+            <p class="text-[11px] text-slate-400">Danh mục chuyên môn thường dùng trong dự án công nghệ thông tin.</p>
+          </div>
+
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
             <div class="space-y-2">
               <label class="block text-sm font-semibold text-slate-700">Trạng thái</label>
@@ -146,16 +203,50 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
             </div>
           </div>
 
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+          <div class="grid grid-cols-1 gap-5 sm:grid-cols-3">
+            <div class="space-y-2">
+              <label class="block text-sm font-semibold text-slate-700">Ngày bắt đầu</label>
+              <input v-model="form.startDate" type="date" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-violet-300" />
+            </div>
             <div class="space-y-2">
               <label class="block text-sm font-semibold text-slate-700">Hạn chót</label>
               <input v-model="form.dueDate" type="date" @input="errors.due_date = ''" :class="['w-full bg-slate-50 border rounded-xl px-4 py-2.5 text-slate-900 focus:bg-white focus:ring-4 transition-all outline-none cursor-pointer', errors.due_date ? 'border-red-300 focus:border-red-300 focus:ring-red-500/10' : 'border-slate-200 focus:border-violet-300 focus:ring-violet-500/10']" />
               <p v-if="errors.due_date" class="text-xs font-medium text-red-500">{{ errors.due_date }}</p>
             </div>
             <div class="space-y-2">
-              <label class="block text-sm font-semibold text-slate-700">Nhãn</label>
-              <input v-model="form.tags" placeholder="Frontend, UI/UX" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 focus:bg-white focus:border-violet-300 focus:ring-4 focus:ring-violet-500/10 transition-all outline-none" />
+              <label class="block text-sm font-semibold text-slate-700">Ước lượng (giờ)</label>
+              <input v-model="form.estimatedHours" type="number" min="0" step="0.5" placeholder="8" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-violet-300" />
             </div>
+          </div>
+
+          <div class="space-y-2">
+            <label class="block text-sm font-semibold text-slate-700">Nhãn</label>
+            <div class="relative">
+              <div :class="['flex min-h-11 flex-wrap items-center gap-1.5 rounded-xl border bg-slate-50 px-2.5 py-2 transition-all', tagDropdownOpen ? 'border-violet-300 bg-white ring-4 ring-violet-500/10' : 'border-slate-200']">
+                <span v-for="tag in form.tags" :key="tag" class="inline-flex items-center gap-1 rounded-lg border border-violet-100 bg-violet-50 px-2 py-1 text-xs font-bold text-violet-700">
+                  {{ tag }}
+                  <button type="button" @click.stop="removeTag(tag)" class="rounded p-0.5 hover:bg-violet-100" :aria-label="`Bỏ nhãn ${tag}`"><X class="h-3 w-3" /></button>
+                </span>
+                <input
+                  v-model="tagSearch"
+                  @focus="tagDropdownOpen = true"
+                  @blur="closeTagDropdown"
+                  @keydown="handleTagKeydown"
+                  placeholder="Chọn hoặc nhập nhãn mới..."
+                  class="min-w-[180px] flex-1 bg-transparent px-1 py-0.5 text-sm text-slate-800 outline-none placeholder:text-slate-400"
+                />
+              </div>
+              <div v-if="tagDropdownOpen" class="absolute z-30 mt-2 max-h-52 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl">
+                <button v-for="tag in filteredTags" :key="tag" type="button" @mousedown.prevent="addTag(tag)" class="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-violet-50 hover:text-violet-700">
+                  <span>{{ tag }}</span><Plus class="h-3.5 w-3.5" />
+                </button>
+                <button v-if="tagSearch.trim() && !availableTags.some(tag => tag.toLowerCase() === tagSearch.trim().toLowerCase())" type="button" @mousedown.prevent="addTag()" class="flex w-full items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-left text-sm font-bold text-violet-700 hover:bg-violet-50">
+                  <Plus class="h-4 w-4" /> Tạo nhãn “{{ tagSearch.trim() }}”
+                </button>
+                <p v-if="!filteredTags.length && !tagSearch.trim()" class="px-3 py-3 text-center text-xs text-slate-400">Đã chọn tất cả nhãn có sẵn.</p>
+              </div>
+            </div>
+            <p class="text-[11px] text-slate-400">Có thể chọn nhiều nhãn; nhấn Enter hoặc dấu phẩy để tạo nhãn mới.</p>
           </div>
         </div>
 

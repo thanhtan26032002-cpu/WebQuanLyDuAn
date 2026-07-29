@@ -5,13 +5,16 @@ import { useRouter } from 'vue-router'
 import { useProjectWorkspace } from '../../composables/useProjectWorkspace'
 
 const router = useRouter()
-const { projects, projectSettingsModalOpen, editingProjectId, updateProject, deleteProject } = useProjectWorkspace()
+const { projects, members, customers, projectSettingsModalOpen, editingProjectId, updateProject, deleteProject } = useProjectWorkspace()
 
 const form = reactive({
   name: '',
   description: '',
   color: 'indigo',
   status: 'planning',
+  customerId: '',
+  managerId: '',
+  startDate: '',
   dueDate: '',
   progress: 0,
 })
@@ -34,6 +37,9 @@ watch(projectSettingsModalOpen, (isOpen) => {
     form.description = project.value.description || ''
     form.color = project.value.color
     form.status = project.value.status
+    form.customerId = project.value.customerId || ''
+    form.managerId = project.value.managerId || ''
+    form.startDate = project.value.startDate ? project.value.startDate.split('T')[0] : ''
     form.dueDate = project.value.dueDate ? project.value.dueDate.split('T')[0] : ''
     form.progress = project.value.progress
     isDeleting.value = false
@@ -126,6 +132,27 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
             <div class="space-y-2">
               <label class="block text-sm font-semibold text-slate-700">Mô tả</label>
               <textarea v-model="form.description" rows="3" placeholder="Mô tả ngắn về dự án..." class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 focus:bg-white focus:border-violet-300 focus:ring-4 focus:ring-violet-500/10 transition-all outline-none resize-none"></textarea>
+            </div>
+
+            <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
+              <div class="space-y-2 sm:col-span-2">
+                <label class="block text-sm font-semibold text-slate-700">Khách hàng</label>
+                <select v-model="form.customerId" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none focus:border-violet-300">
+                  <option value="">— Chưa gắn khách hàng —</option>
+                  <option v-for="customer in customers" :key="customer.id" :value="customer.id">{{ customer.name }}{{ customer.company ? ` · ${customer.company}` : '' }}</option>
+                </select>
+              </div>
+              <div class="space-y-2">
+                <label class="block text-sm font-semibold text-slate-700">Quản lý dự án</label>
+                <select v-model="form.managerId" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none focus:border-violet-300">
+                  <option value="">— Chưa phân công —</option>
+                  <option v-for="member in members" :key="member.id" :value="member.id">{{ member.name }}</option>
+                </select>
+              </div>
+              <div class="space-y-2">
+                <label class="block text-sm font-semibold text-slate-700">Ngày bắt đầu</label>
+                <input v-model="form.startDate" type="date" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none focus:border-violet-300" />
+              </div>
             </div>
 
             <div class="space-y-3">

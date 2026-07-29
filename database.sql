@@ -2,7 +2,7 @@ CREATE DATABASE IF NOT EXISTS `web_quan_ly_du_an` DEFAULT CHARACTER SET utf8mb4 
 USE `web_quan_ly_du_an`;
 
 SET FOREIGN_KEY_CHECKS = 0;
-DROP TABLE IF EXISTS `notifications`, `attachments`, `task_comments`, `activities`, `tasks`, `project_members`, `projects`, `groups`, `members`, `users`;
+DROP TABLE IF EXISTS `notifications`, `attachments`, `task_comments`, `activities`, `tasks`, `project_members`, `projects`, `customers`, `groups`, `members`, `users`;
 SET FOREIGN_KEY_CHECKS = 1;
 
 CREATE TABLE IF NOT EXISTS `users` (
@@ -54,8 +54,22 @@ CREATE TABLE IF NOT EXISTS `groups` (
   PRIMARY KEY (`group_code`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS `customers` (
+  `customer_code` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `customer_name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `customer_company` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `customer_email` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `customer_phone` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `customer_address` text COLLATE utf8mb4_unicode_ci,
+  `customer_notes` text COLLATE utf8mb4_unicode_ci,
+  `customer_created_at` timestamp NULL DEFAULT NULL,
+  `customer_updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`customer_code`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS `projects` (
   `project_code` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `project_customer_code` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `project_name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   `project_description` text COLLATE utf8mb4_unicode_ci,
   `project_color` varchar(30) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'indigo',
@@ -64,10 +78,13 @@ CREATE TABLE IF NOT EXISTS `projects` (
   `project_due_date` date DEFAULT NULL,
   `project_progress` int(11) DEFAULT 0,
   `project_created_by` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `project_manager_code` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `project_created_at` timestamp NULL DEFAULT NULL,
   `project_updated_at` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`project_code`),
-  FOREIGN KEY (`project_created_by`) REFERENCES `users` (`user_code`) ON DELETE CASCADE
+  FOREIGN KEY (`project_created_by`) REFERENCES `users` (`user_code`) ON DELETE CASCADE,
+  FOREIGN KEY (`project_customer_code`) REFERENCES `customers` (`customer_code`) ON DELETE SET NULL,
+  FOREIGN KEY (`project_manager_code`) REFERENCES `members` (`member_code`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `project_members` (
@@ -87,10 +104,13 @@ CREATE TABLE IF NOT EXISTS `tasks` (
   `task_project_code` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `task_title` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   `task_description` text COLLATE utf8mb4_unicode_ci,
+  `task_type` varchar(30) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'task',
   `task_status` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'todo',
   `task_priority` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'medium',
+  `task_start_date` date DEFAULT NULL,
   `task_due_date` date DEFAULT NULL,
   `task_progress` int(11) DEFAULT 0,
+  `task_estimated_hours` decimal(8,2) DEFAULT NULL,
   `task_assignee_code` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `task_tags` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `task_created_at` timestamp NULL DEFAULT NULL,

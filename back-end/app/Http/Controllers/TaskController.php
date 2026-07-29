@@ -29,10 +29,13 @@ class TaskController extends Controller
             'project_code' => 'nullable|exists:projects,project_code',
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
+            'type' => 'nullable|string|in:task,analysis,ui_ux,frontend,backend,mobile,api,database,devops,testing,security,documentation,research,maintenance,bug,feature,milestone',
             'status' => 'nullable|string|in:todo,in_progress,done',
             'priority' => 'nullable|string|in:low,medium,high',
-            'due_date' => 'nullable|date|after_or_equal:today',
+            'start_date' => 'nullable|date',
+            'due_date' => 'nullable|date|after_or_equal:today|after_or_equal:start_date',
             'progress' => 'nullable|integer|min:0|max:100',
+            'estimated_hours' => 'nullable|numeric|min:0|max:99999.99',
             'assignee_code' => 'nullable|exists:members,member_code',
             'tags' => 'nullable|string|max:500',
         ]);
@@ -87,10 +90,13 @@ class TaskController extends Controller
         $validator = Validator::make($input, [
             'title' => 'nullable|string|max:255',
             'description' => 'nullable|string',
+            'type' => 'nullable|string|in:task,analysis,ui_ux,frontend,backend,mobile,api,database,devops,testing,security,documentation,research,maintenance,bug,feature,milestone',
             'status' => 'nullable|string|in:todo,in_progress,done',
             'priority' => 'nullable|string|in:low,medium,high',
+            'start_date' => 'nullable|date',
             'due_date' => 'nullable|date',
             'progress' => 'nullable|integer|min:0|max:100',
+            'estimated_hours' => 'nullable|numeric|min:0|max:99999.99',
             'assignee_code' => 'nullable|exists:members,member_code',
             'project_code' => 'nullable|exists:projects,project_code',
             'tags' => 'nullable|string|max:500',
@@ -226,7 +232,7 @@ class TaskController extends Controller
 
     private function normalizeOptionalFields(array $input): array
     {
-        foreach (['project_code', 'assignee_code', 'due_date', 'tags'] as $field) {
+        foreach (['project_code', 'assignee_code', 'start_date', 'due_date', 'estimated_hours', 'tags'] as $field) {
             if (array_key_exists($field, $input) && trim((string) ($input[$field] ?? '')) === '') {
                 $input[$field] = null;
             }

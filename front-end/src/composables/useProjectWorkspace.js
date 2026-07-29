@@ -61,6 +61,10 @@ function mapProject(p) {
     id: p.code, // Map code sang id để frontend không bị lỗi
     dueDate: p.due_date || p.dueDate,
     startDate: p.start_date || p.startDate,
+    customerId: p.customer_code || p.customerId || null,
+    managerId: p.manager_code || p.managerId || null,
+    customer: p.customer || null,
+    manager: p.manager || null,
     createdAt: p.created_at || p.createdAt,
     memberIds: p.members ? p.members.map(m => m.code) : (p.memberIds || []),
     progress: p.progress || 0,
@@ -81,7 +85,10 @@ function mapTask(t) {
     id: t.code,
     projectId: t.project_code || t.projectId,
     assigneeId: t.assignee_code || t.assigneeId,
+    startDate: t.start_date || t.startDate,
     dueDate: t.due_date || t.dueDate,
+    type: t.type || 'task',
+    estimatedHours: t.estimated_hours ?? t.estimatedHours ?? null,
     createdAt: t.created_at || t.createdAt,
     tags: parsedTags,
     progress: t.progress || 0,
@@ -147,11 +154,16 @@ function mapGroup(g) {
   }
 }
 
+function mapCustomer(customer) {
+  return { ...customer, id: customer.code || customer.id }
+}
+
 // ========== STATE (Khởi tạo rỗng, dữ liệu sẽ được tải từ DB) ==========
 const projects = ref([])
 const tasks = ref([])
 const members = ref([])
 const groups = ref([])
+const customers = ref([])
 const comments = ref([])
 const activities = ref([])
 const users = ref([])
@@ -160,17 +172,18 @@ const apiConnectionError = ref('')
 // ========== FETCH DỮ LIỆU TỪ DATABASE ==========
 const loadDataFromAPI = async () => {
   try {
-    const [resProjects, resMembers, resGroups, resTasks, resActivities, resNotifications, resUsers] = await Promise.all([
+    const [resProjects, resMembers, resGroups, resTasks, resActivities, resNotifications, resUsers, resCustomers] = await Promise.all([
       fetch(`${API_URL}/projects`).catch(() => null),
       fetch(`${API_URL}/members`).catch(() => null),
       fetch(`${API_URL}/groups`).catch(() => null),
       fetch(`${API_URL}/tasks`).catch(() => null),
       fetch(`${API_URL}/activities`).catch(() => null),
       fetch(`${API_URL}/notifications`).catch(() => null),
-      fetch(`${API_URL}/users`).catch(() => null)
+      fetch(`${API_URL}/users`).catch(() => null),
+      fetch(`${API_URL}/customers`).catch(() => null)
     ])
 
-    const responses = [resProjects, resMembers, resGroups, resTasks, resActivities, resNotifications, resUsers]
+    const responses = [resProjects, resMembers, resGroups, resTasks, resActivities, resNotifications, resUsers, resCustomers]
     apiConnectionError.value = responses.some(response => !response?.ok)
       ? 'Không thể tải đầy đủ dữ liệu từ máy chủ. Vui lòng kiểm tra kết nối API.'
       : ''
@@ -207,6 +220,10 @@ const loadDataFromAPI = async () => {
     }
     if (resNotifications && resNotifications.ok) {
       notifications.value = await resNotifications.json()
+    }
+    if (resCustomers && resCustomers.ok) {
+      const raw = await resCustomers.json()
+      customers.value = raw.map(mapCustomer)
     }
 
     if (!apiConnectionError.value) {
@@ -305,8 +322,12 @@ function translateValidationMessage(msg, field = '') {
     role: 'Vị trí',
     department: 'Phòng ban',
     description: 'Mô tả',
+    customer_code: 'Khách hàng',
+    manager_code: 'Quản lý dự án',
     due_date: 'Hạn chót',
     start_date: 'Ngày bắt đầu',
+    estimated_hours: 'Giờ ước lượng',
+    type: 'Loại nhiệm vụ',
     status: 'Trạng thái',
     priority: 'Mức độ ưu tiên',
     code: 'Mã',
@@ -395,6 +416,10 @@ export function useProjectWorkspace() {
     return projects.value.find((project) => project.id === projectId)
   }
 
+  function findCustomer(customerId) {
+    return customers.value.find((customer) => customer.id === customerId)
+  }
+
   function formatDate(dateValue) {
     if (!dateValue) return 'Chưa đặt'
     const [year, month, day] = dateValue.split('T')[0].split('-')
@@ -447,6 +472,8 @@ export function useProjectWorkspace() {
         body: JSON.stringify({
           name: payload.name,
           description: payload.description || '',
+          customer_code: payload.customerId || null,
+          manager_code: payload.managerId || null,
           color: payload.color || 'indigo',
           status: payload.status || 'planning',
           start_date: payload.startDate || new Date().toISOString().split('T')[0],
@@ -490,6 +517,8 @@ export function useProjectWorkspace() {
       const payload = {}
       if (updates.name !== undefined) payload.name = updates.name
       if (updates.description !== undefined) payload.description = updates.description
+      if (updates.customerId !== undefined) payload.customer_code = updates.customerId || null
+      if (updates.managerId !== undefined) payload.manager_code = updates.managerId || null
       if (updates.color !== undefined) payload.color = updates.color
       if (updates.status !== undefined) payload.status = updates.status
       if (updates.progress !== undefined) payload.progress = Number(updates.progress)
@@ -525,6 +554,25 @@ export function useProjectWorkspace() {
     }
   }
 
+  async function addCustomer(payload) {
+    try {
+      const res = await fetch(`${API_URL}/customers`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      if (!res.ok) return { success: false, errors: await parseValidationErrors(res) }
+      const data = await res.json()
+      const customer = mapCustomer(data.customer)
+      customers.value.push(customer)
+      customers.value.sort((a, b) => a.name.localeCompare(b.name, 'vi'))
+      notify('Đã thêm khách hàng mới')
+      return { success: true, customer }
+    } catch {
+      return { success: false, errors: { _general: 'Không thể kết nối tới máy chủ.' } }
+    }
+  }
+
   async function deleteProject(projectId) {
     try {
       const res = await fetch(`${API_URL}/projects/${projectId}`, {
@@ -553,9 +601,12 @@ export function useProjectWorkspace() {
           project_code: payload.projectId || null,
           title: payload.title,
           description: payload.description || '',
+          type: payload.type || 'task',
           status: payload.status || 'todo',
           priority: payload.priority || 'medium',
+          start_date: payload.startDate || null,
           due_date: payload.dueDate || null,
+          estimated_hours: payload.estimatedHours === '' ? null : payload.estimatedHours,
           assignee_code: payload.assigneeId || null,
           tags: payload.tags !== undefined ? (Array.isArray(payload.tags) ? payload.tags.join(', ') : payload.tags) : null,
           user_code: currentUser.value.code,
@@ -612,6 +663,7 @@ export function useProjectWorkspace() {
       const payload = {}
       if (updates.title !== undefined) payload.title = updates.title
       if (updates.description !== undefined) payload.description = updates.description
+      if (updates.type !== undefined) payload.type = updates.type
       if (updates.status !== undefined) payload.status = updates.status
       if (updates.priority !== undefined) payload.priority = updates.priority
       if (updates.progress !== undefined) payload.progress = Number(updates.progress)
@@ -623,6 +675,12 @@ export function useProjectWorkspace() {
       }
       if (updates.dueDate !== undefined || updates.due_date !== undefined) {
         payload.due_date = updates.due_date !== undefined ? updates.due_date : (updates.dueDate || null)
+      }
+      if (updates.startDate !== undefined || updates.start_date !== undefined) {
+        payload.start_date = updates.start_date !== undefined ? updates.start_date : (updates.startDate || null)
+      }
+      if (updates.estimatedHours !== undefined || updates.estimated_hours !== undefined) {
+        payload.estimated_hours = updates.estimated_hours !== undefined ? updates.estimated_hours : (updates.estimatedHours || null)
       }
       if (updates.tags !== undefined) {
         payload.tags = Array.isArray(updates.tags) ? updates.tags.join(', ') : (updates.tags || null)
@@ -1086,6 +1144,7 @@ export function useProjectWorkspace() {
     tasks,
     members,
     groups,
+    customers,
     comments,
     activities,
     apiConnectionError,
@@ -1130,11 +1189,13 @@ export function useProjectWorkspace() {
     completionRate,
     findMember,
     findProject,
+    findCustomer,
     formatDate,
     formatDateTime,
     getTaskDeadlineState,
     formatBytes,
     notify,
+    addCustomer,
     addProject,
     updateProject,
     deleteProject,

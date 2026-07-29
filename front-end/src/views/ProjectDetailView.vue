@@ -1,10 +1,11 @@
 <script setup>
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { FolderKanban, Calendar, Clock, ArrowLeft, Plus, MoreVertical, ListTodo, Paperclip, MoreHorizontal, Check, Settings, ShieldAlert, LogOut, CheckCircle2, Users, CalendarDays, Tag, LayoutGrid, List, Activity } from '@lucide/vue'
+import { FolderKanban, Calendar, Clock, ArrowLeft, Plus, MoreVertical, ListTodo, Paperclip, MoreHorizontal, Check, Settings, ShieldAlert, LogOut, CheckCircle2, Users, CalendarDays, Tag, LayoutGrid, List, Activity, Building2, UserRound } from '@lucide/vue'
 import draggable from 'vuedraggable'
 import { useProjectWorkspace } from '../composables/useProjectWorkspace'
 import TaskCard from '../components/common/TaskCard.vue'
+import TaskCalendar from '../components/common/TaskCalendar.vue'
 import { ref } from 'vue'
 import DownloadArchiveModal from '../components/modals/DownloadArchiveModal.vue'
 
@@ -124,6 +125,8 @@ const statusClasses = {
   done: 'bg-emerald-50 text-emerald-600',
 }
 
+const taskTypeLabels = { task: 'Công việc', analysis: 'Phân tích', ui_ux: 'UI/UX', frontend: 'Frontend', backend: 'Backend', mobile: 'Mobile', api: 'API', database: 'Cơ sở dữ liệu', devops: 'DevOps', testing: 'Kiểm thử', security: 'Bảo mật', documentation: 'Tài liệu', research: 'Nghiên cứu', maintenance: 'Bảo trì', bug: 'Lỗi', feature: 'Tính năng', milestone: 'Cột mốc' }
+
 const projectStatusClasses = {
   active: 'bg-emerald-50 text-emerald-700',
   planning: 'bg-slate-100 text-slate-600',
@@ -192,6 +195,10 @@ const projectStatusClasses = {
           <CheckCircle2 class="w-4 h-4" />
           {{ project.progress }}% hoàn thành
         </div>
+        <div class="flex items-center gap-1.5">
+          <Building2 class="w-4 h-4" />
+          {{ project.customer?.name || 'Chưa gắn khách hàng' }}
+        </div>
       </div>
 
       <!-- Progress bar -->
@@ -200,6 +207,13 @@ const projectStatusClasses = {
           <div class="h-full bg-white/80 rounded-full transition-all duration-500" :style="{ width: `${project.progress}%` }"></div>
         </div>
       </div>
+    </div>
+
+    <div class="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div class="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm"><p class="text-xs font-semibold text-slate-400">Khách hàng</p><p class="mt-1 truncate text-sm font-bold text-slate-800">{{ project.customer?.name || 'Chưa cập nhật' }}</p><p class="truncate text-xs text-slate-500">{{ project.customer?.company || project.customer?.email || '—' }}</p></div>
+      <div class="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm"><p class="text-xs font-semibold text-slate-400">Quản lý dự án</p><p class="mt-1 truncate text-sm font-bold text-slate-800">{{ project.manager?.name || findMember(project.managerId).name }}</p><p class="truncate text-xs text-slate-500">{{ project.manager?.role || 'Chưa phân công' }}</p></div>
+      <div class="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm"><p class="text-xs font-semibold text-slate-400">Ngày bắt đầu</p><p class="mt-1 text-sm font-bold text-slate-800">{{ formatDate(project.startDate) }}</p></div>
+      <div class="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm"><p class="text-xs font-semibold text-slate-400">Hạn hoàn thành</p><p class="mt-1 text-sm font-bold text-slate-800">{{ formatDate(project.dueDate) }}</p></div>
     </div>
 
     <!-- Stats Row -->
@@ -363,6 +377,13 @@ const projectStatusClasses = {
             >
               <LayoutGrid class="w-4 h-4" />
             </button>
+            <button
+              @click="taskViewMode = 'calendar'"
+              :class="['p-1.5 rounded-md transition-all', taskViewMode === 'calendar' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700']"
+              title="Xem dạng lịch"
+            >
+              <CalendarDays class="w-4 h-4" />
+            </button>
           </div>
           <button
             @click="openTaskModal(project?.id)"
@@ -385,48 +406,49 @@ const projectStatusClasses = {
       <!-- Task Content -->
       <div v-else class="flex-1 bg-slate-50/50">
         <!-- List View -->
-        <div v-if="taskViewMode === 'list'" class="divide-y divide-slate-50">
+        <div v-if="taskViewMode === 'list'" class="p-4 sm:p-6">
+          <div class="mb-2 hidden grid-cols-[minmax(0,1fr)_110px_125px_150px_44px] gap-4 px-4 text-[10px] font-bold uppercase tracking-wider text-slate-400 lg:grid">
+            <span>Nhiệm vụ</span><span>Tiến độ</span><span>Trạng thái</span><span>Thời hạn</span><span></span>
+          </div>
           <div
             v-for="task in projectTasks"
             :key="task.id"
             @click="openTask(task)"
-            class="flex items-center gap-4 px-6 py-4 hover:bg-slate-50 transition-colors group cursor-pointer"
+            class="group mb-2 grid cursor-pointer grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-violet-200 hover:shadow-md lg:grid-cols-[minmax(0,1fr)_110px_125px_150px_44px]"
           >
-            <!-- Priority dot -->
-            <div :class="['w-2.5 h-2.5 rounded-full shrink-0', task.priority === 'high' ? 'bg-rose-500' : task.priority === 'medium' ? 'bg-amber-500' : 'bg-sky-500']"></div>
-
-            <!-- Title + tags -->
-            <div class="flex-1 min-w-0">
-              <p class="font-medium text-slate-900 truncate group-hover:text-violet-600 transition-colors">{{ task.title }}</p>
-              <div class="flex items-center gap-1.5 mt-1 flex-wrap">
+            <div class="col-span-2 flex min-w-0 items-start gap-3 lg:col-span-1">
+              <div :class="['mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ring-4 ring-opacity-20', task.priority === 'high' ? 'bg-rose-500 ring-rose-200' : task.priority === 'medium' ? 'bg-amber-500 ring-amber-200' : 'bg-sky-500 ring-sky-200']"></div>
+              <div class="min-w-0">
+                <p class="truncate text-sm font-bold text-slate-900 transition-colors group-hover:text-violet-700">{{ task.title }}</p>
+                <div class="mt-1.5 flex flex-wrap items-center gap-1.5">
+                  <span class="rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-500">{{ taskTypeLabels[task.type] || 'Công việc' }}</span>
                 <span v-for="tag in task.tags?.slice(0, 3)" :key="tag" class="px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded text-[10px] font-medium uppercase tracking-wide">
                   {{ tag }}
                 </span>
+                  <span v-if="task.estimatedHours" class="text-[10px] font-semibold text-slate-400">• {{ task.estimatedHours }} giờ</span>
+                </div>
               </div>
             </div>
-
-            <!-- Priority badge -->
-            <span :class="['px-2 py-0.5 text-xs font-semibold rounded-full hidden sm:inline-flex', priorityClasses[task.priority] || priorityClasses.medium]">
-              {{ priorityMap[task.priority]?.label }}
-            </span>
-
-            <!-- Status -->
-            <span :class="['px-2.5 py-1 text-xs font-semibold rounded-full hidden md:inline-flex', statusClasses[task.status]]">
+            <div class="hidden lg:block">
+              <div class="mb-1 flex justify-between text-[10px] font-semibold text-slate-500"><span>{{ task.progress }}%</span></div>
+              <div class="h-1.5 overflow-hidden rounded-full bg-slate-100"><div class="h-full rounded-full bg-violet-500" :style="{ width: `${task.progress}%` }"></div></div>
+            </div>
+            <span :class="['hidden w-fit rounded-full px-2.5 py-1 text-xs font-semibold lg:inline-flex', statusClasses[task.status]]">
               {{ taskStatusMap[task.status]?.label }}
             </span>
-
-            <!-- Due date -->
-            <div :class="['hidden sm:flex items-center gap-1 text-xs font-semibold shrink-0 rounded-lg border px-2 py-1', deadlineDateClass(task)]">
+            <div :class="['hidden w-fit items-center gap-1 rounded-lg border px-2 py-1 text-xs font-semibold lg:flex', deadlineDateClass(task)]">
               <CalendarDays class="w-3.5 h-3.5" />
               {{ formatDate(task.dueDate) }}
             </div>
-
-            <!-- Assignee -->
             <div
-              :class="['w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold text-white shadow-sm ring-2 ring-white shrink-0', `bg-${findMember(task.assigneeId).color}-500`]"
+              :class="['h-8 w-8 rounded-full flex items-center justify-center text-[10px] font-bold text-white shadow-sm ring-2 ring-white', `bg-${findMember(task.assigneeId).color}-500`]"
               :title="findMember(task.assigneeId).name"
             >
               {{ findMember(task.assigneeId).initials }}
+            </div>
+            <div class="col-span-3 mt-1 flex items-center justify-between border-t border-slate-100 pt-3 text-xs lg:hidden">
+              <span :class="['rounded-full px-2 py-1 font-semibold', statusClasses[task.status]]">{{ taskStatusMap[task.status]?.label }}</span>
+              <span :class="['flex items-center gap-1 rounded-lg border px-2 py-1 font-semibold', deadlineDateClass(task)]"><CalendarDays class="h-3.5 w-3.5" />{{ formatDate(task.dueDate) }}</span>
             </div>
           </div>
         </div>
@@ -467,6 +489,10 @@ const projectStatusClasses = {
               </button>
             </div>
           </div>
+        </div>
+
+        <div v-if="taskViewMode === 'calendar'" class="p-5">
+          <TaskCalendar :tasks="projectTasks" :show-project="false" @select="openTask" />
         </div>
       </div>
     </div>

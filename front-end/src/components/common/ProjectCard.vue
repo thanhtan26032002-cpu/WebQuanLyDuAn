@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from "vue";
 import { useRouter } from "vue-router";
-import { CalendarDays, ArrowRight, MoreHorizontal } from "@lucide/vue";
+import { CalendarDays, ArrowRight, MoreHorizontal, Building2 } from "@lucide/vue";
 import { useProjectWorkspace } from "../../composables/useProjectWorkspace";
 
 const props = defineProps({
@@ -124,6 +124,10 @@ const statusBadge = computed(() => {
 
     <!-- Body -->
     <div class="p-5 flex flex-col flex-1">
+      <div class="mb-3 flex items-center gap-2 text-xs font-semibold text-slate-500">
+        <Building2 class="h-3.5 w-3.5 text-violet-500" />
+        <span class="truncate">{{ project.customer?.name || 'Chưa gắn khách hàng' }}</span>
+      </div>
       <p class="text-sm text-slate-500 mb-4 line-clamp-2 flex-1">
         {{ project.description }}
       </p>

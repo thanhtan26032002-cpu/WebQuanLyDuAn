@@ -21,6 +21,7 @@ const {
 } = useProjectWorkspace()
 
 const isDownloadModalOpen = ref(false)
+const taskTypeLabels = { task: 'Công việc', analysis: 'Phân tích yêu cầu', ui_ux: 'Thiết kế UI/UX', frontend: 'Phát triển Frontend', backend: 'Phát triển Backend', mobile: 'Ứng dụng Mobile', api: 'API / Tích hợp', database: 'Cơ sở dữ liệu', devops: 'DevOps / Hạ tầng', testing: 'Kiểm thử / QA', security: 'Bảo mật', documentation: 'Tài liệu', research: 'Nghiên cứu', maintenance: 'Bảo trì', feature: 'Tính năng', bug: 'Lỗi cần sửa', milestone: 'Cột mốc' }
 
 const task = computed(() => tasks.value.find(t => t.id === activeTaskId.value))
 const project = computed(() => findProject(task.value?.projectId))
@@ -95,10 +96,13 @@ const handleSave = () => {
     description: editedTask.value.description,
     status: editedTask.value.status,
     priority: editedTask.value.priority,
+    type: editedTask.value.type || 'task',
     progress: Number(editedTask.value.progress),
     projectId: editedTask.value.projectId || null,
     assigneeId: editedTask.value.assigneeId || null,
+    startDate: editedTask.value.startDate || null,
     dueDate: editedTask.value.dueDate || null,
+    estimatedHours: editedTask.value.estimatedHours || null,
     tags: tagsArray
   })
   isEditing.value = false
@@ -607,6 +611,26 @@ const formatDateTime = (isoStr) => {
                 </p>
               </div>
             </div>
+          </div>
+        </div>
+
+        <div class="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div class="rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
+            <span class="mb-2 block text-xs font-medium uppercase tracking-wide text-slate-500">Loại nhiệm vụ</span>
+            <select v-if="isEditing" v-model="editedTask.type" class="w-full rounded-lg border-none bg-slate-100 px-3 py-2 text-sm font-semibold focus:ring-2 focus:ring-violet-500">
+              <option v-for="(label, value) in taskTypeLabels" :key="value" :value="value">{{ label }}</option>
+            </select>
+            <p v-else class="text-sm font-bold text-slate-800">{{ taskTypeLabels[task.type] || 'Công việc' }}</p>
+          </div>
+          <div class="rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
+            <span class="mb-2 block text-xs font-medium uppercase tracking-wide text-slate-500">Ngày bắt đầu</span>
+            <input v-if="isEditing" v-model="editedTask.startDate" type="date" class="w-full rounded-lg border-none bg-slate-100 px-3 py-2 text-sm font-semibold focus:ring-2 focus:ring-violet-500" />
+            <p v-else class="text-sm font-bold text-slate-800">{{ formatDate(task.startDate) }}</p>
+          </div>
+          <div class="rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
+            <span class="mb-2 block text-xs font-medium uppercase tracking-wide text-slate-500">Ước lượng</span>
+            <input v-if="isEditing" v-model="editedTask.estimatedHours" type="number" min="0" step="0.5" class="w-full rounded-lg border-none bg-slate-100 px-3 py-2 text-sm font-semibold focus:ring-2 focus:ring-violet-500" />
+            <p v-else class="text-sm font-bold text-slate-800">{{ task.estimatedHours ? `${task.estimatedHours} giờ` : 'Chưa ước lượng' }}</p>
           </div>
         </div>
 

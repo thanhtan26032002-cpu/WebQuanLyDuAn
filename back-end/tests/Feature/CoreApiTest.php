@@ -222,6 +222,56 @@ class CoreApiTest extends TestCase
         ]);
     }
 
+    public function test_customer_project_and_task_planning_fields_are_persisted(): void
+    {
+        $user = User::create([
+            'user_name' => 'Quản trị viên',
+            'user_email' => 'planning@example.com',
+            'user_password' => Hash::make('test-password'),
+        ]);
+        $manager = Member::create([
+            'member_name' => 'Quản lý dự án',
+            'member_email' => 'manager@example.com',
+        ]);
+
+        $customer = $this->postJson('/api/customers', [
+            'name' => 'Nguyễn Văn Khách',
+            'company' => 'Công ty Khách hàng',
+            'email' => 'customer@example.com',
+            'phone' => '0901234567',
+        ])->assertCreated()->json('customer');
+
+        $project = $this->postJson('/api/projects', [
+            'name' => 'Dự án có khách hàng',
+            'customer_code' => $customer['code'],
+            'manager_code' => $manager->member_code,
+            'start_date' => now()->toDateString(),
+            'due_date' => now()->addMonth()->toDateString(),
+            'user_code' => $user->user_code,
+        ])->assertCreated()
+            ->assertJsonPath('project.customer.code', 'KH0001')
+            ->assertJsonPath('project.manager.code', 'MB0001')
+            ->json('project');
+
+        $this->postJson('/api/tasks', [
+            'project_code' => $project['code'],
+            'title' => 'Thiết kế tính năng',
+            'type' => 'devops',
+            'start_date' => now()->toDateString(),
+            'due_date' => now()->addWeek()->toDateString(),
+            'estimated_hours' => 16.5,
+            'user_code' => $user->user_code,
+        ])->assertCreated()
+            ->assertJsonPath('task.type', 'devops')
+            ->assertJsonPath('task.start_date', now()->toDateString())
+            ->assertJsonPath('task.estimated_hours', 16.5);
+
+        $this->getJson('/api/projects/'.$project['code'])
+            ->assertOk()
+            ->assertJsonPath('customer.company', 'Công ty Khách hàng')
+            ->assertJsonCount(1, 'tasks');
+    }
+
     public function test_member_group_can_be_selected_in_forms_and_removed_by_drag_api(): void
     {
         $firstGroup = $this->postJson('/api/groups', [
