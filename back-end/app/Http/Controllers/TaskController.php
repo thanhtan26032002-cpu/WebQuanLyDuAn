@@ -29,7 +29,7 @@ class TaskController extends Controller
             'project_code' => 'nullable|exists:projects,project_code',
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
-            'type' => 'nullable|string|in:task,analysis,ui_ux,frontend,backend,mobile,api,database,devops,testing,security,documentation,research,maintenance,bug,feature,milestone',
+            'type' => 'nullable|string|in:task,analysis,ui_ux,frontend,backend,api,database,devops,testing,security,documentation,research,maintenance,bug,feature,milestone',
             'status' => 'nullable|string|in:todo,in_progress,done',
             'priority' => 'nullable|string|in:low,medium,high',
             'start_date' => 'nullable|date',
@@ -90,7 +90,7 @@ class TaskController extends Controller
         $validator = Validator::make($input, [
             'title' => 'nullable|string|max:255',
             'description' => 'nullable|string',
-            'type' => 'nullable|string|in:task,analysis,ui_ux,frontend,backend,mobile,api,database,devops,testing,security,documentation,research,maintenance,bug,feature,milestone',
+            'type' => 'nullable|string|in:task,analysis,ui_ux,frontend,backend,api,database,devops,testing,security,documentation,research,maintenance,bug,feature,milestone',
             'status' => 'nullable|string|in:todo,in_progress,done',
             'priority' => 'nullable|string|in:low,medium,high',
             'start_date' => 'nullable|date',

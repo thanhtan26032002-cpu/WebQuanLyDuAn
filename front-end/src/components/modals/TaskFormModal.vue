@@ -6,7 +6,7 @@ import { useProjectWorkspace } from '../../composables/useProjectWorkspace'
 const { projects, tasks, members, taskModalOpen, addTask, newTaskProjectId, closeTaskModal } = useProjectWorkspace()
 const taskTypes = [
   ['task', 'Công việc chung'], ['analysis', 'Phân tích yêu cầu'], ['ui_ux', 'Thiết kế UI/UX'],
-  ['frontend', 'Phát triển Frontend'], ['backend', 'Phát triển Backend'], ['mobile', 'Ứng dụng Mobile'],
+  ['frontend', 'Phát triển Frontend'], ['backend', 'Phát triển Backend'],
   ['api', 'API / Tích hợp hệ thống'], ['database', 'Cơ sở dữ liệu'], ['devops', 'DevOps / Hạ tầng'],
   ['testing', 'Kiểm thử / QA'], ['security', 'Bảo mật'], ['documentation', 'Viết tài liệu'],
   ['research', 'Nghiên cứu kỹ thuật'], ['maintenance', 'Bảo trì / Nâng cấp'], ['feature', 'Tính năng mới'],

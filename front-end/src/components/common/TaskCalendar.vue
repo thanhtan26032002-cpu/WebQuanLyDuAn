@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref } from 'vue'
-import { CalendarDays, ChevronLeft, ChevronRight } from '@lucide/vue'
+import { CalendarDays, ChevronLeft, ChevronRight, CheckCircle2, Clock3 } from '@lucide/vue'
 import { useProjectWorkspace } from '../../composables/useProjectWorkspace'
 
 const props = defineProps({ tasks: { type: Array, default: () => [] }, showProject: { type: Boolean, default: true } })
@@ -74,8 +74,8 @@ const resetToday = () => { viewDate.value = new Date() }
 </script>
 
 <template>
-  <div class="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
-    <div class="flex min-w-[820px] items-center justify-between gap-4 border-b border-slate-100 p-4">
+  <div class="max-h-[75vh] overflow-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
+    <div class="sticky top-0 z-40 flex min-w-[820px] items-center justify-between gap-4 border-b border-slate-100 bg-white p-4">
       <div class="flex items-center gap-3">
         <div class="flex rounded-xl border border-slate-200 bg-slate-50 p-1">
           <button @click="navigate(-1)" class="rounded-lg p-1.5 text-slate-500 hover:bg-white hover:text-slate-900 hover:shadow-sm" title="Trước"><ChevronLeft class="h-4 w-4" /></button>
@@ -89,7 +89,7 @@ const resetToday = () => { viewDate.value = new Date() }
         <button @click="mode = 'month'" :class="['rounded-lg px-3 py-1.5 text-xs font-bold transition-all', mode === 'month' ? 'bg-white text-violet-700 shadow-sm' : 'text-slate-500']">Tháng</button>
       </div>
     </div>
-    <div class="grid min-w-[820px] grid-cols-7 border-b border-slate-200 bg-slate-50/80">
+    <div class="sticky top-[65px] z-30 grid min-w-[820px] grid-cols-7 border-b border-slate-200 bg-slate-50/95 backdrop-blur-sm">
       <div v-for="label in ['T2','T3','T4','T5','T6','T7','CN']" :key="label" class="border-r border-slate-200 py-2.5 text-center text-[11px] font-bold uppercase tracking-wider text-slate-500 last:border-r-0">{{ label }}</div>
     </div>
     <div class="min-w-[820px] divide-y divide-slate-200">
@@ -97,7 +97,7 @@ const resetToday = () => { viewDate.value = new Date() }
         v-for="week in visibleWeeks"
         :key="week.key"
         :class="['relative grid grid-cols-7 overflow-hidden bg-white', mode === 'week' ? 'min-h-[470px]' : 'min-h-[142px]']"
-        :style="{ gridTemplateRows: mode === 'week' ? `68px repeat(${week.laneCount}, 42px) minmax(140px, 1fr)` : `40px repeat(${week.laneCount}, 30px) minmax(12px, 1fr)` }"
+        :style="{ gridTemplateRows: mode === 'week' ? `68px repeat(${week.laneCount}, 44px) minmax(140px, 1fr)` : `40px repeat(${week.laneCount}, 34px) minmax(12px, 1fr)` }"
       >
         <div
           v-for="(day, index) in week.days"
@@ -115,13 +115,16 @@ const resetToday = () => { viewDate.value = new Date() }
           v-for="segment in week.segments"
           :key="`${week.key}-${segment.id}`"
           @click="emit('select', segment)"
-          :class="['z-10 mx-1 flex min-w-0 items-center gap-2 self-center overflow-hidden border px-2 text-left text-[11px] font-bold shadow-sm transition-all hover:-translate-y-px hover:brightness-95 hover:shadow-md', taskClass(segment), segment.continuesBefore ? 'rounded-l-sm border-l-4' : 'rounded-l-lg', segment.continuesAfter ? 'rounded-r-sm border-r-4' : 'rounded-r-lg', mode === 'week' ? 'h-9' : 'h-6']"
+          :class="['z-10 mx-1 flex min-w-0 items-center gap-1.5 self-center overflow-hidden border px-2 text-left text-[11px] font-bold shadow-sm transition-all hover:-translate-y-px hover:brightness-95 hover:shadow-md', taskClass(segment), segment.continuesBefore ? 'rounded-l-sm border-l-4' : 'rounded-l-lg', segment.continuesAfter ? 'rounded-r-sm border-r-4' : 'rounded-r-lg', mode === 'week' ? 'h-10' : 'h-7']"
           :style="{ gridColumn: `${segment.colStart} / span ${segment.span}`, gridRow: segment.lane + 2 }"
-          :title="`${segment.title} · ${segment.startDate || segment.dueDate} → ${segment.dueDate || segment.startDate}`"
+          :title="`${segment.title} · ${findMember(segment.assigneeId).name} · ${segment.progress || 0}% · ${segment.startDate || segment.dueDate} → ${segment.dueDate || segment.startDate}`"
         >
-          <span v-if="mode === 'week'" class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/70 text-[9px] font-black text-slate-700">{{ findMember(segment.assigneeId).initials }}</span>
-          <span class="truncate">{{ segment.title }}</span>
-          <span v-if="showProject && mode === 'week'" class="ml-auto truncate text-[9px] font-medium opacity-75">{{ findProject(segment.projectId)?.name }}</span>
+          <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white/75 text-[8px] font-black text-slate-700">{{ findMember(segment.assigneeId).initials }}</span>
+          <span class="min-w-0 flex-1 truncate">{{ segment.title }}</span>
+          <span v-if="showProject && mode === 'week'" class="max-w-[28%] truncate text-[9px] font-medium opacity-75">{{ findProject(segment.projectId)?.name }}</span>
+          <span v-if="segment.estimatedHours && (mode === 'week' || segment.span > 1)" class="flex shrink-0 items-center gap-0.5 text-[9px] font-bold opacity-80"><Clock3 class="h-3 w-3" />{{ segment.estimatedHours }}h</span>
+          <CheckCircle2 v-if="segment.status === 'done'" class="h-3.5 w-3.5 shrink-0" />
+          <span v-else-if="segment.progress" class="shrink-0 rounded bg-white/30 px-1 py-0.5 text-[8px] font-black">{{ segment.progress }}%</span>
         </button>
       </div>
     </div>

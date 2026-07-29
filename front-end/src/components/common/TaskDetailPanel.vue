@@ -21,7 +21,7 @@ const {
 } = useProjectWorkspace()
 
 const isDownloadModalOpen = ref(false)
-const taskTypeLabels = { task: 'Công việc', analysis: 'Phân tích yêu cầu', ui_ux: 'Thiết kế UI/UX', frontend: 'Phát triển Frontend', backend: 'Phát triển Backend', mobile: 'Ứng dụng Mobile', api: 'API / Tích hợp', database: 'Cơ sở dữ liệu', devops: 'DevOps / Hạ tầng', testing: 'Kiểm thử / QA', security: 'Bảo mật', documentation: 'Tài liệu', research: 'Nghiên cứu', maintenance: 'Bảo trì', feature: 'Tính năng', bug: 'Lỗi cần sửa', milestone: 'Cột mốc' }
+const taskTypeLabels = { task: 'Công việc', analysis: 'Phân tích yêu cầu', ui_ux: 'Thiết kế UI/UX', frontend: 'Phát triển Frontend', backend: 'Phát triển Backend', api: 'API / Tích hợp', database: 'Cơ sở dữ liệu', devops: 'DevOps / Hạ tầng', testing: 'Kiểm thử / QA', security: 'Bảo mật', documentation: 'Tài liệu', research: 'Nghiên cứu', maintenance: 'Bảo trì', feature: 'Tính năng', bug: 'Lỗi cần sửa', milestone: 'Cột mốc' }
 
 const task = computed(() => tasks.value.find(t => t.id === activeTaskId.value))
 const project = computed(() => findProject(task.value?.projectId))

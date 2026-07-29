@@ -125,7 +125,7 @@ const statusClasses = {
   done: 'bg-emerald-50 text-emerald-600',
 }
 
-const taskTypeLabels = { task: 'Công việc', analysis: 'Phân tích', ui_ux: 'UI/UX', frontend: 'Frontend', backend: 'Backend', mobile: 'Mobile', api: 'API', database: 'Cơ sở dữ liệu', devops: 'DevOps', testing: 'Kiểm thử', security: 'Bảo mật', documentation: 'Tài liệu', research: 'Nghiên cứu', maintenance: 'Bảo trì', bug: 'Lỗi', feature: 'Tính năng', milestone: 'Cột mốc' }
+const taskTypeLabels = { task: 'Công việc', analysis: 'Phân tích', ui_ux: 'UI/UX', frontend: 'Frontend', backend: 'Backend', api: 'API', database: 'Cơ sở dữ liệu', devops: 'DevOps', testing: 'Kiểm thử', security: 'Bảo mật', documentation: 'Tài liệu', research: 'Nghiên cứu', maintenance: 'Bảo trì', bug: 'Lỗi', feature: 'Tính năng', milestone: 'Cột mốc' }
 
 const projectStatusClasses = {
   active: 'bg-emerald-50 text-emerald-700',
