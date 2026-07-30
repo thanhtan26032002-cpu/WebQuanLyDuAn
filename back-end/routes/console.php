@@ -17,7 +17,7 @@ Schedule::call(fn () => AutomationService::sendDeadlineReminders())
     ->dailyAt('08:00')
     ->withoutOverlapping();
 
-Artisan::command('ringnet:create-test-accounts', function () {
+Artisan::command('ringnet:create-test-accounts {--password= : Mật khẩu dùng chung tùy chọn cho môi trường test}', function () {
     if (app()->environment('production')) {
         $this->error('Lệnh tạo tài khoản thử nghiệm bị khóa trong production.');
 
@@ -30,9 +30,16 @@ Artisan::command('ringnet:create-test-accounts', function () {
         ['employee@example.com', 'Nhân viên kiểm thử', 'member', 'Nhân viên', 'Phát triển sản phẩm', '0900000003', 'emerald'],
     ];
     $credentials = [];
+    $sharedPassword = $this->option('password');
+
+    if ($sharedPassword !== null && mb_strlen($sharedPassword) < 6) {
+        $this->error('Mật khẩu test phải có ít nhất 6 ký tự.');
+
+        return 1;
+    }
 
     foreach ($definitions as [$email, $name, $role, $jobTitle, $department, $phone, $color]) {
-        $password = Str::password(16);
+        $password = $sharedPassword ?: Str::password(16);
         User::updateOrCreate(
             ['user_email' => $email],
             [
