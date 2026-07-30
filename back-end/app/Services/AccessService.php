@@ -77,13 +77,17 @@ class AccessService
             return true;
         }
 
+        if ($task->task_assignee_code === self::userCode($user)) {
+            return true;
+        }
+
         if ($task->task_project_code) {
             $project = $task->project;
 
             return $project && self::canViewProject($user, $project);
         }
 
-        return $task->task_assignee_code === $user->user_code;
+        return false;
     }
 
     public static function canEditTask(User $user, Task $task): bool

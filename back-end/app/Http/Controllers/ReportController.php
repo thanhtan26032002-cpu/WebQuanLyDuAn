@@ -15,8 +15,10 @@ class ReportController extends Controller
     {
         $memberCode = AccessService::userCode($request->user());
         $query = $this->visibleTasks($request)->with(['project', 'assignee', 'dependencies']);
-        if (! AccessService::isAdmin($request->user()) && $memberCode) {
+        if ($memberCode) {
             $query->where('task_assignee_code', $memberCode);
+        } else {
+            $query->whereRaw('1 = 0');
         }
 
         $tasks = $query->get();
@@ -121,9 +123,7 @@ class ReportController extends Controller
         return Task::where(function (Builder $query) use ($projectCodes, $memberCode) {
             $query->whereIn('task_project_code', $projectCodes);
             if ($memberCode) {
-                $query->orWhere(function (Builder $standalone) use ($memberCode) {
-                    $standalone->whereNull('task_project_code')->where('task_assignee_code', $memberCode);
-                });
+                $query->orWhere('task_assignee_code', $memberCode);
             }
         });
     }

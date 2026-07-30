@@ -179,4 +179,52 @@ class AuthApiTest extends TestCase
             'password' => 'new-password',
         ])->assertOk();
     }
+
+    public function test_my_work_only_returns_tasks_assigned_to_the_logged_in_user(): void
+    {
+        $admin = $this->postJson('/api/register', [
+            'name' => 'Admin',
+            'email' => 'my-work-admin@example.com',
+            'password' => 'secure-password',
+        ])->assertCreated()->json();
+        User::whereKey($admin['user']['code'])->update(['user_role' => 'admin']);
+
+        $employee = $this->postJson('/api/register', [
+            'name' => 'Employee',
+            'email' => 'my-work-employee@example.com',
+            'password' => 'secure-password',
+        ])->assertCreated()->json();
+
+        $project = $this->withToken($admin['token'])->postJson('/api/projects', [
+            'name' => 'Dự án chỉ quản trị viên quản lý',
+        ])->assertCreated()->json('project');
+
+        $this->withToken($admin['token'])->postJson('/api/tasks', [
+            'title' => 'Việc của quản trị viên',
+            'assignee_code' => $admin['user']['code'],
+            'due_date' => now()->toDateString(),
+        ])->assertCreated();
+
+        $this->withToken($admin['token'])->postJson('/api/tasks', [
+            'title' => 'Việc của nhân viên',
+            'project_code' => $project['code'],
+            'assignee_code' => $employee['user']['code'],
+            'due_date' => now()->toDateString(),
+        ])->assertCreated();
+
+        $this->withToken($admin['token'])->getJson('/api/my-work')
+            ->assertOk()
+            ->assertJsonCount(1, 'today')
+            ->assertJsonPath('today.0.title', 'Việc của quản trị viên');
+
+        $this->withToken($employee['token'])->getJson('/api/my-work')
+            ->assertOk()
+            ->assertJsonCount(1, 'today')
+            ->assertJsonPath('today.0.title', 'Việc của nhân viên');
+
+        $this->withToken($employee['token'])->getJson('/api/tasks')
+            ->assertOk()
+            ->assertJsonCount(1)
+            ->assertJsonPath('0.title', 'Việc của nhân viên');
+    }
 }

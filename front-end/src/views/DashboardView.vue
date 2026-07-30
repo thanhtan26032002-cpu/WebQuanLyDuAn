@@ -7,7 +7,6 @@ import {
   CheckCircle2,
   Target,
   ArrowUpRight,
-  ArrowDownRight,
   Plus,
   MoreHorizontal,
   Activity,
@@ -15,6 +14,8 @@ import {
   UploadCloud,
   CheckSquare,
   ChevronRight,
+  BellRing,
+  X,
 } from "@lucide/vue";
 import draggable from "vuedraggable";
 import ProjectCard from "../components/common/ProjectCard.vue";
@@ -25,15 +26,9 @@ const router = useRouter();
 const {
   projects,
   tasks,
+  currentUser,
   projectStatusMap,
   priorityMap,
-  planningProjects,
-  activeProjects,
-  operatingProjects,
-  completedProjects,
-  projectCompletionRate,
-  completedTasks,
-  completionRate,
   projectModalOpen,
   taskModalOpen,
   activities,
@@ -58,8 +53,31 @@ const getLocalDateKey = (dateValue = new Date()) => {
 };
 
 const todayKey = getLocalDateKey();
+const currentUserCode = computed(() => currentUser.value?.code || "");
+const currentUserName = computed(
+  () => currentUser.value?.name?.trim() || "bạn",
+);
+
+const myProjects = computed(() => {
+  if (!currentUserCode.value) return [];
+
+  return projects.value.filter(
+    (project) =>
+      project.managerId === currentUserCode.value ||
+      project.created_by === currentUserCode.value ||
+      project.memberIds?.includes(currentUserCode.value),
+  );
+});
+
+const myTasks = computed(() => {
+  if (!currentUserCode.value) return [];
+  return tasks.value.filter(
+    (task) => task.assigneeId === currentUserCode.value,
+  );
+});
+
 const todayTasks = computed(() =>
-  tasks.value.filter(
+  myTasks.value.filter(
     (task) =>
       Boolean(task.dueDate) &&
       getLocalDateKey(task.dueDate) === todayKey &&
@@ -67,7 +85,7 @@ const todayTasks = computed(() =>
   ),
 );
 const todayProjects = computed(() =>
-  projects.value.filter(
+  myProjects.value.filter(
     (project) =>
       Boolean(project.dueDate) &&
       getLocalDateKey(project.dueDate) === todayKey &&
@@ -78,42 +96,108 @@ const todayDueCount = computed(
   () => todayTasks.value.length + todayProjects.value.length,
 );
 
+const completedMyTasks = computed(
+  () => myTasks.value.filter((task) => task.status === "done").length,
+);
+const myTaskCompletionRate = computed(() =>
+  myTasks.value.length
+    ? Math.round((completedMyTasks.value / myTasks.value.length) * 100)
+    : 0,
+);
+
+const DAY_IN_MILLISECONDS = 24 * 60 * 60 * 1000;
+const toUtcDate = (dateValue) => {
+  const [year, month, day] = getLocalDateKey(dateValue)
+    .split("-")
+    .map(Number);
+  return Date.UTC(year, month - 1, day);
+};
+const daysUntil = (dateValue) =>
+  Math.round((toUtcDate(dateValue) - toUtcDate(todayKey)) / DAY_IN_MILLISECONDS);
+
+const dueReminderItems = computed(() => {
+  const projectItems = myProjects.value
+    .filter(
+      (project) => project.dueDate && project.status !== "completed",
+    )
+    .map((project) => ({
+      key: `project-${project.id}`,
+      type: "project",
+      typeLabel: "Dự án",
+      title: project.name,
+      dueDate: project.dueDate,
+      days: daysUntil(project.dueDate),
+    }));
+  const taskItems = myTasks.value
+    .filter((task) => task.dueDate && task.status !== "done")
+    .map((task) => ({
+      key: `task-${task.id}`,
+      type: "task",
+      typeLabel: "Nhiệm vụ",
+      title: task.title,
+      dueDate: task.dueDate,
+      days: daysUntil(task.dueDate),
+    }));
+
+  return [...projectItems, ...taskItems]
+    .filter((item) => item.days <= 7)
+    .sort((first, second) => first.days - second.days);
+});
+
+const dueLabel = (item) => {
+  if (item.days < 0) return `Quá hạn ${Math.abs(item.days)} ngày`;
+  if (item.days === 0) return "Đến hạn hôm nay";
+  if (item.days === 1) return "Đến hạn ngày mai";
+  return `Còn ${item.days} ngày`;
+};
+
+const reminderStorageKey = computed(
+  () => `ringnet_due_reminder_dismissed_${currentUserCode.value || "guest"}`,
+);
+const dueReminderOpen = ref(
+  localStorage.getItem(reminderStorageKey.value) !== todayKey,
+);
+const closeDueReminder = () => {
+  dueReminderOpen.value = false;
+  localStorage.setItem(reminderStorageKey.value, todayKey);
+};
+const goToMyWork = () => {
+  closeDueReminder();
+  router.push("/my-work");
+};
+
 const stats = computed(() => [
   {
     icon: FolderKanban,
     color: "text-violet-600",
     bg: "bg-violet-100",
-    value: operatingProjects.value.length,
-    label: "Dự án hoạt động",
-    trend: "12%",
-    up: true,
+    value: myProjects.value.length,
+    label: "Dự án của tôi",
+    helper: "Được giao hoặc phụ trách",
   },
   {
     icon: Clock,
     color: "text-amber-600",
     bg: "bg-amber-100",
-    value: activeProjects.value.length,
-    label: "Đang thực hiện",
-    trend: "5%",
-    up: false,
+    value: myTasks.value.length,
+    label: "Nhiệm vụ của tôi",
+    helper: "Được phân công trực tiếp",
   },
   {
     icon: CheckCircle2,
     color: "text-emerald-600",
     bg: "bg-emerald-100",
-    value: completedProjects.value.length,
-    label: "Đã hoàn thành",
-    trend: "23%",
-    up: true,
+    value: completedMyTasks.value,
+    label: "Nhiệm vụ hoàn thành",
+    helper: `Trên tổng số ${myTasks.value.length} nhiệm vụ`,
   },
   {
     icon: Target,
     color: "text-sky-600",
     bg: "bg-sky-100",
-    value: `${projectCompletionRate.value}%`,
+    value: `${myTaskCompletionRate.value}%`,
     label: "Tỷ lệ hoàn thành",
-    trend: "8%",
-    up: true,
+    helper: "Tiến độ nhiệm vụ cá nhân",
   },
 ]);
 
@@ -124,7 +208,7 @@ const columns = ref([
 ]);
 
 const getTasksByStatus = (status) => {
-  return tasks.value.filter((t) => t.status === status);
+  return myTasks.value.filter((t) => t.status === status);
 };
 
 const onTaskChange = (event, newStatus) => {
@@ -161,23 +245,17 @@ const showRecentActivities = ref(false);
     >
       <div>
         <h1 class="text-2xl font-bold text-slate-900 mb-1">
-          Xin chào, User 👋
+          Xin chào, {{ currentUserName }} 👋
         </h1>
         <p class="text-slate-500 text-sm">
-          <template v-if="todayDueCount > 0">
-            Hôm nay có
-            <strong class="font-semibold text-indigo-700">
-              {{ todayProjects.length }} dự án
-            </strong>
-            và
-            <strong class="font-semibold text-rose-700">
-              {{ todayTasks.length }} nhiệm vụ
-            </strong>
-            đến hạn
-          </template>
-          <template v-else
-            >Hôm nay không có dự án hay nhiệm vụ đến hạn</template
-          >
+          Bạn đang phụ trách hoặc được phân công
+          <strong class="font-semibold text-indigo-700">
+            {{ myProjects.length }} dự án
+          </strong>
+          và
+          <strong class="font-semibold text-rose-700">
+            {{ myTasks.length }} nhiệm vụ
+          </strong>.
         </p>
       </div>
       <div class="flex items-center gap-3 shrink-0">
@@ -214,24 +292,16 @@ const showRecentActivities = ref(false);
             <component :is="stat.icon" class="w-5 h-5" />
           </div>
           <div
-            :class="[
-              'flex items-center text-xs font-bold px-2 py-1 rounded-full',
-              stat.up
-                ? 'bg-emerald-50 text-emerald-600'
-                : 'bg-rose-50 text-rose-600',
-            ]"
+            class="rounded-full bg-slate-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-400"
           >
-            <component
-              :is="stat.up ? ArrowUpRight : ArrowDownRight"
-              class="w-3 h-3 mr-1"
-            />
-            {{ stat.trend }}
+            Cá nhân
           </div>
         </div>
         <h3 class="text-3xl font-display font-bold text-slate-900 mb-1">
           {{ stat.value }}
         </h3>
         <p class="text-sm text-slate-500 font-medium">{{ stat.label }}</p>
+        <p class="mt-1 text-xs text-slate-400">{{ stat.helper }}</p>
       </div>
     </div>
 
@@ -242,7 +312,7 @@ const showRecentActivities = ref(false);
         <div>
           <div class="flex items-end justify-between mb-4">
             <div>
-              <h2 class="text-lg font-bold text-slate-900">Bảng nhiệm vụ</h2>
+              <h2 class="text-lg font-bold text-slate-900">Bảng nhiệm vụ của tôi</h2>
               <p class="text-sm text-slate-500">
                 Kéo thả để thay đổi trạng thái
               </p>
@@ -303,7 +373,7 @@ const showRecentActivities = ref(false);
         <div>
           <div class="flex items-end justify-between mb-4">
             <div>
-              <h2 class="text-lg font-bold text-slate-900">Dự án gần đây</h2>
+              <h2 class="text-lg font-bold text-slate-900">Dự án của tôi gần đây</h2>
               <p class="text-sm text-slate-500">
                 Các dự án gần đây đang hoạt động
               </p>
@@ -317,7 +387,7 @@ const showRecentActivities = ref(false);
           </div>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <ProjectCard
-              v-for="project in projects.slice(0, 2)"
+              v-for="project in myProjects.slice(0, 2)"
               :key="project.id"
               :project="project"
             />
@@ -571,6 +641,126 @@ const showRecentActivities = ref(false);
       </div>
     </div>
   </div>
+
+  <Teleport to="body">
+    <Transition
+      enter-active-class="transition duration-200 ease-out"
+      enter-from-class="opacity-0"
+      enter-to-class="opacity-100"
+      leave-active-class="transition duration-150 ease-in"
+      leave-from-class="opacity-100"
+      leave-to-class="opacity-0"
+    >
+      <div
+        v-if="dueReminderOpen && dueReminderItems.length > 0"
+        class="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm"
+        role="presentation"
+        @click.self="closeDueReminder"
+      >
+        <section
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="due-reminder-title"
+          class="w-full max-w-xl overflow-hidden rounded-3xl border border-white/60 bg-white shadow-2xl shadow-slate-950/20"
+        >
+          <header
+            class="relative overflow-hidden bg-gradient-to-br from-violet-600 via-indigo-600 to-blue-600 px-6 py-6 text-white"
+          >
+            <div class="absolute -right-10 -top-12 h-36 w-36 rounded-full bg-white/10"></div>
+            <button
+              type="button"
+              class="absolute right-4 top-4 rounded-full p-2 text-white/75 transition hover:bg-white/15 hover:text-white"
+              aria-label="Đóng thông báo"
+              @click="closeDueReminder"
+            >
+              <X class="h-5 w-5" />
+            </button>
+            <div class="relative flex items-start gap-4 pr-8">
+              <span
+                class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/15 ring-1 ring-white/25"
+              >
+                <BellRing class="h-6 w-6" />
+              </span>
+              <div>
+                <p class="text-xs font-bold uppercase tracking-[0.18em] text-indigo-100">
+                  Nhắc hạn công việc
+                </p>
+                <h2 id="due-reminder-title" class="mt-1 text-xl font-bold">
+                  Bạn có {{ dueReminderItems.length }} công việc cần chú ý
+                </h2>
+                <p class="mt-2 text-sm leading-relaxed text-indigo-100">
+                  Hãy kiểm tra và hoàn thành sớm để bảo đảm tiến độ chung.
+                </p>
+              </div>
+            </div>
+          </header>
+
+          <div class="max-h-[48vh] space-y-2 overflow-y-auto bg-slate-50/70 p-5 custom-scrollbar">
+            <article
+              v-for="item in dueReminderItems"
+              :key="item.key"
+              class="flex items-center gap-3 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm"
+            >
+              <span
+                :class="[
+                  'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl',
+                  item.type === 'project'
+                    ? 'bg-indigo-50 text-indigo-600'
+                    : 'bg-rose-50 text-rose-600',
+                ]"
+              >
+                <FolderKanban v-if="item.type === 'project'" class="h-5 w-5" />
+                <CheckSquare v-else class="h-5 w-5" />
+              </span>
+              <div class="min-w-0 flex-1">
+                <div class="flex flex-wrap items-center gap-2">
+                  <span class="text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                    {{ item.typeLabel }}
+                  </span>
+                  <span
+                    :class="[
+                      'rounded-full px-2 py-0.5 text-[10px] font-bold',
+                      item.days < 0
+                        ? 'bg-rose-50 text-rose-700'
+                        : item.days === 0
+                          ? 'bg-amber-50 text-amber-700'
+                          : 'bg-blue-50 text-blue-700',
+                    ]"
+                  >
+                    {{ dueLabel(item) }}
+                  </span>
+                </div>
+                <p class="mt-1 truncate text-sm font-semibold text-slate-800">
+                  {{ item.title }}
+                </p>
+                <p class="mt-0.5 text-xs text-slate-400">
+                  Hạn chót: {{ formatDate(item.dueDate) }}
+                </p>
+              </div>
+            </article>
+          </div>
+
+          <footer class="flex flex-col-reverse gap-3 border-t border-slate-100 bg-white px-5 py-4 sm:flex-row sm:justify-end">
+            <button
+              type="button"
+              class="rounded-xl border border-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+              @click="closeDueReminder"
+            >
+              Hủy
+            </button>
+            <button
+              type="button"
+              class="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-indigo-200 transition hover:-translate-y-0.5 hover:shadow-lg"
+              @click="goToMyWork"
+            >
+              Đến công việc của tôi
+              <ArrowUpRight class="h-4 w-4" />
+            </button>
+          </footer>
+        </section>
+      </div>
+    </Transition>
+  </Teleport>
 </template>
 
 <style scoped>

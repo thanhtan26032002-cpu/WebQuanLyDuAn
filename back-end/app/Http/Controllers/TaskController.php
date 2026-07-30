@@ -426,9 +426,7 @@ class TaskController extends Controller
         return $query->where(function (Builder $visible) use ($projectCodes, $memberCode) {
             $visible->whereIn('task_project_code', $projectCodes);
             if ($memberCode) {
-                $visible->orWhere(fn (Builder $standalone) => $standalone
-                    ->whereNull('task_project_code')
-                    ->where('task_assignee_code', $memberCode));
+                $visible->orWhere('task_assignee_code', $memberCode);
             }
         });
     }
