@@ -2,21 +2,25 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Relations\Pivot;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use App\Traits\GeneratesCode;
 use App\Traits\MapsAttributes;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\Pivot;
 
 class ProjectMember extends Pivot
 {
-    use HasFactory, GeneratesCode, MapsAttributes;
+    use GeneratesCode, HasFactory, MapsAttributes;
 
     protected $table = 'project_members';
+
     protected $primaryKey = 'pm_code';
+
     public $incrementing = false;
+
     protected $keyType = 'string';
 
     const CREATED_AT = 'pm_created_at';
+
     const UPDATED_AT = 'pm_updated_at';
 
     protected $fillable = ['pm_code', 'pm_project_code', 'pm_member_code', 'pm_role'];
@@ -45,6 +49,6 @@ class ProjectMember extends Pivot
 
     public function member()
     {
-        return $this->belongsTo(Member::class, 'pm_member_code', 'member_code');
+        return $this->belongsTo(User::class, 'pm_member_code', 'user_code');
     }
 }

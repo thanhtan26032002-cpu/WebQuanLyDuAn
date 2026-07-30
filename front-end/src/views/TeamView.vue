@@ -3,7 +3,8 @@ import { computed, ref } from 'vue'
 import { Users, UserPlus, MoreHorizontal, Mail, ArrowRight, ListTodo, Hash, Plus } from '@lucide/vue'
 import { useProjectWorkspace } from '../composables/useProjectWorkspace'
 
-const { members, groups, tasks, activeMemberId, memberDetailModalOpen, openAddMemberModal, addGroupModalOpen, editGroupModalOpen, activeEditGroupId, assignMemberToGroup } = useProjectWorkspace()
+const { members, groups, tasks, activeMemberId, memberDetailModalOpen, openAddMemberModal, addGroupModalOpen, editGroupModalOpen, activeEditGroupId, assignMemberToGroup, currentUser } = useProjectWorkspace()
+const canManageTeam = computed(() => ['admin', 'project_manager', 'manager'].includes(currentUser.value?.role))
 
 const totalOnline = computed(() => members.value.filter(m => m.online).length)
 const totalTasksInProgress = computed(() => tasks.value.filter(t => t.status === 'in_progress').length)
@@ -14,6 +15,7 @@ const dragOverGroupId = ref(null)
 const dragOverUnassigned = ref(false)
 
 const onDragStart = (e, memberId) => {
+  if (!canManageTeam.value) return
   draggedMemberId.value = memberId
   // Thiết lập drag image hoặc hiệu ứng nếu cần
   if (e.dataTransfer) {
@@ -33,6 +35,7 @@ const getDraggedMemberId = (e) => {
 }
 
 const onDrop = async (e, targetGroupId) => {
+  if (!canManageTeam.value) return
   e.preventDefault()
   const memberId = getDraggedMemberId(e)
   if (memberId) {
@@ -42,6 +45,7 @@ const onDrop = async (e, targetGroupId) => {
 }
 
 const onDropUnassigned = async (e) => {
+  if (!canManageTeam.value) return
   e.preventDefault()
   const memberId = getDraggedMemberId(e)
   if (memberId) {
@@ -96,7 +100,7 @@ const taskCount = (memberId, status) => tasks.value.filter((task) => task.assign
           Tổng cộng {{ members.length }} thành viên • <span class="text-emerald-500 font-medium">{{ totalOnline }} đang online</span> • {{ totalTasksInProgress }} nhiệm vụ đang làm
         </p>
       </div>
-      <div class="flex items-center gap-3">
+      <div v-if="canManageTeam" class="flex items-center gap-3">
         <button 
           @click="addGroupModalOpen = true"
           class="bg-white border border-slate-200 text-slate-700 px-5 py-2.5 rounded-xl font-medium hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm shrink-0 flex items-center gap-2"
@@ -146,7 +150,7 @@ const taskCount = (memberId, status) => tasks.value.filter((task) => task.assign
               </p>
             </div>
           </div>
-          <button @click="openEditGroup(group.id)" class="text-slate-400 hover:text-slate-700 p-2 rounded-xl hover:bg-white/80 shadow-sm transition-all">
+          <button v-if="canManageTeam" @click="openEditGroup(group.id)" class="text-slate-400 hover:text-slate-700 p-2 rounded-xl hover:bg-white/80 shadow-sm transition-all">
             <MoreHorizontal class="w-5 h-5" />
           </button>
         </div>
@@ -158,7 +162,7 @@ const taskCount = (memberId, status) => tasks.value.filter((task) => task.assign
           <article 
             v-for="member in getMembersByGroup(group.id)" 
             :key="member.id" 
-            draggable="true"
+            :draggable="canManageTeam"
             @dragstart="onDragStart($event, member.id)"
             @dragend="resetDragState"
             class="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 hover:shadow-md transition-shadow group/card cursor-grab active:cursor-grabbing"
@@ -190,7 +194,7 @@ const taskCount = (memberId, status) => tasks.value.filter((task) => task.assign
         </div>
 
         <!-- Add member to group button -->
-        <div class="relative mt-4 z-10">
+        <div v-if="canManageTeam" class="relative mt-4 z-10">
           <button 
             @click="openAddMemberModal(group.id)"
             :class="[
@@ -222,7 +226,7 @@ const taskCount = (memberId, status) => tasks.value.filter((task) => task.assign
         <article 
           v-for="member in getUnassignedMembers()" 
           :key="member.id" 
-          draggable="true"
+          :draggable="canManageTeam"
           @dragstart="onDragStart($event, member.id)"
           @dragend="resetDragState"
           class="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 hover:shadow-md transition-shadow cursor-grab active:cursor-grabbing flex items-center gap-3"

@@ -3,9 +3,13 @@ import { computed, ref, watch } from 'vue'
 import { X, Mail, Phone, Briefcase, Hash, CalendarDays, Edit2, Check, User } from '@lucide/vue'
 import { useProjectWorkspace } from '../../composables/useProjectWorkspace'
 
-const { activeMemberId, memberDetailModalOpen, members, groups, updateMember } = useProjectWorkspace()
+const { activeMemberId, memberDetailModalOpen, members, groups, updateMember, currentUser } = useProjectWorkspace()
 
 const member = computed(() => members.value.find(m => m.id === activeMemberId.value))
+const canEditMember = computed(() => {
+  const role = currentUser.value?.role
+  return currentUser.value?.code === member.value?.id || ['admin', 'project_manager', 'manager'].includes(role)
+})
 const isEditing = ref(false)
 const editedMember = ref({})
 
@@ -110,7 +114,7 @@ const errors = ref({})
 const phonePattern = /^\+?[0-9]{9,15}$/
 
 const startEditing = () => {
-  if (!member.value) return
+  if (!member.value || !canEditMember.value || member.value.profileLimited) return
   editedMember.value = {
     ...JSON.parse(JSON.stringify(member.value)),
     groupId: memberGroups.value[0]?.id || null,
@@ -185,14 +189,14 @@ const save = async () => {
 
         <div class="absolute bottom-4 right-6 flex gap-2">
           <button 
-            v-if="!isEditing"
+            v-if="!isEditing && canEditMember && !member.profileLimited"
             @click="startEditing"
             class="flex items-center gap-1.5 px-3 py-1.5 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white font-medium text-sm rounded-lg transition-colors shadow-sm"
           >
             <Edit2 class="w-4 h-4" /> Chỉnh sửa
           </button>
           <button 
-            v-else
+            v-if="isEditing"
             @click="save"
             class="flex items-center gap-1.5 px-3 py-1.5 bg-white text-slate-900 font-bold text-sm rounded-lg hover:bg-slate-50 transition-colors shadow-sm"
           >
@@ -206,14 +210,18 @@ const save = async () => {
           <div class="mb-6">
             <h2 class="text-2xl font-bold text-slate-900 leading-tight mb-1">{{ member.name }}</h2>
             <p class="text-violet-600 font-medium">{{ member.role }}</p>
+            <p class="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-400">{{ member.systemRole === 'project_manager' ? 'Quản lý dự án' : member.systemRole === 'admin' ? 'Quản trị viên' : 'Thành viên' }}</p>
           </div>
           
-          <div class="mb-6">
+          <div v-if="!member.profileLimited" class="mb-6">
             <p class="text-sm text-slate-600 leading-relaxed">{{ member.bio || 'Chưa có tiểu sử.' }}</p>
+          </div>
+          <div v-else class="mb-6 rounded-xl border border-violet-100 bg-violet-50 px-4 py-3 text-sm text-violet-700">
+            Bạn đang xem hồ sơ cơ bản. Email, điện thoại và thông tin riêng tư chỉ hiển thị cho chính chủ hoặc người quản lý.
           </div>
 
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-            <div class="flex items-center gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100">
+            <div v-if="!member.profileLimited" class="flex items-center gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100">
               <div class="w-8 h-8 rounded-lg bg-white shadow-sm flex items-center justify-center text-slate-400 shrink-0">
                 <Mail class="w-4 h-4" />
               </div>
@@ -222,7 +230,7 @@ const save = async () => {
                 <p class="text-sm font-medium text-slate-900 truncate">{{ member.email }}</p>
               </div>
             </div>
-            <div class="flex items-center gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100">
+            <div v-if="!member.profileLimited" class="flex items-center gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100">
               <div class="w-8 h-8 rounded-lg bg-white shadow-sm flex items-center justify-center text-slate-400 shrink-0">
                 <Phone class="w-4 h-4" />
               </div>
@@ -231,7 +239,7 @@ const save = async () => {
                 <p class="text-sm font-medium text-slate-900 truncate">{{ member.phone || 'Chưa cập nhật' }}</p>
               </div>
             </div>
-            <div class="flex items-center gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100">
+            <div v-if="!member.profileLimited" class="flex items-center gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100">
               <div class="w-8 h-8 rounded-lg bg-white shadow-sm flex items-center justify-center text-slate-400 shrink-0">
                 <Briefcase class="w-4 h-4" />
               </div>
@@ -287,7 +295,7 @@ const save = async () => {
                 <p v-if="errors.name" class="text-xs font-medium text-red-500 mt-1">{{ errors.name }}</p>
               </div>
               <div>
-                <label class="block text-sm font-semibold text-slate-700 mb-1">Vị trí (Role)</label>
+                <label class="block text-sm font-semibold text-slate-700 mb-1">Chức danh</label>
                 <input v-model="editedMember.role" type="text" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500" />
               </div>
             </div>

@@ -50,7 +50,7 @@ return new class extends Migration
             $table->timestamp('milestone_updated_at')->nullable();
 
             $table->foreign('milestone_project_code')->references('project_code')->on('projects')->cascadeOnDelete();
-            $table->index(['milestone_project_code', 'milestone_target_date']);
+            $table->index(['milestone_project_code', 'milestone_target_date'], 'milestone_project_date_index');
         });
 
         Schema::table('tasks', function (Blueprint $table) {

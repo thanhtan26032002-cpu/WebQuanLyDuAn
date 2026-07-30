@@ -1,15 +1,18 @@
 <script setup>
-import { ref, watch } from 'vue'
-import { X, UserPlus, Mail, Phone, Briefcase, Hash } from '@lucide/vue'
+import { computed, ref, watch } from 'vue'
+import { X, UserPlus, Mail, Phone, Briefcase, Hash, LockKeyhole } from '@lucide/vue'
 import { useProjectWorkspace } from '../../composables/useProjectWorkspace'
 
-const { addMemberModalOpen, addMemberTargetGroupId, closeAddMemberModal, groups, addMember } = useProjectWorkspace()
+const { addMemberModalOpen, addMemberTargetGroupId, closeAddMemberModal, groups, addMember, currentUser } = useProjectWorkspace()
+const canAssignSystemRole = computed(() => currentUser.value?.role === 'admin')
 
 const formData = ref({
   name: '',
   email: '',
+  password: '',
   phone: '',
-  role: '',
+  jobTitle: '',
+  systemRole: 'member',
   department: '',
   groupId: null,
   bio: '',
@@ -40,7 +43,7 @@ const close = () => {
   closeAddMemberModal()
   // reset
   formData.value = {
-    name: '', email: '', phone: '', role: '', department: '', groupId: null, bio: '', color: 'blue'
+    name: '', email: '', password: '', phone: '', jobTitle: '', systemRole: 'member', department: '', groupId: null, bio: '', color: 'blue'
   }
   errors.value = {}
 }
@@ -62,6 +65,9 @@ const submit = async () => {
   } else if (!phonePattern.test(phone)) {
     errors.value.phone = 'Số điện thoại phải gồm từ 9 đến 15 chữ số và chỉ có thể bắt đầu bằng dấu +.'
   }
+  if (!formData.value.password || formData.value.password.length < 8) errors.value.password = 'Mật khẩu phải có ít nhất 8 ký tự.'
+  if (!formData.value.jobTitle?.trim()) errors.value.job_title = 'Vui lòng nhập chức danh.'
+  if (!formData.value.department?.trim()) errors.value.department = 'Vui lòng nhập phòng ban.'
   if (Object.keys(errors.value).length > 0) return
   
   const res = await addMember({ ...formData.value, name, email, phone })
@@ -102,6 +108,15 @@ const submit = async () => {
             </div>
           </div>
 
+          <div>
+            <label class="block text-sm font-semibold text-slate-700 mb-1">Mật khẩu ban đầu *</label>
+            <div class="relative">
+              <LockKeyhole class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <input v-model="formData.password" type="password" autocomplete="new-password" @input="errors.password = ''" :class="['w-full rounded-xl border bg-slate-50 py-2 pl-9 pr-4 text-sm outline-none', errors.password ? 'border-red-300' : 'border-slate-200 focus:border-violet-500']" placeholder="Tối thiểu 8 ký tự" />
+            </div>
+            <p v-if="errors.password" class="mt-1 text-xs font-medium text-red-500">{{ errors.password }}</p>
+          </div>
+
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label class="block text-sm font-semibold text-slate-700 mb-1">Họ tên *</label>
@@ -134,18 +149,20 @@ const submit = async () => {
               <p v-if="errors.phone" class="text-xs font-medium text-red-500 mt-1">{{ errors.phone }}</p>
             </div>
             <div>
-              <label class="block text-sm font-semibold text-slate-700 mb-1">Vị trí (Role)</label>
+              <label class="block text-sm font-semibold text-slate-700 mb-1">Chức danh *</label>
               <div class="relative">
                 <Briefcase class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <input v-model="formData.role" type="text" class="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-4 py-2 text-sm focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500" placeholder="Frontend Developer" />
+                <input v-model="formData.jobTitle" type="text" @input="errors.job_title = ''" class="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-4 py-2 text-sm focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500" placeholder="Frontend Developer" />
               </div>
+              <p v-if="errors.job_title" class="mt-1 text-xs font-medium text-red-500">{{ errors.job_title }}</p>
             </div>
           </div>
 
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label class="block text-sm font-semibold text-slate-700 mb-1">Phòng ban</label>
-              <input v-model="formData.department" type="text" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500" placeholder="Phát triển" />
+              <label class="block text-sm font-semibold text-slate-700 mb-1">Phòng ban *</label>
+              <input v-model="formData.department" type="text" @input="errors.department = ''" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500" placeholder="Phát triển" />
+              <p v-if="errors.department" class="mt-1 text-xs font-medium text-red-500">{{ errors.department }}</p>
             </div>
             <div>
               <label class="block text-sm font-semibold text-slate-700 mb-1">Thêm vào nhóm</label>
@@ -157,6 +174,16 @@ const submit = async () => {
                 </select>
               </div>
             </div>
+          </div>
+
+          <div v-if="canAssignSystemRole">
+            <label class="block text-sm font-semibold text-slate-700 mb-1">Vai trò hệ thống</label>
+            <select v-model="formData.systemRole" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm outline-none focus:border-violet-500">
+              <option value="member">Nhân viên</option>
+              <option value="project_manager">Quản lý dự án</option>
+              <option value="viewer">Chỉ xem</option>
+              <option value="admin">Quản trị viên</option>
+            </select>
           </div>
           
           <div>
@@ -171,7 +198,7 @@ const submit = async () => {
           Hủy bỏ
         </button>
         <button @click="submit" class="bg-gradient-to-r from-violet-500 to-indigo-600 text-white px-5 py-2 rounded-xl text-sm font-medium shadow-md shadow-violet-500/25 hover:shadow-lg transition-all">
-          Thêm thành viên
+          Tạo tài khoản thành viên
         </button>
       </footer>
     </div>

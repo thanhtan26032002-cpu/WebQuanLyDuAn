@@ -64,7 +64,7 @@ class Project extends Model
 
     public function members()
     {
-        return $this->belongsToMany(Member::class, 'project_members', 'pm_project_code', 'pm_member_code', 'project_code', 'member_code')
+        return $this->belongsToMany(User::class, 'project_members', 'pm_project_code', 'pm_member_code', 'project_code', 'user_code')
             ->using(ProjectMember::class)
             ->withPivot('pm_code', 'pm_role as role');
     }
@@ -76,7 +76,7 @@ class Project extends Model
 
     public function manager()
     {
-        return $this->belongsTo(Member::class, 'project_manager_code', 'member_code');
+        return $this->belongsTo(User::class, 'project_manager_code', 'user_code');
     }
 
     public function tasks()

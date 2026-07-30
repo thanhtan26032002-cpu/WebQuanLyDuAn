@@ -184,6 +184,10 @@ function mapMember(m) {
   return {
     ...m,
     id: m.code,
+    role: m.job_title || m.jobTitle || 'Nhân viên',
+    systemRole: m.role || 'member',
+    jobTitle: m.job_title || m.jobTitle || 'Nhân viên',
+    profileLimited: Boolean(m.profile_limited || m.profileLimited),
     joinDate: m.join_date || m.joinDate,
     initials: m.name ? m.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : '??',
     color: m.color || ['purple', 'blue', 'pink', 'orange', 'green', 'sky'][colorIndex],
@@ -1220,8 +1224,16 @@ export function useProjectWorkspace() {
 
   async function addMember(payload) {
     try {
-      const requestPayload = { ...payload, group_code: payload.groupId || null }
+      const requestPayload = {
+        ...payload,
+        job_title: payload.jobTitle || payload.role || 'Nhân viên',
+        system_role: payload.systemRole || 'member',
+        group_code: payload.groupId || null,
+      }
       delete requestPayload.groupId
+      delete requestPayload.jobTitle
+      delete requestPayload.systemRole
+      delete requestPayload.role
       const res = await fetch(`${API_URL}/members`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
@@ -1248,6 +1260,11 @@ export function useProjectWorkspace() {
   async function updateMember(memberId, updates) {
     try {
       const requestPayload = { ...updates }
+      if (updates.role !== undefined || updates.jobTitle !== undefined) {
+        requestPayload.job_title = updates.jobTitle || updates.role || null
+        delete requestPayload.role
+        delete requestPayload.jobTitle
+      }
       if (updates.groupId !== undefined) {
         requestPayload.group_code = updates.groupId || null
         delete requestPayload.groupId

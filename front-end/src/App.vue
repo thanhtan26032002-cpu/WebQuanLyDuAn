@@ -23,10 +23,10 @@ const { projectModalOpen, taskModalOpen, toastMessage, sidebarOpen, apiConnectio
 </script>
 
 <template>
-  <router-view v-if=route.meta.public />
+  <router-view v-if="route.meta.public || route.meta.onboarding" />
   <div
     v-else
-    class="h-screen bg-slate-50 flex overflow-hidden font-sans text-slate-900 selection:bg-violet-200 selection:text-violet-900"
+    class="app-shell h-screen flex overflow-hidden font-sans text-slate-900 selection:bg-violet-200 selection:text-violet-900"
   >
     <!-- Desktop Sidebar -->
     <div class="hidden lg:block shrink-0">
@@ -63,7 +63,7 @@ const { projectModalOpen, taskModalOpen, toastMessage, sidebarOpen, apiConnectio
 
       <!-- Main Scrollable Content -->
       <main
-        class="flex-1 overflow-x-hidden overflow-y-auto bg-slate-50 relative"
+        class="app-canvas flex-1 overflow-x-hidden overflow-y-auto relative"
       >
         <div class="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
           <div v-if="isWorkspaceLoading" aria-live="polite" class="space-y-5">

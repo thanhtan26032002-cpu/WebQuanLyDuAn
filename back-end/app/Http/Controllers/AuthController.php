@@ -2,10 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Member;
 use App\Models\User;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -20,31 +18,24 @@ class AuthController extends Controller
             'password' => 'required|string|min:6',
         ]);
 
-        $user = DB::transaction(function () use ($validated) {
-            $member = Member::firstOrCreate(
-                ['member_email' => mb_strtolower($validated['email'])],
-                [
-                    'member_name' => $validated['name'],
-                    'member_role' => 'member',
-                    'member_join_date' => now()->toDateString(),
-                ]
-            );
-
-            return User::create([
-                'user_name' => $validated['name'],
-                'user_email' => mb_strtolower($validated['email']),
-                'user_password' => Hash::make($validated['password']),
-                'user_role' => User::count() === 0 ? 'admin' : 'member',
-                'user_member_code' => $member->member_code,
-                'user_notification_preferences' => $this->defaultNotificationPreferences(),
-            ]);
-        });
+        $user = User::create([
+            'user_name' => trim($validated['name']),
+            'user_email' => mb_strtolower($validated['email']),
+            'user_password' => Hash::make($validated['password']),
+            'user_role' => User::count() === 0 ? 'admin' : 'member',
+            'user_color' => 'blue',
+            'user_join_date' => now()->toDateString(),
+            'user_online' => true,
+            'user_weekly_capacity_hours' => 40,
+            'user_notification_preferences' => $this->defaultNotificationPreferences(),
+        ]);
 
         $token = $this->issueToken($user);
 
         return response()->json([
             'message' => 'Đăng ký thành công',
-            'user' => $user->load('member'),
+            'user' => $user,
+            'requires_profile_completion' => ! $user->user_profile_completed_at,
             'token' => $token,
         ], 201);
     }
@@ -56,7 +47,7 @@ class AuthController extends Controller
             'password' => 'required|string',
         ]);
 
-        $user = User::where('user_email', $validated['email'])->first();
+        $user = User::whereRaw('LOWER(user_email) = ?', [mb_strtolower($validated['email'])])->first();
 
         if (! $user || ! Hash::check($validated['password'], $user->user_password)) {
             throw ValidationException::withMessages([
@@ -68,7 +59,8 @@ class AuthController extends Controller
 
         return response()->json([
             'message' => 'Đăng nhập thành công',
-            'user' => $user->load('member'),
+            'user' => $user,
+            'requires_profile_completion' => ! $user->user_profile_completed_at,
             'token' => $token,
         ]);
     }

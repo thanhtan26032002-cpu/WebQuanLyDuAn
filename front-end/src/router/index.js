@@ -1,7 +1,8 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { hasAuthSession } from '../services/api'
+import { getStoredUser, hasAuthSession } from '../services/api'
 const routes = [
   { path: '/login', name: 'login', component: () => import('../views/LoginView.vue'), meta: { title: 'Đăng nhập', public: true } },
+  { path: '/complete-profile', name: 'complete-profile', component: () => import('../views/CompleteProfileView.vue'), meta: { title: 'Hoàn tất hồ sơ', onboarding: true } },
   { path: '/my-work', name: 'my-work', component: () => import('../views/MyWorkView.vue'), meta: { title: 'Công việc của tôi' } },
   { path: '/', name: 'dashboard', component: () => import('../views/DashboardView.vue'), meta: { title: 'Tổng quan' } },
   { path: '/projects', name: 'projects', component: () => import('../views/ProjectsView.vue'), meta: { title: 'Dự án' } },
@@ -23,7 +24,12 @@ const router = createRouter({
 
 router.beforeEach((to) => {
   if (!to.meta.public && !hasAuthSession()) return { name: 'login', query: { redirect: to.fullPath } }
-  if (to.name === 'login' && hasAuthSession()) return { name: 'dashboard' }
+  if (!hasAuthSession()) return true
+
+  const user = getStoredUser()
+  const requiresProfileCompletion = !user?.profile_completed_at
+  if (requiresProfileCompletion && to.name !== 'complete-profile') return { name: 'complete-profile' }
+  if (!requiresProfileCompletion && ['login', 'complete-profile'].includes(to.name)) return { name: 'dashboard' }
   return true
 })
 

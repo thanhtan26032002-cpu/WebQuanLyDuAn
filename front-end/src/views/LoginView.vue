@@ -18,7 +18,7 @@ async function submit() {
     if (!response.ok) throw new Error(await parseApiError(response))
     const payload = await response.json()
     setAuthSession(payload.token, payload.user)
-    await router.replace('/')
+    await router.replace(payload.requires_profile_completion ? '/complete-profile' : '/')
     window.location.reload()
   } catch (e) {
     error.value = e.message
@@ -29,7 +29,7 @@ async function submit() {
 </script>
 
 <template>
-  <main class="grid min-h-screen place-items-center bg-slate-950 p-4">
+  <main class="login-canvas grid min-h-screen place-items-center p-4">
     <form class="w-full max-w-md rounded-3xl bg-white p-8 shadow-2xl" @submit.prevent="submit">
       <p class="text-2xl font-bold text-violet-700">RingNet</p>
       <h1 class="mt-8 text-3xl font-bold">{{ isRegistering ? 'Tạo tài khoản' : 'Đăng nhập' }}</h1>

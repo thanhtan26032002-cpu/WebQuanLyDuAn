@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\Models\Member;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\User;
@@ -32,15 +31,9 @@ class AccessService
         return in_array(self::role($user), ['admin', 'project_manager'], true);
     }
 
-    public static function memberCode(User $user): ?string
+    public static function userCode(User $user): string
     {
-        if ($user->user_member_code) {
-            return $user->user_member_code;
-        }
-
-        return $user->member()->value('member_code')
-            ?: Member::whereRaw('LOWER(member_email) = ?', [mb_strtolower($user->user_email)])
-                ->value('member_code');
+        return $user->user_code;
     }
 
     public static function scopeProjects(Builder $query, User $user): Builder
@@ -49,14 +42,12 @@ class AccessService
             return $query;
         }
 
-        $memberCode = self::memberCode($user);
+        $userCode = self::userCode($user);
 
-        return $query->where(function (Builder $visible) use ($user, $memberCode) {
+        return $query->where(function (Builder $visible) use ($user, $userCode) {
             $visible->where('project_created_by', $user->user_code);
-            if ($memberCode) {
-                $visible->orWhere('project_manager_code', $memberCode)
-                    ->orWhereHas('members', fn (Builder $members) => $members->where('members.member_code', $memberCode));
-            }
+            $visible->orWhere('project_manager_code', $userCode)
+                ->orWhereHas('members', fn (Builder $members) => $members->where('users.user_code', $userCode));
         });
     }
 
@@ -75,12 +66,10 @@ class AccessService
             return false;
         }
 
-        $memberCode = self::memberCode($user);
+        $userCode = self::userCode($user);
 
-        return $memberCode !== null && (
-            $project->project_manager_code === $memberCode
-            || $project->members()->where('members.member_code', $memberCode)->exists()
-        );
+        return $project->project_manager_code === $userCode
+            || $project->members()->where('users.user_code', $userCode)->exists();
     }
 
     public static function canViewTask(User $user, Task $task): bool
@@ -89,14 +78,13 @@ class AccessService
             return true;
         }
 
-        $memberCode = self::memberCode($user);
         if ($task->task_project_code) {
             $project = $task->project;
 
             return $project && self::canViewProject($user, $project);
         }
 
-        return $memberCode !== null && $task->task_assignee_code === $memberCode;
+        return $task->task_assignee_code === $user->user_code;
     }
 
     public static function canEditTask(User $user, Task $task): bool
@@ -110,8 +98,7 @@ class AccessService
         }
 
         return self::role($user) === 'member'
-            && self::memberCode($user) !== null
-            && $task->task_assignee_code === self::memberCode($user);
+            && $task->task_assignee_code === $user->user_code;
     }
 
     public static function authorize(bool $allowed, string $message = 'Bạn không có quyền thực hiện thao tác này.'): void

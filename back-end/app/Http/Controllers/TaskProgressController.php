@@ -116,10 +116,11 @@ class TaskProgressController extends Controller
             'text' => $item->checklist_text,
         ])->values()->all();
 
-        $workLog = DB::transaction(function () use ($task, $validated, $checklists, $completedItems) {
+        $reporterCode = $request->user()->user_code;
+        $workLog = DB::transaction(function () use ($task, $validated, $checklists, $completedItems, $reporterCode) {
             $workLog = TaskWorkLog::create([
                 'worklog_task_code' => $task->task_code,
-                'worklog_reporter_code' => $task->task_assignee_code,
+                'worklog_reporter_code' => $reporterCode,
                 'worklog_time' => $validated['time'],
                 'worklog_duration_minutes' => $validated['duration_minutes'] ?? null,
                 'worklog_note' => $validated['note'] ?? null,

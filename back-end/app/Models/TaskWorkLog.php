@@ -62,6 +62,6 @@ class TaskWorkLog extends Model
 
     public function reporter()
     {
-        return $this->belongsTo(Member::class, 'worklog_reporter_code', 'member_code');
+        return $this->belongsTo(User::class, 'worklog_reporter_code', 'user_code');
     }
 }

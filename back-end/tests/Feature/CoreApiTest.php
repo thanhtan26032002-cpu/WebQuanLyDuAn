@@ -2,7 +2,6 @@
 
 namespace Tests\Feature;
 
-use App\Models\Member;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\User;
@@ -43,7 +42,7 @@ class CoreApiTest extends TestCase
             'user_role' => 'admin',
         ]);
 
-        $member = Member::create([
+        $member = $this->createMember([
             'member_name' => 'Thành viên kiểm thử',
             'member_email' => 'member@example.com',
         ]);
@@ -53,7 +52,7 @@ class CoreApiTest extends TestCase
             'color' => 'rose',
             'status' => 'active',
             'due_date' => now()->toDateString(),
-            'member_ids' => [$member->member_code],
+            'member_ids' => [$member->user_code],
             'user_code' => $user->user_code,
         ]);
 
@@ -61,7 +60,7 @@ class CoreApiTest extends TestCase
             ->assertCreated()
             ->assertJsonPath('project.code', 'PJ0001')
             ->assertJsonPath('project.color', 'rose')
-            ->assertJsonPath('project.members.0.code', $member->member_code)
+            ->assertJsonPath('project.members.0.code', $member->user_code)
             ->assertJsonPath('project.due_date', now()->toDateString());
 
         $taskResponse = $this->postJson('/api/tasks', [
@@ -70,7 +69,7 @@ class CoreApiTest extends TestCase
             'status' => 'todo',
             'priority' => 'high',
             'due_date' => now()->toDateString(),
-            'assignee_code' => $member->member_code,
+            'assignee_code' => $member->user_code,
             'user_code' => $user->user_code,
         ]);
 
@@ -78,7 +77,7 @@ class CoreApiTest extends TestCase
             ->assertCreated()
             ->assertJsonPath('task.code', 'TK0001')
             ->assertJsonPath('task.project_code', 'PJ0001')
-            ->assertJsonPath('task.assignee.code', 'MB0001');
+            ->assertJsonPath('task.assignee.code', $member->user_code);
 
         $this->patchJson('/api/tasks/TK0001/status', ['status' => 'done'])
             ->assertOk()
@@ -95,8 +94,8 @@ class CoreApiTest extends TestCase
             ->assertJsonCount(1, 'tasks');
 
         $this->putJson('/api/projects/PJ0001/members', [
-            'member_ids' => [$member->member_code],
-        ])->assertOk()->assertJsonPath('project.members.0.code', 'MB0001');
+            'member_ids' => [$member->user_code],
+        ])->assertOk()->assertJsonPath('project.members.0.code', $member->user_code);
 
         $this->getJson('/api/activities')
             ->assertOk()
@@ -119,12 +118,12 @@ class CoreApiTest extends TestCase
             'user_email' => 'admin@example.com',
             'user_password' => Hash::make('test-password'),
         ]);
-        $member = Member::create([
+        $member = $this->createMember([
             'member_name' => 'Thành viên',
             'member_email' => 'member@example.com',
         ]);
 
-        $this->putJson('/api/members/'.$member->member_code, [
+        $this->putJson('/api/members/'.$member->user_code, [
             'name' => 'Thành viên đã sửa',
             'email' => 'member@example.com',
             'phone' => '0901234567',
@@ -137,9 +136,9 @@ class CoreApiTest extends TestCase
             'color' => 'violet',
         ])->assertCreated()->json('group');
 
-        $this->putJson('/api/groups/members/'.$member->member_code, [
+        $this->putJson('/api/groups/members/'.$member->user_code, [
             'group_code' => $group['code'],
-        ])->assertOk()->assertJsonPath('0.member_ids.0', $member->member_code);
+        ])->assertOk()->assertJsonPath('0.member_ids.0', $member->user_code);
 
         $this->postJson('/api/projects', [
             'name' => 'Dự án có tệp',
@@ -248,7 +247,7 @@ class CoreApiTest extends TestCase
             'user_email' => 'planning@example.com',
             'user_password' => Hash::make('test-password'),
         ]);
-        $manager = Member::create([
+        $manager = $this->createMember([
             'member_name' => 'Quản lý dự án',
             'member_email' => 'manager@example.com',
         ]);
@@ -263,13 +262,13 @@ class CoreApiTest extends TestCase
         $project = $this->postJson('/api/projects', [
             'name' => 'Dự án có khách hàng',
             'customer_code' => $customer['code'],
-            'manager_code' => $manager->member_code,
+            'manager_code' => $manager->user_code,
             'start_date' => now()->toDateString(),
             'due_date' => now()->addMonth()->toDateString(),
             'user_code' => $user->user_code,
         ])->assertCreated()
             ->assertJsonPath('project.customer.code', 'KH0001')
-            ->assertJsonPath('project.manager.code', 'MB0001')
+            ->assertJsonPath('project.manager.code', $manager->user_code)
             ->json('project');
 
         $this->postJson('/api/tasks', [
@@ -325,9 +324,12 @@ class CoreApiTest extends TestCase
             'name' => 'Thành viên có nhóm',
             'email' => 'grouped@example.com',
             'phone' => '0901234567',
+            'password' => 'secure-password',
+            'job_title' => 'Developer',
+            'department' => 'Development',
             'group_code' => $firstGroup['code'],
         ])->assertCreated()
-            ->assertJsonPath('groups.0.member_ids.0', 'MB0001');
+            ->assertJsonPath('groups.0.member_ids.0', 'US0002');
 
         $memberCode = $memberResponse->json('user.code');
 
@@ -369,6 +371,9 @@ class CoreApiTest extends TestCase
             'name' => 'Số điện thoại hợp lệ',
             'email' => 'valid-phone@example.com',
             'phone' => '+84901234567',
+            'password' => 'secure-password',
+            'job_title' => 'Developer',
+            'department' => 'Development',
         ])->assertCreated()->json('user.code');
 
         $this->putJson('/api/members/'.$memberCode, [
@@ -377,10 +382,10 @@ class CoreApiTest extends TestCase
         ])->assertUnprocessable()
             ->assertJsonPath('errors.phone.0', 'Vui lòng nhập số điện thoại.');
 
-        $this->assertDatabaseHas('members', [
-            'member_code' => $memberCode,
-            'member_name' => 'Số điện thoại hợp lệ',
-            'member_phone' => '+84901234567',
+        $this->assertDatabaseHas('users', [
+            'user_code' => $memberCode,
+            'user_name' => 'Số điện thoại hợp lệ',
+            'user_phone' => '+84901234567',
         ]);
     }
 
@@ -509,13 +514,13 @@ class CoreApiTest extends TestCase
         ])->assertUnprocessable()
             ->assertJsonValidationErrors('assignee_code');
 
-        $member = Member::create([
+        $member = $this->createMember([
             'member_name' => 'Assigned member',
             'member_email' => 'assigned-progress@example.com',
         ]);
 
         $this->putJson('/api/tasks/TK0001', [
-            'assignee_code' => $member->member_code,
+            'assignee_code' => $member->user_code,
         ])->assertOk();
 
         $this->postJson('/api/tasks/TK0001/work-logs', [
@@ -530,7 +535,7 @@ class CoreApiTest extends TestCase
             'user_code' => 'US0001',
         ])->assertCreated()
             ->assertJsonPath('work_log.code', 'WL0001')
-            ->assertJsonPath('work_log.reporter_code', $member->member_code)
+            ->assertJsonPath('work_log.reporter_code', $this->apiUser->user_code)
             ->assertJsonPath('work_log.completed_items.0.id', 'CK0001')
             ->assertJsonPath('checklists.0.completed', true)
             ->assertJsonPath('progress', 100);
@@ -549,7 +554,22 @@ class CoreApiTest extends TestCase
         $this->assertDatabaseHas('task_work_logs', [
             'worklog_code' => 'WL0001',
             'worklog_task_code' => 'TK0001',
-            'worklog_reporter_code' => $member->member_code,
+            'worklog_reporter_code' => $this->apiUser->user_code,
+        ]);
+    }
+
+    private function createMember(array $attributes): User
+    {
+        return User::create([
+            'user_name' => $attributes['member_name'],
+            'user_email' => $attributes['member_email'],
+            'user_password' => Hash::make('test-password'),
+            'user_role' => 'member',
+            'user_phone' => $attributes['member_phone'] ?? '0901234567',
+            'user_department' => $attributes['member_department'] ?? 'Development',
+            'user_job_title' => $attributes['member_role'] ?? 'Developer',
+            'user_join_date' => now()->toDateString(),
+            'user_profile_completed_at' => now(),
         ]);
     }
 }

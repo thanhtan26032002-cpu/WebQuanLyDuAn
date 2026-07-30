@@ -10,10 +10,18 @@ const { darkMode, setTheme, notify, currentUser, updateUserProfile, BASE_URL } =
 const userProfile = ref({
   name: currentUser.value?.name || '',
   email: currentUser.value?.email || '',
-  role: currentUser.value?.role || '',
+  jobTitle: currentUser.value?.job_title || '',
   phone: currentUser.value?.phone || '',
-  department: currentUser.value?.department || ''
+  department: currentUser.value?.department || '',
+  bio: currentUser.value?.bio || ''
 })
+
+const systemRoleLabels = {
+  admin: 'Quản trị viên',
+  project_manager: 'Quản lý dự án',
+  member: 'Nhân viên',
+  viewer: 'Người xem',
+}
 
 const selectedAvatarFile = ref(null)
 const avatarPreview = ref(currentUser.value?.avatar || null)
@@ -22,9 +30,10 @@ watch(currentUser, (newVal) => {
   if (newVal) {
     userProfile.value.name = newVal.name || ''
     userProfile.value.email = newVal.email || ''
-    userProfile.value.role = newVal.role || ''
+    userProfile.value.jobTitle = newVal.job_title || ''
     userProfile.value.phone = newVal.phone || ''
     userProfile.value.department = newVal.department || ''
+    userProfile.value.bio = newVal.bio || ''
     if (!selectedAvatarFile.value) {
       avatarPreview.value = newVal.avatar || null
     }
@@ -60,6 +69,9 @@ const saveProfile = async () => {
   // Validate
   if (!userProfile.value.name.trim()) profileErrors.value.name = 'Họ và tên không được để trống'
   if (!userProfile.value.email.trim()) profileErrors.value.email = 'Email không được để trống'
+  if (!userProfile.value.phone.trim()) profileErrors.value.phone = 'Số điện thoại không được để trống'
+  if (!userProfile.value.jobTitle.trim()) profileErrors.value.job_title = 'Chức danh không được để trống'
+  if (!userProfile.value.department.trim()) profileErrors.value.department = 'Phòng ban không được để trống'
   
   if (Object.keys(profileErrors.value).length > 0) {
     isSavingProfile.value = false
@@ -70,9 +82,10 @@ const saveProfile = async () => {
   const formData = new FormData()
   formData.append('name', userProfile.value.name)
   formData.append('email', userProfile.value.email)
-  formData.append('role', userProfile.value.role)
   formData.append('phone', userProfile.value.phone)
   formData.append('department', userProfile.value.department)
+  formData.append('job_title', userProfile.value.jobTitle)
+  formData.append('bio', userProfile.value.bio)
   
   if (selectedAvatarFile.value) {
     formData.append('avatar', selectedAvatarFile.value)
@@ -211,8 +224,8 @@ if (activeColor.value) {
             </div>
             <div class="space-y-2">
               <label class="block text-sm font-semibold text-slate-700">Chức vụ <span class="text-rose-500">*</span></label>
-              <input type="text" v-model="userProfile.role" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 focus:bg-white focus:border-violet-300 focus:ring-4 focus:ring-violet-500/10 transition-all outline-none" :class="{'border-rose-300 focus:border-rose-500 focus:ring-rose-500/20': profileErrors.role}" />
-              <p v-if="profileErrors.role" class="text-xs text-rose-500 mt-1">{{ profileErrors.role }}</p>
+              <input type="text" v-model="userProfile.jobTitle" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 focus:bg-white focus:border-violet-300 focus:ring-4 focus:ring-violet-500/10 transition-all outline-none" :class="{'border-rose-300 focus:border-rose-500 focus:ring-rose-500/20': profileErrors.job_title}" />
+              <p v-if="profileErrors.job_title" class="text-xs text-rose-500 mt-1">{{ profileErrors.job_title }}</p>
             </div>
             <div class="space-y-2">
               <label class="block text-sm font-semibold text-slate-700">Email <span class="text-rose-500">*</span></label>
@@ -229,6 +242,14 @@ if (activeColor.value) {
               <input type="text" v-model="userProfile.department" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 focus:bg-white focus:border-violet-300 focus:ring-4 focus:ring-violet-500/10 transition-all outline-none" :class="{'border-rose-300 focus:border-rose-500 focus:ring-rose-500/20': profileErrors.department}" />
               <p v-if="profileErrors.department" class="text-xs text-rose-500 mt-1">{{ profileErrors.department }}</p>
             </div>
+            <div class="space-y-2 sm:col-span-2">
+              <label class="block text-sm font-semibold text-slate-700">Giới thiệu ngắn</label>
+              <textarea v-model="userProfile.bio" rows="3" maxlength="1000" class="w-full resize-none rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-slate-900 outline-none transition-all focus:border-violet-300 focus:bg-white focus:ring-4 focus:ring-violet-500/10" placeholder="Kinh nghiệm, thế mạnh hoặc lĩnh vực đang phụ trách..."></textarea>
+            </div>
+          </div>
+
+          <div class="rounded-xl border border-violet-100 bg-violet-50 px-4 py-3 text-sm text-violet-800">
+            Vai trò hệ thống: <strong>{{ systemRoleLabels[currentUser?.role] || currentUser?.role }}</strong>. Vai trò này do quản trị viên phân quyền và không thể tự thay đổi.
           </div>
 
           <div class="pt-6 border-t border-slate-100 flex justify-end gap-3">

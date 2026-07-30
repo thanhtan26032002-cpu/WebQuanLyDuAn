@@ -13,7 +13,7 @@ class ReportController extends Controller
 {
     public function myWork(Request $request)
     {
-        $memberCode = AccessService::memberCode($request->user());
+        $memberCode = AccessService::userCode($request->user());
         $query = $this->visibleTasks($request)->with(['project', 'assignee', 'dependencies']);
         if (! AccessService::isAdmin($request->user()) && $memberCode) {
             $query->where('task_assignee_code', $memberCode);
@@ -62,7 +62,7 @@ class ReportController extends Controller
             ->map(function ($memberTasks) {
                 $member = $memberTasks->first()->assignee;
                 $estimated = round((float) $memberTasks->sum('task_estimated_hours'), 2);
-                $capacity = (float) ($member?->member_weekly_capacity_hours ?? 40);
+                $capacity = (float) ($member?->user_weekly_capacity_hours ?? 40);
 
                 return [
                     'member' => $member,
@@ -116,7 +116,7 @@ class ReportController extends Controller
         }
 
         $projectCodes = AccessService::scopeProjects(Project::query(), $request->user())->pluck('project_code');
-        $memberCode = AccessService::memberCode($request->user());
+        $memberCode = AccessService::userCode($request->user());
 
         return Task::where(function (Builder $query) use ($projectCodes, $memberCode) {
             $query->whereIn('task_project_code', $projectCodes);

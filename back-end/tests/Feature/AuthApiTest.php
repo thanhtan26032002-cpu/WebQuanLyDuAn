@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 class AuthApiTest extends TestCase
@@ -42,5 +43,59 @@ class AuthApiTest extends TestCase
     {
         $this->getJson('/api/user')->assertUnauthorized();
         $this->postJson('/api/logout')->assertUnauthorized();
+    }
+
+    public function test_employee_completes_profile_and_can_only_edit_their_own_member_card(): void
+    {
+        $admin = $this->postJson('/api/register', [
+            'name' => 'Admin',
+            'email' => 'admin@example.com',
+            'password' => 'secure-password',
+        ])->assertCreated()->json();
+
+        $employee = $this->postJson('/api/register', [
+            'name' => 'Employee',
+            'email' => 'employee@example.com',
+            'password' => 'secure-password',
+        ])->assertCreated()
+            ->assertJsonPath('requires_profile_completion', true)
+            ->assertJsonPath('user.role', 'member')
+            ->json();
+
+        $this->withToken($employee['token'])->postJson('/api/profile/complete', [
+            'phone' => '0901234567',
+            'department' => 'Development',
+            'job_title' => 'Developer',
+            'bio' => 'API tester',
+            'color' => 'emerald',
+        ])->assertOk()
+            ->assertJsonPath('user.profile_completed_at', fn ($value) => filled($value));
+
+        $this->withToken($employee['token'])->getJson('/api/members')
+            ->assertOk()
+            ->assertJsonPath('0.profile_limited', true)
+            ->assertJsonMissingPath('0.email')
+            ->assertJsonPath('1.email', 'employee@example.com');
+
+        $this->withToken($employee['token'])->putJson('/api/members/'.$admin['user']['code'], [
+            'name' => 'Not allowed',
+        ])->assertForbidden();
+
+        $this->withToken($employee['token'])->postJson('/api/users/'.$employee['user']['code'], [
+            'name' => 'Employee Updated',
+            'role' => 'admin',
+            'phone' => '0901234567',
+            'department' => 'Development',
+            'job_title' => 'Senior Developer',
+        ])->assertOk()
+            ->assertJsonPath('user.name', 'Employee Updated')
+            ->assertJsonPath('user.role', 'member');
+
+        $this->assertFalse(Schema::hasTable('members'));
+        $this->assertDatabaseHas('users', [
+            'user_code' => $employee['user']['code'],
+            'user_job_title' => 'Senior Developer',
+            'user_role' => 'member',
+        ]);
     }
 }

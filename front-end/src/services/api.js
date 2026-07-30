@@ -3,9 +3,20 @@ const USER_KEY = 'currentUser'
 
 export const getAuthToken = () => localStorage.getItem(TOKEN_KEY)
 export const hasAuthSession = () => Boolean(getAuthToken())
+export const getStoredUser = () => {
+  try {
+    return JSON.parse(localStorage.getItem(USER_KEY) || 'null')
+  } catch {
+    return null
+  }
+}
 
 export function setAuthSession(token, user) {
   localStorage.setItem(TOKEN_KEY, token)
+  updateStoredUser(user)
+}
+
+export function updateStoredUser(user) {
   localStorage.setItem(USER_KEY, JSON.stringify(user))
 }
 

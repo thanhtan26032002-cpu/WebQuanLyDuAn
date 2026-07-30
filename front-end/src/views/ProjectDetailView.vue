@@ -11,7 +11,7 @@ import DownloadArchiveModal from '../components/modals/DownloadArchiveModal.vue'
 
 const route = useRoute()
 const router = useRouter()
-const { projects, tasks, members, activities, projectStatusMap, priorityMap, taskStatusMap, findMember, formatDate, getTaskDeadlineState, taskModalOpen, openTaskModal, projectSettingsModalOpen, fileUploadModalOpen, manageMembersModalOpen, editingProjectId, removeFileFromProject, removeMemberFromProject, moveTask, activeTaskId, downloadArchive, downloadSingleFile, activeMemberId, memberDetailModalOpen, addProjectUpdate, addProjectMilestone, deleteProjectMilestone, setProjectAutomation } = useProjectWorkspace()
+const { projects, tasks, members, activities, projectStatusMap, priorityMap, taskStatusMap, findMember, formatDate, getTaskDeadlineState, taskModalOpen, openTaskModal, projectSettingsModalOpen, fileUploadModalOpen, manageMembersModalOpen, editingProjectId, removeFileFromProject, removeMemberFromProject, moveTask, activeTaskId, downloadArchive, downloadSingleFile, activeMemberId, memberDetailModalOpen, addProjectUpdate, addProjectMilestone, deleteProjectMilestone, setProjectAutomation, currentUser } = useProjectWorkspace()
 
 const updateDraft = ref({ health: 'on_track', completed: '', risks: '', next_steps: '' })
 const milestoneDraft = ref({ name: '', target_date: '' })
@@ -60,6 +60,11 @@ const deadlineDateClass = (task) => {
 const projectId = computed(() => route.params.id)
 const isDownloadModalOpen = ref(false)
 const project = computed(() => projects.value.find(p => p.id === projectId.value))
+const canManageProject = computed(() => {
+  const role = currentUser.value?.role
+  const userCode = currentUser.value?.code
+  return role === 'admin' || (role === 'project_manager' && [project.value?.managerId, project.value?.created_by].includes(userCode))
+})
 const projectTasks = computed(() => tasks.value.filter(t => t.projectId === projectId.value))
 
 const taskViewMode = ref('board') // 'list' or 'board'
@@ -215,6 +220,7 @@ const projectStatusClasses = {
           <p class="text-white/80 text-sm max-w-lg">{{ project.description }}</p>
         </div>
         <button 
+          v-if="canManageProject"
           @click="handleEdit"
           class="text-white/70 hover:text-white hover:bg-white/20 p-2 rounded-xl transition-colors shrink-0"
           title="Chỉnh sửa dự án"
@@ -277,7 +283,7 @@ const projectStatusClasses = {
           <div><h2 class="flex items-center gap-2 text-lg font-bold"><HeartPulse class="h-5 w-5 text-violet-500" /> Sức khỏe dự án</h2><p class="mt-1 text-sm text-slate-500">Tình trạng, rủi ro và bước tiếp theo.</p></div>
           <span :class="['rounded-full px-3 py-1 text-xs font-bold', healthClasses[project.health] || healthClasses.on_track]">{{ healthLabels[project.health] || healthLabels.on_track }}</span>
         </header>
-        <button v-if="!showUpdateForm" class="mt-5 w-full rounded-xl border border-dashed border-violet-200 bg-violet-50/50 py-2.5 text-sm font-semibold text-violet-700 hover:bg-violet-50" @click="showUpdateForm = true; updateDraft.health = project.health">+ Đăng cập nhật định kỳ</button>
+        <button v-if="canManageProject && !showUpdateForm" class="mt-5 w-full rounded-xl border border-dashed border-violet-200 bg-violet-50/50 py-2.5 text-sm font-semibold text-violet-700 hover:bg-violet-50" @click="showUpdateForm = true; updateDraft.health = project.health">+ Đăng cập nhật định kỳ</button>
         <form v-else class="mt-5 space-y-3 rounded-xl bg-slate-50 p-4" @submit.prevent="submitProjectUpdate">
           <select v-model="updateDraft.health" class="w-full rounded-lg border border-slate-200 bg-white p-2.5 text-sm font-semibold"><option value="on_track">Đúng tiến độ</option><option value="at_risk">Có rủi ro</option><option value="off_track">Chậm tiến độ</option></select>
           <textarea v-model="updateDraft.completed" rows="2" placeholder="Những việc đã hoàn thành" class="w-full rounded-lg border border-slate-200 p-3 text-sm"></textarea>
@@ -294,11 +300,11 @@ const projectStatusClasses = {
       </section>
 
       <section class="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
-        <header class="flex items-start justify-between gap-4"><div><h2 class="flex items-center gap-2 text-lg font-bold"><Flag class="h-5 w-5 text-violet-500" /> Cột mốc</h2><p class="mt-1 text-sm text-slate-500">Các giai đoạn chính của dự án.</p></div><button class="rounded-lg bg-violet-50 px-3 py-2 text-sm font-semibold text-violet-700" @click="showMilestoneForm = !showMilestoneForm">+ Thêm</button></header>
+        <header class="flex items-start justify-between gap-4"><div><h2 class="flex items-center gap-2 text-lg font-bold"><Flag class="h-5 w-5 text-violet-500" /> Cột mốc</h2><p class="mt-1 text-sm text-slate-500">Các giai đoạn chính của dự án.</p></div><button v-if="canManageProject" class="rounded-lg bg-violet-50 px-3 py-2 text-sm font-semibold text-violet-700" @click="showMilestoneForm = !showMilestoneForm">+ Thêm</button></header>
         <form v-if="showMilestoneForm" class="mt-4 flex flex-col gap-2 rounded-xl bg-slate-50 p-3 sm:flex-row" @submit.prevent="submitMilestone"><input v-model="milestoneDraft.name" required placeholder="Tên cột mốc" class="min-w-0 flex-1 rounded-lg border border-slate-200 p-2.5 text-sm" /><input v-model="milestoneDraft.target_date" type="date" class="rounded-lg border border-slate-200 p-2.5 text-sm" /><button class="rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white">Lưu</button></form>
         <div v-if="project.milestones?.length" class="mt-5 space-y-3">
           <article v-for="milestone in project.milestones" :key="milestone.code" class="group rounded-xl border border-slate-100 p-4">
-            <div class="flex items-start justify-between gap-3"><div><p class="font-semibold text-slate-800">{{ milestone.name }}</p><p class="mt-0.5 text-xs text-slate-500">{{ formatDate(milestone.target_date) }}</p></div><button title="Xóa cột mốc" aria-label="Xóa cột mốc" class="rounded-lg p-1.5 text-slate-300 opacity-0 hover:bg-rose-50 hover:text-rose-500 group-hover:opacity-100" @click="deleteProjectMilestone(project.id, milestone.code)"><Trash2 class="h-4 w-4" /></button></div>
+            <div class="flex items-start justify-between gap-3"><div><p class="font-semibold text-slate-800">{{ milestone.name }}</p><p class="mt-0.5 text-xs text-slate-500">{{ formatDate(milestone.target_date) }}</p></div><button v-if="canManageProject" title="Xóa cột mốc" aria-label="Xóa cột mốc" class="rounded-lg p-1.5 text-slate-300 opacity-0 hover:bg-rose-50 hover:text-rose-500 group-hover:opacity-100" @click="deleteProjectMilestone(project.id, milestone.code)"><Trash2 class="h-4 w-4" /></button></div>
             <div class="mt-3 h-2 overflow-hidden rounded-full bg-slate-100"><div class="h-full rounded-full bg-violet-500" :style="{ width: `${milestone.progress || 0}%` }"></div></div><p class="mt-1 text-right text-[10px] font-bold text-slate-400">{{ milestone.progress || 0 }}%</p>
           </article>
         </div><p v-else class="mt-8 text-center text-sm text-slate-400">Chưa có cột mốc nào.</p>
@@ -308,7 +314,7 @@ const projectStatusClasses = {
     <section class="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
       <header><h2 class="flex items-center gap-2 text-lg font-bold text-slate-900"><Zap class="h-5 w-5 text-violet-500" /> Tự động hóa đơn giản</h2><p class="mt-1 text-sm text-slate-500">Giảm thao tác lặp lại nhưng vẫn giữ quy trình dễ kiểm soát.</p></header>
       <div class="mt-5 grid gap-3 md:grid-cols-3">
-        <button v-for="item in automationRules" :key="item.rule" type="button" class="flex items-start justify-between gap-4 rounded-xl border p-4 text-left transition" :class="automationEnabled(item.rule) ? 'border-violet-200 bg-violet-50/60' : 'border-slate-100 hover:border-slate-200'" @click="toggleAutomation(item.rule)">
+        <button v-for="item in automationRules" :key="item.rule" type="button" :disabled="!canManageProject" class="flex items-start justify-between gap-4 rounded-xl border p-4 text-left transition disabled:cursor-default" :class="automationEnabled(item.rule) ? 'border-violet-200 bg-violet-50/60' : 'border-slate-100 hover:border-slate-200'" @click="toggleAutomation(item.rule)">
           <span><strong class="block text-sm text-slate-800">{{ item.title }}</strong><span class="mt-1 block text-xs leading-5 text-slate-500">{{ item.description }}</span></span>
           <span :class="['mt-0.5 flex h-6 w-11 shrink-0 rounded-full p-0.5 transition', automationEnabled(item.rule) ? 'justify-end bg-violet-500' : 'justify-start bg-slate-200']"><span class="h-5 w-5 rounded-full bg-white shadow-sm"></span></span>
         </button>
@@ -321,7 +327,7 @@ const projectStatusClasses = {
       <div class="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 flex flex-col">
         <div class="flex items-center justify-between mb-4">
           <h2 class="text-lg font-bold text-slate-900">Thành viên</h2>
-          <button @click="openManageMembers" class="text-sm font-medium text-violet-600 hover:text-violet-700 bg-violet-50 hover:bg-violet-100 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5">
+          <button v-if="canManageProject" @click="openManageMembers" class="text-sm font-medium text-violet-600 hover:text-violet-700 bg-violet-50 hover:bg-violet-100 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5">
             <Plus class="w-4 h-4" /> Thêm
           </button>
         </div>
@@ -340,7 +346,7 @@ const projectStatusClasses = {
               <p class="text-sm font-bold text-slate-800 truncate group-hover:text-violet-700 transition-colors">{{ member.name }}</p>
               <p class="text-xs font-medium text-slate-500 truncate">{{ member.role }}</p>
             </div>
-            <button @click.stop="confirmRemoveMember(member.id)" title="Loại khỏi dự án" class="relative z-10 shrink-0 text-slate-300 hover:text-rose-500 p-2 rounded-xl hover:bg-rose-50 transition-all opacity-0 group-hover:opacity-100 hover:scale-110">
+            <button v-if="canManageProject" @click.stop="confirmRemoveMember(member.id)" title="Loại khỏi dự án" class="relative z-10 shrink-0 text-slate-300 hover:text-rose-500 p-2 rounded-xl hover:bg-rose-50 transition-all opacity-0 group-hover:opacity-100 hover:scale-110">
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
             </button>
           </div>
@@ -360,7 +366,7 @@ const projectStatusClasses = {
             <button @click="isDownloadModalOpen = true" :disabled="!projectFiles.length" class="text-sm font-medium text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50">
               Tải xuống tất cả
             </button>
-            <button @click="openFileUpload" class="text-sm font-medium text-violet-600 hover:text-violet-700 bg-violet-50 hover:bg-violet-100 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5">
+            <button v-if="canManageProject" @click="openFileUpload" class="text-sm font-medium text-violet-600 hover:text-violet-700 bg-violet-50 hover:bg-violet-100 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5">
               <Plus class="w-4 h-4" /> Tải lên
             </button>
           </div>
@@ -381,13 +387,13 @@ const projectStatusClasses = {
               <button @click.prevent="downloadSingleFile(file.url, file.name)" title="Tải xuống" class="text-slate-300 hover:text-violet-600 p-2 rounded-lg hover:bg-violet-50 transition-colors flex items-center justify-center">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
               </button>
-              <button @click="confirmRemoveFile(idx)" title="Xóa tệp" class="text-slate-300 hover:text-rose-500 p-2 rounded-lg hover:bg-rose-50 transition-colors flex items-center justify-center">
+              <button v-if="canManageProject" @click="confirmRemoveFile(idx)" title="Xóa tệp" class="text-slate-300 hover:text-rose-500 p-2 rounded-lg hover:bg-rose-50 transition-colors flex items-center justify-center">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
               </button>
             </div>
           </div>
         </div>
-        <div v-else class="flex flex-col items-center justify-center py-8 text-center flex-1 bg-slate-50 rounded-xl border border-dashed border-slate-200 cursor-pointer hover:bg-slate-100 transition-colors" @click="openFileUpload">
+        <div v-else class="flex flex-col items-center justify-center py-8 text-center flex-1 bg-slate-50 rounded-xl border border-dashed border-slate-200 transition-colors" :class="canManageProject ? 'cursor-pointer hover:bg-slate-100' : ''" @click="canManageProject && openFileUpload()">
           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-slate-300 mb-2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
           <p class="text-sm font-medium text-slate-600 mb-1">Chưa có tệp nào</p>
           <p class="text-xs text-slate-400">Nhấn vào đây để tải lên tài liệu.</p>
@@ -476,6 +482,7 @@ const projectStatusClasses = {
             </button>
           </div>
           <button
+            v-if="canManageProject"
             @click="openTaskModal(project?.id)"
             class="flex items-center gap-2 bg-gradient-to-r from-violet-500 to-indigo-600 text-white px-4 py-2 rounded-xl text-sm font-medium shadow-md shadow-violet-500/25 hover:shadow-lg transition-all shrink-0"
           >
@@ -488,7 +495,7 @@ const projectStatusClasses = {
       <div v-if="projectTasks.length === 0" class="py-16 flex flex-col items-center text-center flex-1 justify-center">
         <ListTodo class="w-12 h-12 text-slate-300 mb-3" />
         <p class="text-slate-500 font-medium">Chưa có nhiệm vụ nào trong dự án này.</p>
-        <button @click="openTaskModal(project?.id)" class="mt-4 text-sm text-violet-600 font-medium hover:text-violet-700">
+        <button v-if="canManageProject" @click="openTaskModal(project?.id)" class="mt-4 text-sm text-violet-600 font-medium hover:text-violet-700">
           Tạo nhiệm vụ đầu tiên →
         </button>
       </div>
@@ -561,6 +568,7 @@ const projectStatusClasses = {
                 <draggable 
                   class="h-full space-y-3 pb-4"
                   :list="getTasksByStatus(col.id)"
+                  :disabled="!canManageProject"
                   group="project-tasks"
                   item-key="id"
                   ghost-class="opacity-50"
@@ -574,7 +582,7 @@ const projectStatusClasses = {
                 </draggable>
               </div>
               
-              <button @click="openTaskModal(project?.id)" class="w-full mt-2 py-2 flex items-center justify-center gap-2 text-slate-500 hover:text-slate-800 hover:bg-slate-200/50 rounded-xl transition-colors font-medium text-sm shrink-0">
+              <button v-if="canManageProject" @click="openTaskModal(project?.id)" class="w-full mt-2 py-2 flex items-center justify-center gap-2 text-slate-500 hover:text-slate-800 hover:bg-slate-200/50 rounded-xl transition-colors font-medium text-sm shrink-0">
                 <Plus class="w-4 h-4" /> Thêm thẻ
               </button>
             </div>

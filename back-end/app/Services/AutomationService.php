@@ -4,7 +4,6 @@ namespace App\Services;
 
 use App\Models\Notification;
 use App\Models\Task;
-use App\Models\User;
 
 class AutomationService
 {
@@ -17,8 +16,7 @@ class AutomationService
 
         $rules = $project->automations()->where('automation_enabled', true)->get();
         if ($task->task_status === 'done' && $previousStatus !== 'done' && $rules->contains('automation_rule', 'completion_notify_manager')) {
-            $managerEmail = $project->manager?->member_email;
-            $managerUser = $managerEmail ? User::whereRaw('LOWER(user_email) = ?', [mb_strtolower($managerEmail)])->first() : null;
+            $managerUser = $project->manager;
             if ($managerUser) {
                 ActivityService::notify($managerUser->user_code, 'Nhiệm vụ đã hoàn thành', $task->task_title.' đã được hoàn thành.', 'success');
             }

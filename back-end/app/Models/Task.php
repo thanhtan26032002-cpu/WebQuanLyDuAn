@@ -81,7 +81,7 @@ class Task extends Model
 
     public function assignee()
     {
-        return $this->belongsTo(Member::class, 'task_assignee_code', 'member_code');
+        return $this->belongsTo(User::class, 'task_assignee_code', 'user_code');
     }
 
     public function comments()

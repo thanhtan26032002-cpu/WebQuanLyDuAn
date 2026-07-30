@@ -2,8 +2,9 @@
 
 namespace Tests\Feature;
 
-use App\Models\Member;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
 
 class ProfessionalFeaturesTest extends TestCase
@@ -79,15 +80,20 @@ class ProfessionalFeaturesTest extends TestCase
 
     public function test_recurring_tasks_and_actual_work_duration_are_persisted(): void
     {
-        $member = Member::create([
-            'member_name' => 'Người thực hiện',
-            'member_email' => 'worker@ringnet.test',
-            'member_phone' => '0901234567',
+        $member = User::create([
+            'user_name' => 'Người thực hiện',
+            'user_email' => 'worker@ringnet.test',
+            'user_password' => Hash::make('test-password'),
+            'user_role' => 'member',
+            'user_phone' => '0901234567',
+            'user_department' => 'Phát triển',
+            'user_job_title' => 'Developer',
+            'user_profile_completed_at' => now(),
         ]);
 
         $this->postJson('/api/tasks', [
             'title' => 'Báo cáo tuần',
-            'assignee_code' => $member->member_code,
+            'assignee_code' => $member->user_code,
             'due_date' => now()->toDateString(),
             'estimated_hours' => 2,
             'recurrence' => 'weekly',

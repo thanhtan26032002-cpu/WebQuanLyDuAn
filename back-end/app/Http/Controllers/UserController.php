@@ -10,24 +10,22 @@ use Illuminate\Support\Facades\Validator;
 
 class UserController extends Controller
 {
-    // Lấy danh sách toàn bộ thành viên
     public function index(Request $request)
     {
-        $query = User::select('user_code', 'user_name', 'user_email', 'user_avatar', 'user_role', 'user_member_code');
+        $query = User::select(
+            'user_code', 'user_name', 'user_email', 'user_avatar', 'user_role',
+            'user_color', 'user_job_title', 'user_department', 'user_profile_completed_at'
+        );
         if (! AccessService::canManagePeople($request->user())) {
             $query->whereKey($request->user()->user_code);
         }
-        $users = $query->get();
 
-        return response()->json($users);
+        return response()->json($query->get());
     }
 
-    public function updateProfile(Request $request, $code)
+    public function updateProfile(Request $request, string $code)
     {
-        $user = User::where('user_code', $code)->first();
-        if (! $user) {
-            return response()->json(['message' => 'User not found'], 404);
-        }
+        $user = User::findOrFail($code);
         AccessService::authorize(
             $request->user()->user_code === $user->user_code || AccessService::isAdmin($request->user())
         );
@@ -38,6 +36,10 @@ class UserController extends Controller
             'role' => 'sometimes|required|in:admin,project_manager,member,viewer',
             'phone' => 'nullable|string|max:20',
             'department' => 'nullable|string|max:100',
+            'job_title' => 'nullable|string|max:100',
+            'bio' => 'nullable|string|max:1000',
+            'color' => 'nullable|string|max:30',
+            'weekly_capacity_hours' => 'nullable|numeric|min:1|max:168',
             'avatar' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
         ]);
 
@@ -45,23 +47,59 @@ class UserController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        $data = $request->only(['name', 'email', 'role', 'phone', 'department']);
+        $data = $request->only([
+            'name', 'email', 'role', 'phone', 'department', 'job_title',
+            'bio', 'color', 'weekly_capacity_hours',
+        ]);
         if (array_key_exists('role', $data) && ! AccessService::isAdmin($request->user())) {
             unset($data['role']);
         }
 
         if ($request->hasFile('avatar')) {
-            // Xóa avatar cũ nếu có
             if ($user->user_avatar && Storage::disk('public')->exists(str_replace('/storage/', '', $user->user_avatar))) {
                 Storage::disk('public')->delete(str_replace('/storage/', '', $user->user_avatar));
             }
+            $data['avatar'] = '/storage/'.$request->file('avatar')->store('avatars', 'public');
+        }
 
-            $path = $request->file('avatar')->store('avatars', 'public');
-            $data['avatar'] = '/storage/'.$path;
+        $profileData = array_merge($user->toArray(), $data);
+        if ($this->profileComplete($profileData)) {
+            $data['profile_completed_at'] = $user->user_profile_completed_at ?: now();
         }
 
         $user->update(User::mapToDbAttributes($data));
 
-        return response()->json(['message' => 'Profile updated successfully', 'user' => $user]);
+        return response()->json(['message' => 'Đã cập nhật hồ sơ.', 'user' => $user->fresh()]);
+    }
+
+    public function completeProfile(Request $request)
+    {
+        $validated = $request->validate([
+            'phone' => 'required|string|regex:/^\+?[0-9]{9,15}$/',
+            'department' => 'required|string|max:100',
+            'job_title' => 'required|string|max:100',
+            'bio' => 'nullable|string|max:1000',
+            'color' => 'nullable|string|max:30',
+        ]);
+
+        $request->user()->update(User::mapToDbAttributes([
+            ...$validated,
+            'profile_completed_at' => now(),
+            'join_date' => $request->user()->user_join_date ?: now()->toDateString(),
+            'online' => true,
+        ]));
+
+        return response()->json([
+            'message' => 'Đã hoàn tất hồ sơ thành viên.',
+            'user' => $request->user()->fresh(),
+        ]);
+    }
+
+    private function profileComplete(array $data): bool
+    {
+        return filled($data['name'] ?? null)
+            && filled($data['phone'] ?? null)
+            && filled($data['department'] ?? null)
+            && filled($data['job_title'] ?? null);
     }
 }

@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Member;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\TaskComment;
@@ -25,10 +24,10 @@ class TaskController extends Controller
         $tasks = $this->visibleTasks($request)->where(function ($query) {
             $query->whereNull('task_project_code')->orWhereHas('project');
         })->with([
-            'assignee:member_code,member_name,member_avatar',
+            'assignee:user_code,user_name,user_avatar,user_color,user_job_title',
             'attachments',
             'checklists',
-            'workLogs.reporter:member_code,member_name,member_avatar',
+            'workLogs.reporter:user_code,user_name,user_avatar',
             'dependencies:task_code,task_title,task_status,task_project_code',
             'blocking:task_code,task_title,task_status,task_project_code',
             'milestone',
@@ -67,7 +66,7 @@ class TaskController extends Controller
         $tasks = $this->visibleTasks($request, true)
             ->where('task_deleted_at', '>=', now()->subDays(30))
             ->with([
-                'assignee:member_code,member_name,member_avatar',
+                'assignee:user_code,user_name,user_avatar,user_color,user_job_title',
                 'project' => fn ($query) => $query->withTrashed(),
             ])
             ->orderBy('task_deleted_at', 'desc')
@@ -94,7 +93,7 @@ class TaskController extends Controller
             'due_date' => 'nullable|date|after_or_equal:today|after_or_equal:start_date',
             'progress' => 'nullable|integer|min:0|max:100',
             'estimated_hours' => 'nullable|numeric|min:0|max:99999.99',
-            'assignee_code' => 'nullable|exists:members,member_code',
+            'assignee_code' => 'nullable|exists:users,user_code',
             'tags' => 'nullable|string|max:500',
             'blocked_reason' => 'nullable|string|max:5000',
             'recurrence' => 'nullable|in:daily,weekly,monthly',
@@ -131,14 +130,9 @@ class TaskController extends Controller
         );
 
         if ($task->task_assignee_code) {
-            $assigneeEmail = Member::whereKey($task->task_assignee_code)->value('member_email');
-            $recipientCode = $assigneeEmail
-                ? User::where('user_email', $assigneeEmail)->value('user_code')
-                : null;
-
-            if ($recipientCode) {
+            if (User::whereKey($task->task_assignee_code)->exists()) {
                 ActivityService::notify(
-                    $recipientCode,
+                    $task->task_assignee_code,
                     'Nhiệm vụ mới',
                     'Bạn đã được phân công nhiệm vụ: '.$task->task_title,
                     'info'
@@ -170,7 +164,7 @@ class TaskController extends Controller
             'due_date' => 'nullable|date',
             'progress' => 'nullable|integer|min:0|max:100',
             'estimated_hours' => 'nullable|numeric|min:0|max:99999.99',
-            'assignee_code' => 'nullable|exists:members,member_code',
+            'assignee_code' => 'nullable|exists:users,user_code',
             'project_code' => ['nullable', Rule::exists('projects', 'project_code')->whereNull('project_deleted_at')],
             'milestone_code' => 'nullable|exists:project_milestones,milestone_code',
             'tags' => 'nullable|string|max:500',
@@ -427,7 +421,7 @@ class TaskController extends Controller
         }
 
         $projectCodes = AccessService::scopeProjects(Project::query(), $request->user())->pluck('project_code');
-        $memberCode = AccessService::memberCode($request->user());
+        $memberCode = AccessService::userCode($request->user());
 
         return $query->where(function (Builder $visible) use ($projectCodes, $memberCode) {
             $visible->whereIn('task_project_code', $projectCodes);
@@ -442,7 +436,7 @@ class TaskController extends Controller
     private function taskRelations(): array
     {
         return [
-            'assignee:member_code,member_name,member_avatar,member_weekly_capacity_hours',
+            'assignee:user_code,user_name,user_avatar,user_weekly_capacity_hours,user_color,user_job_title',
             'attachments', 'checklists', 'workLogs.reporter', 'dependencies', 'blocking',
             'milestone', 'watchers:user_code,user_name,user_avatar',
         ];

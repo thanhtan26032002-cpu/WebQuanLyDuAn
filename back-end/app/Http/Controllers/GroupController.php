@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Group;
-use App\Models\Member;
+use App\Models\User;
 use App\Services\AccessService;
 use App\Services\GroupMembershipService;
 use Illuminate\Http\Request;
@@ -59,7 +59,7 @@ class GroupController extends Controller
     public function assignMember(Request $request, string $memberCode)
     {
         AccessService::authorize(AccessService::canManagePeople($request->user()));
-        Member::findOrFail($memberCode);
+        User::findOrFail($memberCode);
         $validated = $request->validate([
             'group_code' => 'nullable|exists:groups,group_code',
         ]);

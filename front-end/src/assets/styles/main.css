@@ -35,7 +35,8 @@
 
 @layer base {
   body {
-    @apply bg-slate-50 text-slate-900 antialiased min-h-screen font-sans;
+    @apply text-slate-900 antialiased min-h-screen font-sans;
+    background: #f3f6fb;
   }
   h1, h2, h3, h4, h5, h6 {
     @apply font-display font-semibold tracking-tight;
@@ -54,6 +55,21 @@
     backdrop-filter: blur(12px);
     border: 1px solid rgba(51, 65, 85, 0.5);
     box-shadow: var(--shadow-soft);
+  }
+  .app-shell {
+    background: #eef2f8;
+  }
+  .app-canvas {
+    background:
+      radial-gradient(circle at 8% 6%, rgba(139, 92, 246, 0.07), transparent 28rem),
+      radial-gradient(circle at 94% 18%, rgba(59, 130, 246, 0.06), transparent 30rem),
+      linear-gradient(145deg, #f8f9fc 0%, #f2f5fa 52%, #eef3f9 100%);
+  }
+  .login-canvas {
+    background:
+      radial-gradient(circle at 18% 12%, rgba(139, 92, 246, 0.22), transparent 30rem),
+      radial-gradient(circle at 84% 82%, rgba(59, 130, 246, 0.18), transparent 34rem),
+      linear-gradient(145deg, #172033 0%, #111827 50%, #1e293b 100%);
   }
 }
 

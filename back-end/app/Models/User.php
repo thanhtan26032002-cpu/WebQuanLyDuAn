@@ -24,8 +24,9 @@ class User extends Authenticatable
 
     protected $fillable = [
         'user_name', 'user_email', 'user_password', 'user_avatar', 'user_role',
-        'user_phone', 'user_department', 'user_api_token', 'user_member_code',
-        'user_notification_preferences',
+        'user_phone', 'user_department', 'user_api_token', 'user_notification_preferences',
+        'user_color', 'user_job_title', 'user_join_date', 'user_bio', 'user_online',
+        'user_weekly_capacity_hours', 'user_profile_completed_at',
     ];
 
     protected $hidden = ['user_password', 'user_api_token', 'user_remember_token'];
@@ -39,13 +40,19 @@ class User extends Authenticatable
     {
         return [
             'user_code' => 'code',
-            'user_member_code' => 'member_code',
             'user_name' => 'name',
             'user_email' => 'email',
             'user_avatar' => 'avatar',
             'user_role' => 'role',
             'user_phone' => 'phone',
             'user_department' => 'department',
+            'user_color' => 'color',
+            'user_job_title' => 'job_title',
+            'user_join_date' => 'join_date',
+            'user_bio' => 'bio',
+            'user_online' => 'online',
+            'user_weekly_capacity_hours' => 'weekly_capacity_hours',
+            'user_profile_completed_at' => 'profile_completed_at',
             'user_notification_preferences' => 'notification_preferences',
             'user_email_verified_at' => 'email_verified_at',
             'user_password' => 'password',
@@ -63,12 +70,14 @@ class User extends Authenticatable
 
     public function assignedTasks()
     {
-        return $this->hasMany(Task::class, 'task_assignee_code', 'user_member_code');
+        return $this->hasMany(Task::class, 'task_assignee_code', 'user_code');
     }
 
-    public function member()
+    public function memberProjects()
     {
-        return $this->belongsTo(Member::class, 'user_member_code', 'member_code');
+        return $this->belongsToMany(Project::class, 'project_members', 'pm_member_code', 'pm_project_code', 'user_code', 'project_code')
+            ->using(ProjectMember::class)
+            ->withPivot('pm_code', 'pm_role as role');
     }
 
     public function savedViews()
@@ -82,6 +91,10 @@ class User extends Authenticatable
             'user_email_verified_at' => 'datetime',
             'user_password' => 'hashed',
             'user_notification_preferences' => 'array',
+            'user_join_date' => 'date:Y-m-d',
+            'user_online' => 'boolean',
+            'user_weekly_capacity_hours' => 'decimal:2',
+            'user_profile_completed_at' => 'datetime',
         ];
     }
 }

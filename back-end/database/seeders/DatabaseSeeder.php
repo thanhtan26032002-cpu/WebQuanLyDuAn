@@ -22,6 +22,12 @@ class DatabaseSeeder extends Seeder
             'user_name' => env('SYSTEM_USER_NAME', 'Quản trị viên'),
             'user_role' => 'admin',
             'user_password' => Hash::make(Str::random(64)),
+            'user_job_title' => 'Quản trị hệ thống',
+            'user_department' => 'Ban điều hành',
+            'user_phone' => '0900000001',
+            'user_color' => 'violet',
+            'user_join_date' => now()->toDateString(),
+            'user_profile_completed_at' => now(),
         ]);
     }
 }

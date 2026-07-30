@@ -18,9 +18,9 @@ class ProjectController extends Controller
             ->withCount('tasks')
             ->with([
                 'customer',
-                'manager',
+                'manager:user_code,user_name,user_avatar,user_color,user_job_title,user_department',
                 'members' => function ($q) {
-                    $q->select('members.member_code', 'members.member_name', 'members.member_avatar');
+                    $q->select('users.user_code', 'users.user_name', 'users.user_avatar', 'users.user_color', 'users.user_job_title', 'users.user_department');
                 },
                 'attachments',
             ])
@@ -48,13 +48,15 @@ class ProjectController extends Controller
     {
         $project = Project::with([
             'customer',
-            'manager',
-            'tasks.assignee',
+            'manager:user_code,user_name,user_avatar,user_color,user_job_title,user_department',
+            'tasks.assignee:user_code,user_name,user_avatar,user_color,user_job_title,user_department',
             'tasks.checklists',
-            'tasks.workLogs.reporter',
-            'members',
+            'tasks.workLogs.reporter:user_code,user_name,user_avatar',
+            'members' => function ($query) {
+                $query->select('users.user_code', 'users.user_name', 'users.user_avatar', 'users.user_color', 'users.user_job_title', 'users.user_department');
+            },
             'attachments',
-            'updates.author',
+            'updates.author:user_code,user_name,user_avatar',
             'milestones.tasks',
             'automations',
         ])->findOrFail($code);
@@ -73,7 +75,7 @@ class ProjectController extends Controller
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
             'customer_code' => 'nullable|string|exists:customers,customer_code',
-            'manager_code' => 'nullable|string|exists:members,member_code',
+            'manager_code' => 'nullable|string|exists:users,user_code',
             'color' => 'sometimes|string|in:indigo,emerald,amber,rose,sky,violet,orange,purple,green,pink,blue',
             'status' => 'nullable|string|in:planning,active,on_hold,completed',
             'health' => 'nullable|string|in:on_track,at_risk,off_track',
@@ -82,7 +84,7 @@ class ProjectController extends Controller
             'due_date' => 'nullable|date|after_or_equal:today',
             'progress' => 'nullable|integer|min:0|max:100',
             'member_ids' => 'sometimes|array',
-            'member_ids.*' => 'string|distinct|exists:members,member_code',
+            'member_ids.*' => 'string|distinct|exists:users,user_code',
             'template' => 'nullable|in:blank,software,marketing,operations',
         ]);
         $validated = $this->discardFieldsMissingFromLegacySchema($validated);
@@ -161,7 +163,7 @@ class ProjectController extends Controller
             'name' => 'nullable|string|max:255',
             'description' => 'nullable|string',
             'customer_code' => 'nullable|string|exists:customers,customer_code',
-            'manager_code' => 'nullable|string|exists:members,member_code',
+            'manager_code' => 'nullable|string|exists:users,user_code',
             'color' => 'sometimes|string|in:indigo,emerald,amber,rose,sky,violet,orange,purple,green,pink,blue',
             'status' => 'nullable|string|in:planning,active,on_hold,completed',
             'health' => 'nullable|string|in:on_track,at_risk,off_track',
@@ -252,7 +254,7 @@ class ProjectController extends Controller
         AccessService::authorize(AccessService::canManageProject($request->user(), $project));
         $validated = $request->validate([
             'member_ids' => 'present|array',
-            'member_ids.*' => 'string|distinct|exists:members,member_code',
+            'member_ids.*' => 'string|distinct|exists:users,user_code',
         ]);
 
         $project->members()->sync($validated['member_ids']);
