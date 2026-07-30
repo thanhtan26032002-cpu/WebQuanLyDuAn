@@ -259,7 +259,7 @@ const showRecentActivities = ref(false);
             <div
               v-for="col in columns"
               :key="col.id"
-              class="bg-slate-50 rounded-2xl p-4 border border-slate-100 flex flex-col h-[500px]"
+              class="bg-slate-50 rounded-2xl p-4 border-2 border-slate-200 flex flex-col h-[500px]"
             >
               <div class="flex items-center justify-between mb-4 px-1">
                 <div class="flex items-center gap-2">
@@ -275,7 +275,7 @@ const showRecentActivities = ref(false);
 
               <div class="flex-1 overflow-y-auto custom-scrollbar">
                 <draggable
-                  class="h-full space-y-3 pb-4"
+                  class="min-h-full space-y-3 pb-4 pr-1"
                   :list="getTasksByStatus(col.id)"
                   group="tasks"
                   item-key="id"
