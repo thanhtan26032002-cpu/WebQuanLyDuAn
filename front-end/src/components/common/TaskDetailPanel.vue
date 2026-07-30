@@ -17,7 +17,8 @@ const {
   projectStatusMap, priorityMap, taskStatusMap, 
   taskModalOpen, activeTaskId, 
   findMember, findProject, formatDate, getTaskDeadlineState, updateTask, loadComments, addComment, uploadFile,
-  downloadArchive, downloadSingleFile, deleteTask
+  downloadArchive, downloadSingleFile, deleteTask, notify,
+  addTaskChecklist, updateTaskChecklist, deleteTaskChecklist, addTaskWorkLog
 } = useProjectWorkspace()
 
 const isDownloadModalOpen = ref(false)
@@ -75,6 +76,7 @@ watch(activeTaskId, async (newVal) => {
   if (newVal) {
     isEditing.value = false
     isConfirmingDelete.value = false
+    showWorkLogForm.value = false
     if (task.value) {
       editedTask.value = JSON.parse(JSON.stringify(task.value))
       editedTask.value.tagsInput = Array.isArray(task.value?.tags) ? task.value.tags.join(', ') : (task.value?.tags || '')
@@ -174,30 +176,16 @@ const timeAgo = (dateStr) => {
 
 // Checklist logic
 const newChecklistText = ref('')
-const addChecklist = () => {
+const addChecklist = async () => {
   if (!newChecklistText.value.trim()) return
-  if (!task.value.checklists) task.value.checklists = []
-  task.value.checklists.push({
-    id: Date.now(),
-    text: newChecklistText.value,
-    completed: false
-  })
-  updateProgressFromChecklist()
-  newChecklistText.value = ''
+  const result = await addTaskChecklist(task.value.id, newChecklistText.value.trim())
+  if (result.success) newChecklistText.value = ''
 }
-const toggleChecklist = (item) => {
-  item.completed = !item.completed
-  updateProgressFromChecklist()
+const toggleChecklist = async (item) => {
+  await updateTaskChecklist(task.value.id, item.id, { completed: !item.completed })
 }
-const removeChecklist = (id) => {
-  task.value.checklists = task.value.checklists.filter(c => c.id !== id)
-  updateProgressFromChecklist()
-}
-const updateProgressFromChecklist = () => {
-  if (!task.value.checklists?.length) return
-  const completed = task.value.checklists.filter(c => c.completed).length
-  const total = task.value.checklists.length
-  task.value.progress = Math.round((completed / total) * 100)
+const removeChecklist = async (id) => {
+  await deleteTaskChecklist(task.value.id, id)
 }
 
 // WorkLog logic
@@ -207,36 +195,23 @@ const newWorkLogNote = ref('')
 const newWorkLogFiles = ref([])
 const newWorkLogChecklists = ref([])
 
-const addWorkLog = () => {
+const openWorkLogForm = () => {
+  if (!task.value?.assigneeId) {
+    notify('Vui lòng phân công người phụ trách trước khi báo cáo tiến độ')
+    return
+  }
+  showWorkLogForm.value = !showWorkLogForm.value
+}
+
+const addWorkLog = async () => {
   if (!newWorkLogTime.value) return
-  if (!task.value.workLogs) task.value.workLogs = []
-  
-  // Create log
-  task.value.workLogs.unshift({
-    id: Date.now(),
-    memberId: 1, // current user
+  const result = await addTaskWorkLog(task.value.id, {
     time: newWorkLogTime.value,
     note: newWorkLogNote.value,
-    date: new Date().toISOString().split('T')[0],
-    checklists: [...newWorkLogChecklists.value],
-    files: [...newWorkLogFiles.value]
+    checklistIds: [...newWorkLogChecklists.value],
+    files: [...newWorkLogFiles.value],
   })
-  
-  // Mark checklists as completed
-  if (newWorkLogChecklists.value.length > 0 && task.value.checklists) {
-    task.value.checklists.forEach(item => {
-      if (newWorkLogChecklists.value.includes(item.id)) {
-        item.completed = true
-      }
-    })
-    updateProgressFromChecklist()
-  }
-
-  // Push files to task attachments
-  if (newWorkLogFiles.value.length > 0) {
-    if (!task.value.files) task.value.files = []
-    task.value.files.unshift(...newWorkLogFiles.value)
-  }
+  if (!result.success) return
   
   showWorkLogForm.value = false
   newWorkLogTime.value = ''
@@ -254,6 +229,7 @@ const onWorkLogFileSelect = async (e) => {
       const res = await uploadFile(file, 'Task', task.value.id)
       if (res && res.attachment) {
         newWorkLogFiles.value.push({
+          code: res.attachment.code,
           name: res.attachment.file_name,
           size: (res.attachment.size_bytes / 1024 / 1024).toFixed(2) + ' MB',
           uploadedBy: res.attachment.uploaded_by,
@@ -483,15 +459,21 @@ const formatDateTime = (isoStr) => {
               <Clock class="w-4 h-4 text-slate-400" /> Báo cáo tiến độ công việc
             </h3>
             <button 
-              @click="showWorkLogForm = !showWorkLogForm"
-              class="text-xs font-medium text-violet-600 hover:text-violet-700 bg-violet-50 hover:bg-violet-100 px-2 py-1 rounded flex items-center gap-1 transition-colors"
+              @click="openWorkLogForm"
+              :disabled="!task.assigneeId"
+              :title="task.assigneeId ? 'Thêm báo cáo tiến độ' : 'Cần phân công người phụ trách trước'"
+              class="text-xs font-medium text-violet-600 hover:text-violet-700 bg-violet-50 hover:bg-violet-100 px-2 py-1 rounded flex items-center gap-1 transition-colors disabled:text-slate-400 disabled:bg-slate-100 disabled:cursor-not-allowed"
             >
               <Plus class="w-3.5 h-3.5" /> Báo cáo tiến độ
             </button>
           </div>
+
+          <div v-if="!task.assigneeId" class="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+            Hãy phân công người phụ trách cho nhiệm vụ trước khi báo cáo tiến độ công việc.
+          </div>
           
           <!-- Log Form -->
-          <div v-if="showWorkLogForm" class="bg-violet-50 border border-violet-100 p-4 rounded-xl mb-4 animate-in slide-in-from-top-2 duration-200 space-y-4">
+          <div v-if="showWorkLogForm && task.assigneeId" class="bg-violet-50 border border-violet-100 p-4 rounded-xl mb-4 animate-in slide-in-from-top-2 duration-200 space-y-4">
             <div class="flex gap-3">
               <div class="w-28 shrink-0">
                 <label class="text-xs font-semibold text-slate-600 block mb-1">Giờ hoàn thành</label>
@@ -529,7 +511,7 @@ const formatDateTime = (isoStr) => {
 
             <div class="flex justify-end gap-2 pt-1 border-t border-violet-100">
               <button @click="showWorkLogForm = false" class="px-3 py-1.5 text-xs font-medium text-slate-500 hover:text-slate-700 hover:bg-slate-200 rounded-lg transition-colors">Hủy</button>
-              <button @click="addWorkLog" class="px-3 py-1.5 text-xs font-medium bg-violet-600 text-white rounded-lg shadow-sm hover:bg-violet-700 transition-colors">Lưu báo cáo</button>
+              <button @click="addWorkLog" :disabled="!newWorkLogTime || isWorkLogUploading" class="px-3 py-1.5 text-xs font-medium bg-violet-600 text-white rounded-lg shadow-sm hover:bg-violet-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">Lưu báo cáo</button>
             </div>
           </div>
           
@@ -553,7 +535,7 @@ const formatDateTime = (isoStr) => {
                       <ul class="space-y-1">
                         <li v-for="cid in log.checklists" :key="cid" class="flex items-center gap-1.5 text-slate-500">
                           <Check class="w-3 h-3 text-emerald-500" />
-                          <span class="truncate">{{ task.checklists.find(c => c.id === cid)?.text || 'Nhiệm vụ con' }}</span>
+                          <span class="truncate">{{ log.completedItems?.find(item => item.id === cid)?.text || task.checklists.find(c => c.id === cid)?.text || 'Nhiệm vụ con' }}</span>
                         </li>
                       </ul>
                     </div>

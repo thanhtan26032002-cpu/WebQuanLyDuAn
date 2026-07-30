@@ -458,4 +458,81 @@ class CoreApiTest extends TestCase
 
         $this->assertTrue(Task::withTrashed()->find('TK0001')->trashed());
     }
+
+    public function test_checklists_and_work_logs_are_persisted_and_require_an_assignee(): void
+    {
+        User::create([
+            'user_name' => 'Admin',
+            'user_email' => 'progress@example.com',
+            'user_password' => Hash::make('test-password'),
+        ]);
+
+        $this->postJson('/api/tasks', [
+            'title' => 'Persistent progress task',
+            'user_code' => 'US0001',
+        ])->assertCreated();
+
+        $this->postJson('/api/tasks/TK0001/checklists', [
+            'text' => 'Complete API integration',
+        ])->assertCreated()
+            ->assertJsonPath('checklist.code', 'CK0001')
+            ->assertJsonPath('checklist.completed', false)
+            ->assertJsonPath('progress', 0);
+
+        $this->getJson('/api/tasks')
+            ->assertOk()
+            ->assertJsonPath('0.checklists.0.text', 'Complete API integration')
+            ->assertJsonCount(0, '0.work_logs');
+
+        $this->postJson('/api/tasks/TK0001/work-logs', [
+            'time' => '14:30',
+            'note' => 'Must be rejected without assignee',
+            'checklist_ids' => ['CK0001'],
+            'user_code' => 'US0001',
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors('assignee_code');
+
+        $member = Member::create([
+            'member_name' => 'Assigned member',
+            'member_email' => 'assigned-progress@example.com',
+        ]);
+
+        $this->putJson('/api/tasks/TK0001', [
+            'assignee_code' => $member->member_code,
+        ])->assertOk();
+
+        $this->postJson('/api/tasks/TK0001/work-logs', [
+            'time' => '14:30',
+            'note' => 'Completed API integration',
+            'checklist_ids' => ['CK0001'],
+            'files' => [[
+                'code' => 'AT0001',
+                'name' => 'evidence.png',
+                'url' => '/storage/attachments/evidence.png',
+            ]],
+            'user_code' => 'US0001',
+        ])->assertCreated()
+            ->assertJsonPath('work_log.code', 'WL0001')
+            ->assertJsonPath('work_log.reporter_code', $member->member_code)
+            ->assertJsonPath('work_log.completed_items.0.id', 'CK0001')
+            ->assertJsonPath('checklists.0.completed', true)
+            ->assertJsonPath('progress', 100);
+
+        $this->getJson('/api/tasks')
+            ->assertOk()
+            ->assertJsonPath('0.progress', 100)
+            ->assertJsonPath('0.checklists.0.completed', true)
+            ->assertJsonPath('0.work_logs.0.note', 'Completed API integration')
+            ->assertJsonPath('0.work_logs.0.files.0.name', 'evidence.png');
+
+        $this->assertDatabaseHas('task_checklists', [
+            'checklist_code' => 'CK0001',
+            'checklist_is_completed' => true,
+        ]);
+        $this->assertDatabaseHas('task_work_logs', [
+            'worklog_code' => 'WL0001',
+            'worklog_task_code' => 'TK0001',
+            'worklog_reporter_code' => $member->member_code,
+        ]);
+    }
 }

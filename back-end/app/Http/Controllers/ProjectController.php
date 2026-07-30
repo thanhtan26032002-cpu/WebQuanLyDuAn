@@ -47,6 +47,8 @@ class ProjectController extends Controller
             'customer',
             'manager',
             'tasks.assignee',
+            'tasks.checklists',
+            'tasks.workLogs.reporter',
             'members',
             'attachments',
         ])->findOrFail($code);

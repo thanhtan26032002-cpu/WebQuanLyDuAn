@@ -124,6 +124,33 @@ CREATE TABLE IF NOT EXISTS `tasks` (
   FOREIGN KEY (`task_assignee_code`) REFERENCES `members` (`member_code`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS `task_checklists` (
+  `checklist_code` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `checklist_task_code` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `checklist_text` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `checklist_is_completed` tinyint(1) NOT NULL DEFAULT 0,
+  `checklist_created_at` timestamp NULL DEFAULT NULL,
+  `checklist_updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`checklist_code`),
+  FOREIGN KEY (`checklist_task_code`) REFERENCES `tasks` (`task_code`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `task_work_logs` (
+  `worklog_code` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `worklog_task_code` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `worklog_reporter_code` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `worklog_time` varchar(5) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `worklog_note` text COLLATE utf8mb4_unicode_ci,
+  `worklog_date` date NOT NULL,
+  `worklog_completed_items` json DEFAULT NULL,
+  `worklog_files` json DEFAULT NULL,
+  `worklog_created_at` timestamp NULL DEFAULT NULL,
+  `worklog_updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`worklog_code`),
+  FOREIGN KEY (`worklog_task_code`) REFERENCES `tasks` (`task_code`) ON DELETE CASCADE,
+  FOREIGN KEY (`worklog_reporter_code`) REFERENCES `members` (`member_code`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS `activities` (
   `activity_code` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
   `activity_user_code` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,

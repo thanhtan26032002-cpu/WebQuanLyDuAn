@@ -19,7 +19,12 @@ class TaskController extends Controller
     {
         $tasks = Task::where(function ($query) {
             $query->whereNull('task_project_code')->orWhereHas('project');
-        })->with(['assignee:member_code,member_name,member_avatar', 'attachments'])->get();
+        })->with([
+            'assignee:member_code,member_name,member_avatar',
+            'attachments',
+            'checklists',
+            'workLogs.reporter:member_code,member_name,member_avatar',
+        ])->get();
 
         return response()->json($tasks);
     }
@@ -66,7 +71,7 @@ class TaskController extends Controller
         $validated = $validator->validated();
 
         $task = Task::create(Task::mapToDbAttributes($validated));
-        $task->load(['assignee:member_code,member_name,member_avatar', 'attachments']);
+        $task->load(['assignee:member_code,member_name,member_avatar', 'attachments', 'checklists', 'workLogs.reporter']);
 
         $userCode = $request->input('user_code', 'US0001');
         ActivityService::log(
@@ -128,7 +133,7 @@ class TaskController extends Controller
         $validated = $validator->validated();
 
         $task->update(Task::mapToDbAttributes($validated));
-        $task->load(['assignee:member_code,member_name,member_avatar', 'attachments']);
+        $task->load(['assignee:member_code,member_name,member_avatar', 'attachments', 'checklists', 'workLogs.reporter']);
 
         $userCode = $request->input('user_code', 'US0001');
         ActivityService::log(
@@ -223,7 +228,7 @@ class TaskController extends Controller
             'Đã khôi phục nhiệm vụ: '.$task->task_title
         );
 
-        $task->load(['assignee:member_code,member_name,member_avatar', 'attachments']);
+        $task->load(['assignee:member_code,member_name,member_avatar', 'attachments', 'checklists', 'workLogs.reporter']);
 
         return response()->json([
             'message' => 'Đã khôi phục nhiệm vụ.',

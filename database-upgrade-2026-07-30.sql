@@ -30,3 +30,30 @@ SET @task_deleted_at_sql = IF(
 PREPARE task_deleted_at_statement FROM @task_deleted_at_sql;
 EXECUTE task_deleted_at_statement;
 DEALLOCATE PREPARE task_deleted_at_statement;
+
+CREATE TABLE IF NOT EXISTS `task_checklists` (
+  `checklist_code` varchar(50) NOT NULL,
+  `checklist_task_code` varchar(50) NOT NULL,
+  `checklist_text` varchar(255) NOT NULL,
+  `checklist_is_completed` tinyint(1) NOT NULL DEFAULT 0,
+  `checklist_created_at` timestamp NULL DEFAULT NULL,
+  `checklist_updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`checklist_code`),
+  CONSTRAINT `task_checklists_task_fk` FOREIGN KEY (`checklist_task_code`) REFERENCES `tasks` (`task_code`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `task_work_logs` (
+  `worklog_code` varchar(50) NOT NULL,
+  `worklog_task_code` varchar(50) NOT NULL,
+  `worklog_reporter_code` varchar(50) DEFAULT NULL,
+  `worklog_time` varchar(5) NOT NULL,
+  `worklog_note` text,
+  `worklog_date` date NOT NULL,
+  `worklog_completed_items` json DEFAULT NULL,
+  `worklog_files` json DEFAULT NULL,
+  `worklog_created_at` timestamp NULL DEFAULT NULL,
+  `worklog_updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`worklog_code`),
+  CONSTRAINT `task_work_logs_task_fk` FOREIGN KEY (`worklog_task_code`) REFERENCES `tasks` (`task_code`) ON DELETE CASCADE,
+  CONSTRAINT `task_work_logs_reporter_fk` FOREIGN KEY (`worklog_reporter_code`) REFERENCES `members` (`member_code`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

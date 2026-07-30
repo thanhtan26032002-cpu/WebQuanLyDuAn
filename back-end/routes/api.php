@@ -10,6 +10,7 @@ use App\Http\Controllers\MemberController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\TaskController;
+use App\Http\Controllers\TaskProgressController;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 
@@ -41,6 +42,11 @@ Route::post('/tasks/{id}/restore', [TaskController::class, 'restore']);
 Route::put('/tasks/{id}', [TaskController::class, 'update']);
 Route::patch('/tasks/{id}/status', [TaskController::class, 'updateStatus']);
 Route::delete('/tasks/{id}', [TaskController::class, 'destroy']);
+
+Route::post('/tasks/{taskId}/checklists', [TaskProgressController::class, 'storeChecklist']);
+Route::patch('/tasks/{taskId}/checklists/{checklistId}', [TaskProgressController::class, 'updateChecklist']);
+Route::delete('/tasks/{taskId}/checklists/{checklistId}', [TaskProgressController::class, 'destroyChecklist']);
+Route::post('/tasks/{taskId}/work-logs', [TaskProgressController::class, 'storeWorkLog']);
 
 Route::get('/tasks/{taskId}/comments', [TaskController::class, 'comments']);
 Route::post('/tasks/{taskId}/comments', [TaskController::class, 'storeComment']);

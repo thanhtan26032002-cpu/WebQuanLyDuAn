@@ -72,6 +72,18 @@ class Task extends Model
         return $this->hasMany(TaskComment::class, 'comment_task_code', 'task_code');
     }
 
+    public function checklists()
+    {
+        return $this->hasMany(TaskChecklist::class, 'checklist_task_code', 'task_code')
+            ->orderBy('checklist_created_at');
+    }
+
+    public function workLogs()
+    {
+        return $this->hasMany(TaskWorkLog::class, 'worklog_task_code', 'task_code')
+            ->orderByDesc('worklog_created_at');
+    }
+
     public function attachments()
     {
         return $this->hasMany(Attachment::class, 'attachment_target_code', 'task_code')->where('attachment_target_type', 'Task');

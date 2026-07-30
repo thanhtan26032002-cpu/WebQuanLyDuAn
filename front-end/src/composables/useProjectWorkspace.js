@@ -76,6 +76,27 @@ function mapProject(p) {
   }
 }
 
+function mapChecklist(item) {
+  return {
+    ...item,
+    id: item.code || item.id,
+    completed: Boolean(item.completed),
+  }
+}
+
+function mapWorkLog(log) {
+  const completedItems = log.completed_items || log.completedItems || []
+  return {
+    ...log,
+    id: log.code || log.id,
+    memberId: log.reporter_code || log.memberId || null,
+    completedItems,
+    checklists: completedItems.map(item => item.id),
+    files: log.files || [],
+    createdAt: log.created_at || log.createdAt,
+  }
+}
+
 function mapTask(t) {
   let parsedTags = []
   if (Array.isArray(t.tags)) {
@@ -99,8 +120,8 @@ function mapTask(t) {
     tags: parsedTags,
     progress: t.progress || 0,
     files: t.attachments ? t.attachments.map(mapAttachment) : (t.files || []),
-    checklists: t.checklists || [],
-    workLogs: t.workLogs || [],
+    checklists: (t.checklists || []).map(mapChecklist),
+    workLogs: (t.work_logs || t.workLogs || []).map(mapWorkLog),
   }
 }
 
@@ -837,6 +858,113 @@ export function useProjectWorkspace() {
     }
   }
 
+  async function addTaskChecklist(taskId, text) {
+    try {
+      const res = await fetch(`${API_URL}/tasks/${taskId}/checklists`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({ text }),
+      })
+      if (!res.ok) return { success: false, errors: await parseValidationErrors(res) }
+
+      const data = await res.json()
+      const task = tasks.value.find(item => item.id === taskId)
+      if (task) {
+        task.checklists.push(mapChecklist(data.checklist))
+        task.progress = data.progress
+      }
+      return { success: true }
+    } catch {
+      notify('Lỗi kết nối: Không thể thêm công việc con')
+      return { success: false }
+    }
+  }
+
+  async function updateTaskChecklist(taskId, checklistId, updates) {
+    try {
+      const res = await fetch(`${API_URL}/tasks/${taskId}/checklists/${checklistId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify(updates),
+      })
+      if (!res.ok) return { success: false, errors: await parseValidationErrors(res) }
+
+      const data = await res.json()
+      const task = tasks.value.find(item => item.id === taskId)
+      if (task) {
+        const index = task.checklists.findIndex(item => item.id === checklistId)
+        if (index >= 0) task.checklists[index] = mapChecklist(data.checklist)
+        task.progress = data.progress
+      }
+      return { success: true }
+    } catch {
+      notify('Lỗi kết nối: Không thể cập nhật công việc con')
+      return { success: false }
+    }
+  }
+
+  async function deleteTaskChecklist(taskId, checklistId) {
+    try {
+      const res = await fetch(`${API_URL}/tasks/${taskId}/checklists/${checklistId}`, {
+        method: 'DELETE',
+        headers: { 'Accept': 'application/json' },
+      })
+      if (!res.ok) return false
+
+      const data = await res.json()
+      const task = tasks.value.find(item => item.id === taskId)
+      if (task) {
+        task.checklists = task.checklists.filter(item => item.id !== checklistId)
+        task.progress = data.progress
+      }
+      return true
+    } catch {
+      notify('Lỗi kết nối: Không thể xóa công việc con')
+      return false
+    }
+  }
+
+  async function addTaskWorkLog(taskId, payload) {
+    const task = tasks.value.find(item => item.id === taskId)
+    if (!task?.assigneeId) {
+      notify('Vui lòng phân công người phụ trách trước khi báo cáo tiến độ')
+      return { success: false, errors: { assignee_code: 'Nhiệm vụ chưa có người phụ trách.' } }
+    }
+
+    try {
+      const res = await fetch(`${API_URL}/tasks/${taskId}/work-logs`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({
+          time: payload.time,
+          note: payload.note || null,
+          checklist_ids: payload.checklistIds || [],
+          files: payload.files || [],
+          user_code: currentUser.value.code,
+        }),
+      })
+
+      if (!res.ok) {
+        const errors = await parseValidationErrors(res)
+        notify(res.status === 422 && errors.assignee_code
+          ? 'Vui lòng phân công người phụ trách trước khi báo cáo tiến độ'
+          : (errors._general || 'Không thể lưu báo cáo tiến độ'))
+        return { success: false, errors }
+      }
+
+      const data = await res.json()
+      task.workLogs.unshift(mapWorkLog(data.work_log))
+      task.checklists = (data.checklists || []).map(mapChecklist)
+      task.progress = data.progress
+      if (payload.files?.length) task.files.unshift(...payload.files)
+      notify('Đã lưu báo cáo tiến độ công việc')
+      return { success: true }
+    } catch {
+      notify('Lỗi kết nối: Không thể lưu báo cáo tiến độ')
+      return { success: false }
+    }
+  }
+
   async function addComment(taskId, text, fileUrl = null, fileName = null) {
     try {
       const res = await fetch(`${API_URL}/tasks/${taskId}/comments`, {
@@ -1326,6 +1454,10 @@ export function useProjectWorkspace() {
     updateTaskStatus,
     deleteTask,
     restoreTask,
+    addTaskChecklist,
+    updateTaskChecklist,
+    deleteTaskChecklist,
+    addTaskWorkLog,
     loadComments,
     addComment,
     uploadFile,
