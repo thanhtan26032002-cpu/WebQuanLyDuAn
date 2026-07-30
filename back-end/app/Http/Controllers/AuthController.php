@@ -22,7 +22,7 @@ class AuthController extends Controller
             'user_name' => trim($validated['name']),
             'user_email' => mb_strtolower($validated['email']),
             'user_password' => Hash::make($validated['password']),
-            'user_role' => User::count() === 0 ? 'admin' : 'member',
+            'user_role' => 'member',
             'user_color' => 'blue',
             'user_join_date' => now()->toDateString(),
             'user_online' => true,

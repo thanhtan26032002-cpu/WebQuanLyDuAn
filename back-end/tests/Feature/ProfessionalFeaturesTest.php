@@ -23,6 +23,8 @@ class ProfessionalFeaturesTest extends TestCase
             'password' => 'secure-password',
         ])->assertCreated()->json('token');
 
+        User::where('user_email', 'admin@ringnet.test')->update(['user_role' => 'admin']);
+
         $this->withToken($this->token);
     }
 

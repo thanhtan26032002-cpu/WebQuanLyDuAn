@@ -33,7 +33,7 @@ async function submit() {
     <form class="w-full max-w-md rounded-3xl bg-white p-8 shadow-2xl" @submit.prevent="submit">
       <p class="text-2xl font-bold text-violet-700">RingNet</p>
       <h1 class="mt-8 text-3xl font-bold">{{ isRegistering ? 'Tạo tài khoản' : 'Đăng nhập' }}</h1>
-      <p class="mt-2 text-sm text-slate-500">{{ isRegistering ? 'Tài khoản đầu tiên sẽ là quản trị viên hệ thống.' : 'Tiếp tục vào không gian làm việc của bạn.' }}</p>
+      <p class="mt-2 text-sm text-slate-500">{{ isRegistering ? 'Tài khoản mới sẽ bắt đầu với vai trò Nhân viên.' : 'Tiếp tục vào không gian làm việc của bạn.' }}</p>
       <p v-if="error" role="alert" class="mt-5 rounded-xl bg-rose-50 p-3 text-sm text-rose-700">{{ error }}</p>
       <label v-if="isRegistering" class="mt-6 block text-sm font-semibold">Họ và tên
         <input v-model="form.name" required autocomplete="name" class="mt-1.5 w-full rounded-xl border p-3 focus:border-violet-400 focus:outline-none focus:ring-4 focus:ring-violet-100" />

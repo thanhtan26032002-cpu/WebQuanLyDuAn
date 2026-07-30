@@ -5,7 +5,7 @@ import { useProjectWorkspace } from '../composables/useProjectWorkspace'
 
 const { members, groups, tasks, activeMemberId, memberDetailModalOpen, openAddMemberModal, addGroupModalOpen, editGroupModalOpen, activeEditGroupId, assignMemberToGroup, currentUser } = useProjectWorkspace()
 const canManageTeam = computed(() => ['admin', 'project_manager', 'manager'].includes(currentUser.value?.role))
-const systemRoleLabels = { admin: 'Quản trị viên', project_manager: 'Quản lý dự án', member: 'Nhân viên', viewer: 'Chỉ xem' }
+const systemRoleLabels = { admin: 'Quản trị viên', project_manager: 'Quản lý dự án', member: 'Nhân viên' }
 
 const totalOnline = computed(() => members.value.filter(m => m.online).length)
 const totalTasksInProgress = computed(() => tasks.value.filter(t => t.status === 'in_progress').length)

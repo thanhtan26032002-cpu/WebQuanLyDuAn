@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
@@ -17,6 +18,8 @@ class AuthApiTest extends TestCase
             'email' => 'user@example.com',
             'password' => 'mat-khau-an-toan',
         ])->assertCreated();
+
+        $register->assertJsonPath('user.role', 'member');
 
         $token = $register->json('token');
         $this->assertIsString($token);
@@ -52,6 +55,8 @@ class AuthApiTest extends TestCase
             'email' => 'admin@example.com',
             'password' => 'secure-password',
         ])->assertCreated()->json();
+
+        User::whereKey($admin['user']['code'])->update(['user_role' => 'admin']);
 
         $employee = $this->postJson('/api/register', [
             'name' => 'Employee',
@@ -107,6 +112,8 @@ class AuthApiTest extends TestCase
             'password' => 'secure-password',
         ])->assertCreated()->json();
 
+        User::whereKey($admin['user']['code'])->update(['user_role' => 'admin']);
+
         $employee = $this->postJson('/api/register', [
             'name' => 'Employee',
             'email' => 'employee@example.com',
@@ -117,6 +124,11 @@ class AuthApiTest extends TestCase
             'system_role' => 'project_manager',
         ])->assertOk()
             ->assertJsonPath('member.role', 'project_manager');
+
+        $this->withToken($admin['token'])->putJson('/api/members/'.$employee['user']['code'], [
+            'system_role' => 'viewer',
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors('system_role');
 
         $this->withToken($admin['token'])->putJson('/api/members/'.$admin['user']['code'], [
             'system_role' => 'member',

@@ -20,7 +20,6 @@ const systemRoleLabels = {
   admin: 'Quản trị viên',
   project_manager: 'Quản lý dự án',
   member: 'Nhân viên',
-  viewer: 'Người xem',
 }
 
 const selectedAvatarFile = ref(null)

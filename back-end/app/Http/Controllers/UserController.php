@@ -35,7 +35,7 @@ class UserController extends Controller
         $validator = Validator::make($request->all(), [
             'name' => 'sometimes|required|string|max:255',
             'email' => 'sometimes|required|email|unique:users,user_email,'.$user->user_code.',user_code',
-            'role' => 'sometimes|required|in:admin,project_manager,member,viewer',
+            'role' => 'sometimes|required|in:admin,project_manager,member',
             'phone' => 'nullable|string|max:20',
             'department' => 'nullable|string|max:100',
             'job_title' => 'nullable|string|max:100',

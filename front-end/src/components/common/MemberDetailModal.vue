@@ -16,7 +16,6 @@ const systemRoleLabels = {
   admin: 'Quản trị viên',
   project_manager: 'Quản lý dự án',
   member: 'Nhân viên',
-  viewer: 'Chỉ xem',
 }
 
 const colors = [
@@ -328,7 +327,6 @@ const save = async () => {
                 <option value="admin">Quản trị viên</option>
                 <option value="project_manager">Quản lý dự án</option>
                 <option value="member">Nhân viên</option>
-                <option value="viewer">Chỉ xem</option>
               </select>
               <p class="mt-2 text-xs leading-5 text-violet-700">Quyền mới có hiệu lực ngay sau khi lưu. Người dùng không thể tự thay đổi vai trò của mình.</p>
               <p v-if="errors.system_role" class="mt-1 text-xs font-medium text-rose-600">{{ errors.system_role }}</p>

@@ -429,7 +429,7 @@ CREATE TABLE `users` (
   `user_email` varchar(255) NOT NULL,
   `user_avatar` varchar(255) DEFAULT NULL,
   `user_color` varchar(30) NOT NULL DEFAULT 'blue',
-  `user_role` varchar(255) NOT NULL DEFAULT 'admin',
+  `user_role` varchar(255) NOT NULL DEFAULT 'member',
   `user_job_title` varchar(255) DEFAULT NULL,
   `user_phone` varchar(50) DEFAULT NULL,
   `user_department` varchar(255) DEFAULT NULL,
@@ -471,7 +471,8 @@ INSERT INTO `migrations` VALUES
 (17,'0001_01_01_000001_create_cache_table',2),
 (18,'0001_01_01_000002_create_jobs_table',2),
 (19,'2026_07_30_000002_add_professional_project_management_features',3),
-(20,'2026_07_30_000003_merge_members_into_users',4);
+(20,'2026_07_30_000003_merge_members_into_users',4),
+(21,'2026_07_30_000004_limit_system_roles_and_default_to_member',5);
 UNLOCK TABLES;
 
 -- Tài khoản thử nghiệm không được ghi cứng vào mã nguồn.

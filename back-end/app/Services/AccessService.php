@@ -16,7 +16,6 @@ class AccessService
         return match (true) {
             in_array($role, ['admin', 'administrator', 'quản trị viên'], true) => 'admin',
             in_array($role, ['project_manager', 'manager', 'quản lý', 'quản lý dự án'], true) => 'project_manager',
-            in_array($role, ['viewer', 'guest', 'client', 'người xem', 'khách hàng'], true) => 'viewer',
             default => 'member',
         };
     }

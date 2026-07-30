@@ -181,7 +181,6 @@ const submit = async () => {
             <select v-model="formData.systemRole" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm outline-none focus:border-violet-500">
               <option value="member">Nhân viên</option>
               <option value="project_manager">Quản lý dự án</option>
-              <option value="viewer">Chỉ xem</option>
               <option value="admin">Quản trị viên</option>
             </select>
           </div>

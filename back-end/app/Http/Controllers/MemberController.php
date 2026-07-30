@@ -141,7 +141,7 @@ class MemberController extends Controller
             'name' => [$creating ? 'required' : 'sometimes', 'string', 'max:255'],
             'email' => [$creating ? 'required' : 'sometimes', 'email', 'max:255', Rule::unique('users', 'user_email')->ignore($code, 'user_code')],
             'password' => [$creating ? 'required' : 'nullable', 'string', 'min:8', 'max:255'],
-            'system_role' => 'nullable|in:admin,project_manager,member,viewer',
+            'system_role' => 'nullable|in:admin,project_manager,member',
             'job_title' => [$creating ? 'required' : 'sometimes', 'string', 'max:100'],
             'phone' => [$creating ? 'required' : 'sometimes', 'string', 'regex:/^\+?[0-9]{9,15}$/'],
             'department' => [$creating ? 'required' : 'sometimes', 'string', 'max:255'],
