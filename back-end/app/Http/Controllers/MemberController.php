@@ -87,6 +87,15 @@ class MemberController extends Controller
         if (! AccessService::isAdmin($request->user())) {
             unset($validated['system_role']);
         }
+        if (
+            isset($validated['system_role'])
+            && $request->user()->user_code === $user->user_code
+            && $validated['system_role'] !== $user->user_role
+        ) {
+            return response()->json([
+                'errors' => ['system_role' => ['Quản trị viên không thể tự thay đổi vai trò của chính mình.']],
+            ], 422);
+        }
 
         $shouldUpdateGroup = $canManage && array_key_exists('group_code', $validated);
         $groupCode = $validated['group_code'] ?? null;

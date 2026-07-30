@@ -5,6 +5,7 @@ import { useProjectWorkspace } from '../composables/useProjectWorkspace'
 
 const { members, groups, tasks, activeMemberId, memberDetailModalOpen, openAddMemberModal, addGroupModalOpen, editGroupModalOpen, activeEditGroupId, assignMemberToGroup, currentUser } = useProjectWorkspace()
 const canManageTeam = computed(() => ['admin', 'project_manager', 'manager'].includes(currentUser.value?.role))
+const systemRoleLabels = { admin: 'Quản trị viên', project_manager: 'Quản lý dự án', member: 'Nhân viên', viewer: 'Chỉ xem' }
 
 const totalOnline = computed(() => members.value.filter(m => m.online).length)
 const totalTasksInProgress = computed(() => tasks.value.filter(t => t.status === 'in_progress').length)
@@ -179,6 +180,7 @@ const taskCount = (memberId, status) => tasks.value.filter((task) => task.assign
                 <div>
                   <h3 class="font-bold text-slate-900 leading-tight group-hover/card:text-violet-600 transition-colors">{{ member.name }}</h3>
                   <p class="text-xs text-slate-500 mt-0.5">{{ member.role }}</p>
+                  <p v-if="currentUser?.role === 'admin'" class="mt-1 text-[10px] font-bold uppercase tracking-wide text-violet-500">{{ systemRoleLabels[member.systemRole] || 'Nhân viên' }}</p>
                 </div>
               </div>
               

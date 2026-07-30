@@ -1,6 +1,6 @@
 <script setup>
 import { onMounted, ref, watch } from 'vue'
-import { User, Bell, Palette, Moon, Sun, CheckCircle2 } from '@lucide/vue'
+import { User, Bell, Palette, Moon, Sun, CheckCircle2, KeyRound, ShieldCheck } from '@lucide/vue'
 import { useProjectWorkspace } from '../composables/useProjectWorkspace'
 import { apiFetch, parseApiError } from '../services/api'
 
@@ -42,6 +42,9 @@ watch(currentUser, (newVal) => {
 
 const isSavingProfile = ref(false)
 const profileErrors = ref({})
+const passwordForm = ref({ current_password: '', password: '', password_confirmation: '' })
+const passwordErrors = ref({})
+const isChangingPassword = ref(false)
 
 const onAvatarSelected = (event) => {
   const file = event.target.files[0]
@@ -103,8 +106,35 @@ const saveProfile = async () => {
   }
 }
 
+const changePassword = async () => {
+  passwordErrors.value = {}
+  if (!passwordForm.value.current_password) passwordErrors.value.current_password = ['Vui lòng nhập mật khẩu hiện tại.']
+  if (passwordForm.value.password.length < 8) passwordErrors.value.password = ['Mật khẩu mới phải có ít nhất 8 ký tự.']
+  if (passwordForm.value.password !== passwordForm.value.password_confirmation) passwordErrors.value.password_confirmation = ['Xác nhận mật khẩu mới không khớp.']
+  if (Object.keys(passwordErrors.value).length > 0) return
+
+  isChangingPassword.value = true
+  try {
+    const response = await apiFetch('/api/profile/password', {
+      method: 'PUT',
+      body: JSON.stringify(passwordForm.value),
+    })
+    const payload = await response.json().catch(() => ({}))
+    if (!response.ok) {
+      passwordErrors.value = payload.errors || { _general: payload.message || 'Không thể đổi mật khẩu.' }
+      return
+    }
+
+    passwordForm.value = { current_password: '', password: '', password_confirmation: '' }
+    notify(payload.message || 'Đã đổi mật khẩu thành công')
+  } finally {
+    isChangingPassword.value = false
+  }
+}
+
 const tabs = [
   { id: 'profile', label: 'Hồ sơ', icon: User },
+  { id: 'security', label: 'Bảo mật', icon: KeyRound },
   { id: 'notifications', label: 'Thông báo', icon: Bell },
   { id: 'appearance', label: 'Giao diện', icon: Palette }
 ]
@@ -289,7 +319,7 @@ if (activeColor.value) {
         </div>
 
         <!-- Appearance Tab -->
-        <div v-else class="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div v-else-if="activeTab === 'appearance'" class="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
           <div>
             <h2 class="text-xl font-bold text-slate-900 mb-1">Giao diện</h2>
             <p class="text-sm text-slate-500">Tùy chỉnh cách RingNet hiển thị với bạn.</p>
@@ -357,6 +387,45 @@ if (activeColor.value) {
               </button>
             </div>
           </div>
+        </div>
+
+        <!-- Security Tab -->
+        <div v-else class="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <div>
+            <div class="mb-3 inline-flex rounded-xl bg-violet-50 p-2.5 text-violet-600"><ShieldCheck class="h-6 w-6" /></div>
+            <h2 class="text-xl font-bold text-slate-900 mb-1">Đổi mật khẩu</h2>
+            <p class="text-sm text-slate-500">Xác nhận mật khẩu hiện tại trước khi thiết lập mật khẩu mới.</p>
+          </div>
+
+          <div class="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-800">
+            Mật khẩu mới nên có ít nhất 8 ký tự và không dùng lại mật khẩu hiện tại. Không chia sẻ mật khẩu với người khác.
+          </div>
+
+          <form class="max-w-xl space-y-5" @submit.prevent="changePassword">
+            <div class="space-y-2">
+              <label class="block text-sm font-semibold text-slate-700">Mật khẩu hiện tại <span class="text-rose-500">*</span></label>
+              <input v-model="passwordForm.current_password" type="password" required autocomplete="current-password" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-violet-300 focus:bg-white focus:ring-4 focus:ring-violet-500/10" :class="{ 'border-rose-300': passwordErrors.current_password }" @input="passwordErrors.current_password = null" />
+              <p v-if="passwordErrors.current_password" class="text-xs font-medium text-rose-600">{{ passwordErrors.current_password[0] }}</p>
+            </div>
+            <div class="grid gap-5 sm:grid-cols-2">
+              <div class="space-y-2">
+                <label class="block text-sm font-semibold text-slate-700">Mật khẩu mới <span class="text-rose-500">*</span></label>
+                <input v-model="passwordForm.password" type="password" required minlength="8" autocomplete="new-password" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-violet-300 focus:bg-white focus:ring-4 focus:ring-violet-500/10" :class="{ 'border-rose-300': passwordErrors.password }" @input="passwordErrors.password = null" />
+                <p v-if="passwordErrors.password" class="text-xs font-medium text-rose-600">{{ passwordErrors.password[0] }}</p>
+              </div>
+              <div class="space-y-2">
+                <label class="block text-sm font-semibold text-slate-700">Xác nhận mật khẩu mới <span class="text-rose-500">*</span></label>
+                <input v-model="passwordForm.password_confirmation" type="password" required minlength="8" autocomplete="new-password" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-violet-300 focus:bg-white focus:ring-4 focus:ring-violet-500/10" :class="{ 'border-rose-300': passwordErrors.password_confirmation }" @input="passwordErrors.password_confirmation = null" />
+                <p v-if="passwordErrors.password_confirmation" class="text-xs font-medium text-rose-600">{{ passwordErrors.password_confirmation[0] }}</p>
+              </div>
+            </div>
+            <p v-if="passwordErrors._general" class="rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-700">{{ passwordErrors._general }}</p>
+            <div class="flex justify-end border-t border-slate-100 pt-5">
+              <button :disabled="isChangingPassword" class="rounded-xl bg-gradient-to-r from-violet-500 to-indigo-600 px-5 py-3 text-sm font-semibold text-white shadow-md shadow-violet-500/20 transition hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-60">
+                {{ isChangingPassword ? 'Đang đổi mật khẩu...' : 'Đổi mật khẩu' }}
+              </button>
+            </div>
+          </form>
         </div>
       </div>
     </div>

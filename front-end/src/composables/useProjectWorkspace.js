@@ -1260,6 +1260,10 @@ export function useProjectWorkspace() {
   async function updateMember(memberId, updates) {
     try {
       const requestPayload = { ...updates }
+      if (updates.systemRole !== undefined) {
+        requestPayload.system_role = updates.systemRole
+        delete requestPayload.systemRole
+      }
       if (updates.role !== undefined || updates.jobTitle !== undefined) {
         requestPayload.job_title = updates.jobTitle || updates.role || null
         delete requestPayload.role

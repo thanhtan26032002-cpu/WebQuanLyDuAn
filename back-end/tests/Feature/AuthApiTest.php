@@ -98,4 +98,73 @@ class AuthApiTest extends TestCase
             'user_role' => 'member',
         ]);
     }
+
+    public function test_admin_can_assign_a_system_role_but_cannot_demote_themselves(): void
+    {
+        $admin = $this->postJson('/api/register', [
+            'name' => 'Admin',
+            'email' => 'admin@example.com',
+            'password' => 'secure-password',
+        ])->assertCreated()->json();
+
+        $employee = $this->postJson('/api/register', [
+            'name' => 'Employee',
+            'email' => 'employee@example.com',
+            'password' => 'secure-password',
+        ])->assertCreated()->json();
+
+        $this->withToken($admin['token'])->putJson('/api/members/'.$employee['user']['code'], [
+            'system_role' => 'project_manager',
+        ])->assertOk()
+            ->assertJsonPath('member.role', 'project_manager');
+
+        $this->withToken($admin['token'])->putJson('/api/members/'.$admin['user']['code'], [
+            'system_role' => 'member',
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors('system_role');
+
+        $this->assertDatabaseHas('users', [
+            'user_code' => $admin['user']['code'],
+            'user_role' => 'admin',
+        ]);
+    }
+
+    public function test_user_can_change_password_with_their_current_password(): void
+    {
+        $account = $this->postJson('/api/register', [
+            'name' => 'Password User',
+            'email' => 'password@example.com',
+            'password' => 'old-password',
+        ])->assertCreated()->json();
+
+        $this->withToken($account['token'])->putJson('/api/profile/password', [
+            'current_password' => 'wrong-password',
+            'password' => 'new-password',
+            'password_confirmation' => 'new-password',
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors('current_password');
+
+        $this->withToken($account['token'])->putJson('/api/profile/password', [
+            'current_password' => 'old-password',
+            'password' => 'new-password',
+            'password_confirmation' => 'not-matching',
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors('password');
+
+        $this->withToken($account['token'])->putJson('/api/profile/password', [
+            'current_password' => 'old-password',
+            'password' => 'new-password',
+            'password_confirmation' => 'new-password',
+        ])->assertOk();
+
+        $this->postJson('/api/login', [
+            'email' => 'password@example.com',
+            'password' => 'old-password',
+        ])->assertUnprocessable();
+
+        $this->postJson('/api/login', [
+            'email' => 'password@example.com',
+            'password' => 'new-password',
+        ])->assertOk();
+    }
 }

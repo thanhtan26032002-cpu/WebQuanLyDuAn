@@ -5,8 +5,10 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use App\Services\AccessService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
 
 class UserController extends Controller
 {
@@ -93,6 +95,30 @@ class UserController extends Controller
             'message' => 'Đã hoàn tất hồ sơ thành viên.',
             'user' => $request->user()->fresh(),
         ]);
+    }
+
+    public function changePassword(Request $request)
+    {
+        $validated = $request->validate([
+            'current_password' => 'required|string',
+            'password' => 'required|string|min:8|confirmed|different:current_password',
+        ], [
+            'password.confirmed' => 'Xác nhận mật khẩu mới không khớp.',
+            'password.different' => 'Mật khẩu mới phải khác mật khẩu hiện tại.',
+            'password.min' => 'Mật khẩu mới phải có ít nhất 8 ký tự.',
+        ]);
+
+        if (! Hash::check($validated['current_password'], $request->user()->user_password)) {
+            throw ValidationException::withMessages([
+                'current_password' => ['Mật khẩu hiện tại không chính xác.'],
+            ]);
+        }
+
+        $request->user()->update([
+            'user_password' => Hash::make($validated['password']),
+        ]);
+
+        return response()->json(['message' => 'Đã đổi mật khẩu thành công.']);
     }
 
     private function profileComplete(array $data): bool

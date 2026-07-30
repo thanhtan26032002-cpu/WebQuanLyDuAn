@@ -12,6 +12,12 @@ const canEditMember = computed(() => {
 })
 const isEditing = ref(false)
 const editedMember = ref({})
+const systemRoleLabels = {
+  admin: 'Quản trị viên',
+  project_manager: 'Quản lý dự án',
+  member: 'Nhân viên',
+  viewer: 'Chỉ xem',
+}
 
 const colors = [
   { id: 'blue', bg: 'bg-blue-500' },
@@ -155,6 +161,7 @@ const save = async () => {
     email,
     phone,
     role: editedMember.value.role,
+    systemRole: editedMember.value.systemRole,
     department: editedMember.value.department,
     bio: editedMember.value.bio,
     groupId: editedMember.value.groupId || null,
@@ -193,7 +200,7 @@ const save = async () => {
             @click="startEditing"
             class="flex items-center gap-1.5 px-3 py-1.5 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white font-medium text-sm rounded-lg transition-colors shadow-sm"
           >
-            <Edit2 class="w-4 h-4" /> Chỉnh sửa
+            <Edit2 class="w-4 h-4" /> {{ currentUser?.role === 'admin' && member.id !== currentUser?.code ? 'Chỉnh sửa & phân quyền' : 'Chỉnh sửa' }}
           </button>
           <button 
             v-if="isEditing"
@@ -210,7 +217,7 @@ const save = async () => {
           <div class="mb-6">
             <h2 class="text-2xl font-bold text-slate-900 leading-tight mb-1">{{ member.name }}</h2>
             <p class="text-violet-600 font-medium">{{ member.role }}</p>
-            <p class="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-400">{{ member.systemRole === 'project_manager' ? 'Quản lý dự án' : member.systemRole === 'admin' ? 'Quản trị viên' : 'Thành viên' }}</p>
+            <p class="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-400">{{ systemRoleLabels[member.systemRole] || 'Nhân viên' }}</p>
           </div>
           
           <div v-if="!member.profileLimited" class="mb-6">
@@ -314,6 +321,17 @@ const save = async () => {
             <div>
               <label class="block text-sm font-semibold text-slate-700 mb-1">Phòng ban</label>
               <input v-model="editedMember.department" type="text" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500" />
+            </div>
+            <div v-if="currentUser?.role === 'admin' && member.id !== currentUser?.code" class="rounded-xl border border-violet-100 bg-violet-50/60 p-4">
+              <label class="block text-sm font-semibold text-violet-900 mb-1">Vai trò hệ thống</label>
+              <select v-model="editedMember.systemRole" class="w-full rounded-xl border border-violet-200 bg-white px-4 py-2.5 text-sm text-slate-800 outline-none focus:border-violet-500 focus:ring-4 focus:ring-violet-100">
+                <option value="admin">Quản trị viên</option>
+                <option value="project_manager">Quản lý dự án</option>
+                <option value="member">Nhân viên</option>
+                <option value="viewer">Chỉ xem</option>
+              </select>
+              <p class="mt-2 text-xs leading-5 text-violet-700">Quyền mới có hiệu lực ngay sau khi lưu. Người dùng không thể tự thay đổi vai trò của mình.</p>
+              <p v-if="errors.system_role" class="mt-1 text-xs font-medium text-rose-600">{{ errors.system_role }}</p>
             </div>
             <div>
               <label class="block text-sm font-semibold text-slate-700 mb-1">Thuộc nhóm</label>

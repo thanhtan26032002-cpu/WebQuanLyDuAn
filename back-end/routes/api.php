@@ -24,6 +24,7 @@ Route::post('/login', [AuthController::class, 'login']);
 Route::middleware('api.token')->group(function () {
     Route::get('/user', [AuthController::class, 'user']);
     Route::post('/profile/complete', [UserController::class, 'completeProfile']);
+    Route::put('/profile/password', [UserController::class, 'changePassword']);
     Route::post('/logout', [AuthController::class, 'logout']);
 
     Route::get('/my-work', [ReportController::class, 'myWork']);
