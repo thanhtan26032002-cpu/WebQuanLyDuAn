@@ -2,22 +2,26 @@
 
 namespace App\Models;
 
+use App\Traits\GeneratesCode;
+use App\Traits\MapsAttributes;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use App\Traits\GeneratesCode;
-use App\Traits\MapsAttributes;
 
 class Project extends Model
 {
-    use HasFactory, GeneratesCode, MapsAttributes, SoftDeletes;
+    use GeneratesCode, HasFactory, MapsAttributes, SoftDeletes;
 
     protected $primaryKey = 'project_code';
+
     public $incrementing = false;
+
     protected $keyType = 'string';
 
     const CREATED_AT = 'project_created_at';
+
     const UPDATED_AT = 'project_updated_at';
+
     const DELETED_AT = 'project_deleted_at';
 
     protected $casts = [
@@ -27,7 +31,8 @@ class Project extends Model
     protected $fillable = [
         'project_name', 'project_description', 'project_color', 'project_status',
         'project_start_date', 'project_due_date', 'project_created_by', 'project_progress',
-        'project_customer_code', 'project_manager_code'
+        'project_customer_code', 'project_manager_code', 'project_health',
+        'project_update_cadence',
     ];
 
     public function getCodePrefix()
@@ -44,6 +49,8 @@ class Project extends Model
             'project_description' => 'description',
             'project_color' => 'color',
             'project_status' => 'status',
+            'project_health' => 'health',
+            'project_update_cadence' => 'update_cadence',
             'project_start_date' => 'start_date',
             'project_due_date' => 'due_date',
             'project_progress' => 'progress',
@@ -58,8 +65,8 @@ class Project extends Model
     public function members()
     {
         return $this->belongsToMany(Member::class, 'project_members', 'pm_project_code', 'pm_member_code', 'project_code', 'member_code')
-                    ->using(ProjectMember::class)
-                    ->withPivot('pm_code', 'pm_role as role');
+            ->using(ProjectMember::class)
+            ->withPivot('pm_code', 'pm_role as role');
     }
 
     public function customer()
@@ -80,5 +87,23 @@ class Project extends Model
     public function attachments()
     {
         return $this->hasMany(Attachment::class, 'attachment_target_code', 'project_code')->where('attachment_target_type', 'Project');
+    }
+
+    public function updates()
+    {
+        return $this->hasMany(ProjectUpdate::class, 'update_project_code', 'project_code')
+            ->orderByDesc('update_created_at');
+    }
+
+    public function milestones()
+    {
+        return $this->hasMany(ProjectMilestone::class, 'milestone_project_code', 'project_code')
+            ->orderBy('milestone_sort_order')
+            ->orderBy('milestone_target_date');
+    }
+
+    public function automations()
+    {
+        return $this->hasMany(ProjectAutomation::class, 'automation_project_code', 'project_code');
     }
 }

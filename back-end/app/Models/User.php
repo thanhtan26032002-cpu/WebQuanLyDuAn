@@ -22,7 +22,11 @@ class User extends Authenticatable
 
     const UPDATED_AT = 'user_updated_at';
 
-    protected $fillable = ['user_name', 'user_email', 'user_password', 'user_avatar', 'user_role', 'user_phone', 'user_department', 'user_api_token'];
+    protected $fillable = [
+        'user_name', 'user_email', 'user_password', 'user_avatar', 'user_role',
+        'user_phone', 'user_department', 'user_api_token', 'user_member_code',
+        'user_notification_preferences',
+    ];
 
     protected $hidden = ['user_password', 'user_api_token', 'user_remember_token'];
 
@@ -35,12 +39,14 @@ class User extends Authenticatable
     {
         return [
             'user_code' => 'code',
+            'user_member_code' => 'member_code',
             'user_name' => 'name',
             'user_email' => 'email',
             'user_avatar' => 'avatar',
             'user_role' => 'role',
             'user_phone' => 'phone',
             'user_department' => 'department',
+            'user_notification_preferences' => 'notification_preferences',
             'user_email_verified_at' => 'email_verified_at',
             'user_password' => 'password',
             'user_api_token' => 'api_token',
@@ -57,7 +63,17 @@ class User extends Authenticatable
 
     public function assignedTasks()
     {
-        return $this->hasMany(Task::class, 'task_assignee_code', 'user_code');
+        return $this->hasMany(Task::class, 'task_assignee_code', 'user_member_code');
+    }
+
+    public function member()
+    {
+        return $this->belongsTo(Member::class, 'user_member_code', 'member_code');
+    }
+
+    public function savedViews()
+    {
+        return $this->hasMany(SavedView::class, 'view_user_code', 'user_code');
     }
 
     protected function casts(): array
@@ -65,6 +81,7 @@ class User extends Authenticatable
         return [
             'user_email_verified_at' => 'datetime',
             'user_password' => 'hashed',
+            'user_notification_preferences' => 'array',
         ];
     }
 }

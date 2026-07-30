@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Member;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -18,17 +20,31 @@ class AuthController extends Controller
             'password' => 'required|string|min:6',
         ]);
 
-        $user = User::create([
-            'user_name' => $validated['name'],
-            'user_email' => $validated['email'],
-            'user_password' => Hash::make($validated['password']),
-        ]);
+        $user = DB::transaction(function () use ($validated) {
+            $member = Member::firstOrCreate(
+                ['member_email' => mb_strtolower($validated['email'])],
+                [
+                    'member_name' => $validated['name'],
+                    'member_role' => 'member',
+                    'member_join_date' => now()->toDateString(),
+                ]
+            );
+
+            return User::create([
+                'user_name' => $validated['name'],
+                'user_email' => mb_strtolower($validated['email']),
+                'user_password' => Hash::make($validated['password']),
+                'user_role' => User::count() === 0 ? 'admin' : 'member',
+                'user_member_code' => $member->member_code,
+                'user_notification_preferences' => $this->defaultNotificationPreferences(),
+            ]);
+        });
 
         $token = $this->issueToken($user);
 
         return response()->json([
             'message' => 'Đăng ký thành công',
-            'user' => $user,
+            'user' => $user->load('member'),
             'token' => $token,
         ], 201);
     }
@@ -52,7 +68,7 @@ class AuthController extends Controller
 
         return response()->json([
             'message' => 'Đăng nhập thành công',
-            'user' => $user,
+            'user' => $user->load('member'),
             'token' => $token,
         ]);
     }
@@ -79,5 +95,16 @@ class AuthController extends Controller
         ])->save();
 
         return $plainTextToken;
+    }
+
+    private function defaultNotificationPreferences(): array
+    {
+        return [
+            'assignment' => true,
+            'deadline' => true,
+            'comments' => true,
+            'mentions' => true,
+            'blocked' => true,
+        ];
     }
 }

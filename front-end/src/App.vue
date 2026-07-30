@@ -18,12 +18,14 @@ import MemberDetailModal from "./components/common/MemberDetailModal.vue";
 import { useProjectWorkspace } from "./composables/useProjectWorkspace";
 
 const route = useRoute();
-const { projectModalOpen, taskModalOpen, toastMessage, sidebarOpen, apiConnectionError } =
+const { projectModalOpen, taskModalOpen, toastMessage, sidebarOpen, apiConnectionError, isWorkspaceLoading, loadDataFromAPI } =
   useProjectWorkspace();
 </script>
 
 <template>
+  <router-view v-if=route.meta.public />
   <div
+    v-else
     class="h-screen bg-slate-50 flex overflow-hidden font-sans text-slate-900 selection:bg-violet-200 selection:text-violet-900"
   >
     <!-- Desktop Sidebar -->
@@ -56,7 +58,7 @@ const { projectModalOpen, taskModalOpen, toastMessage, sidebarOpen, apiConnectio
         class="mx-4 mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800 sm:mx-6 lg:mx-8"
         role="alert"
       >
-        {{ apiConnectionError }}
+        <div class="flex items-center justify-between gap-4"><span>{{ apiConnectionError }}</span><button type="button" class="shrink-0 rounded-lg bg-amber-100 px-3 py-1.5 text-xs font-bold hover:bg-amber-200" @click="loadDataFromAPI">Thử lại</button></div>
       </div>
 
       <!-- Main Scrollable Content -->
@@ -64,8 +66,13 @@ const { projectModalOpen, taskModalOpen, toastMessage, sidebarOpen, apiConnectio
         class="flex-1 overflow-x-hidden overflow-y-auto bg-slate-50 relative"
       >
         <div class="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
+          <div v-if="isWorkspaceLoading" aria-live="polite" class="space-y-5">
+            <div class="h-9 w-64 animate-pulse rounded-xl bg-slate-200"></div>
+            <div class="grid gap-4 sm:grid-cols-3"><div v-for="item in 3" :key="item" class="h-28 animate-pulse rounded-2xl bg-white shadow-sm"></div></div>
+            <div class="h-80 animate-pulse rounded-2xl bg-white shadow-sm"></div>
+          </div>
           <router-view v-slot="{ Component }">
-            <component :is="Component" :key="route.path" />
+            <component v-if="!isWorkspaceLoading" :is="Component" :key="route.path" />
           </router-view>
         </div>
       </main>

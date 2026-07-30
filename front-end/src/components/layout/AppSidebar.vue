@@ -3,6 +3,8 @@ import { useRoute, useRouter } from "vue-router";
 import { computed } from "vue";
 import {
   LayoutDashboard,
+  UserRoundCheck,
+  ChartNoAxesCombined,
   FolderKanban,
   CheckSquare,
   Users,
@@ -15,7 +17,8 @@ import { useProjectWorkspace } from "../../composables/useProjectWorkspace";
 
 const route = useRoute();
 const router = useRouter();
-const { projectModalOpen, tasks } = useProjectWorkspace();
+const { projectModalOpen, tasks, currentUser } = useProjectWorkspace();
+const canManageWorkspace = computed(() => ['admin', 'project_manager', 'manager'].includes(currentUser.value?.role));
 
 // Badge for Tasks that are not done
 const pendingTasksCount = computed(
@@ -23,6 +26,7 @@ const pendingTasksCount = computed(
 );
 
 const navigation = computed(() => [
+  { name: 'C\u00f4ng vi\u1ec7c c\u1ee7a t\u00f4i', href: '/my-work', icon: UserRoundCheck },
   { name: "Tổng quan", href: "/", icon: LayoutDashboard },
   { name: "Dự án", href: "/projects", icon: FolderKanban },
   {
@@ -33,7 +37,9 @@ const navigation = computed(() => [
   },
   { name: "Nhóm", href: "/team", icon: Users },
   { name: "Lịch", href: "/calendar", icon: CalendarIcon },
-  { name: "Thùng rác", href: "/trash", icon: Trash2 },
+  ...(currentUser.value && ['admin', 'project_manager', 'manager'].includes(currentUser.value.role)
+    ? [{ name: 'B\u00e1o c\u00e1o', href: '/reports', icon: ChartNoAxesCombined }]
+    : []),
 ]);
 
 const isActive = (path) => {
@@ -116,7 +122,7 @@ const goHomeAndReload = () => {
     </nav>
 
     <!-- Add Project Button -->
-    <div class="px-3 pb-3">
+    <div v-if="canManageWorkspace" class="px-3 pb-3">
       <button
         @click="projectModalOpen = true"
         class="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-violet-500 to-indigo-600 text-white py-2.5 rounded-xl font-semibold text-sm hover:shadow-lg hover:shadow-violet-500/25 transition-all duration-300 active:scale-95"
@@ -127,6 +133,13 @@ const goHomeAndReload = () => {
 
     <!-- Settings -->
     <div class="px-3 pb-4 border-t border-slate-50 pt-3">
+      <router-link
+        to="/trash"
+        class="mb-1 flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all"
+        :class="isActive('/trash') ? 'bg-violet-50 text-violet-700' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'"
+      >
+        <Trash2 class="h-5 w-5" /> Thùng rác
+      </router-link>
       <router-link
         to="/settings"
         class="relative flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all duration-200"

@@ -9,18 +9,22 @@ use Illuminate\Database\Eloquent\Model;
 
 class TaskWorkLog extends Model
 {
-    use HasFactory, GeneratesCode, MapsAttributes;
+    use GeneratesCode, HasFactory, MapsAttributes;
 
     protected $primaryKey = 'worklog_code';
+
     public $incrementing = false;
+
     protected $keyType = 'string';
 
     const CREATED_AT = 'worklog_created_at';
+
     const UPDATED_AT = 'worklog_updated_at';
 
     protected $fillable = [
         'worklog_task_code', 'worklog_reporter_code', 'worklog_time',
         'worklog_note', 'worklog_date', 'worklog_completed_items', 'worklog_files',
+        'worklog_duration_minutes',
     ];
 
     protected $casts = [
@@ -41,6 +45,7 @@ class TaskWorkLog extends Model
             'worklog_task_code' => 'task_code',
             'worklog_reporter_code' => 'reporter_code',
             'worklog_time' => 'time',
+            'worklog_duration_minutes' => 'duration_minutes',
             'worklog_note' => 'note',
             'worklog_date' => 'date',
             'worklog_completed_items' => 'completed_items',

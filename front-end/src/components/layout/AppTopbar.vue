@@ -1,13 +1,14 @@
 <script setup>
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import { Search, Menu, X, Plus } from '@lucide/vue'
+import { Search, Menu, X, Plus, LogOut } from '@lucide/vue'
 import { useProjectWorkspace } from '../../composables/useProjectWorkspace'
 import NotificationDropdown from './NotificationDropdown.vue'
 
 const route = useRoute()
-const { sidebarOpen, globalSearchModalOpen, taskModalOpen, openTaskModal, toastMessage } = useProjectWorkspace()
+const { sidebarOpen, globalSearchModalOpen, openTaskModal, currentUser, logout } = useProjectWorkspace()
 const searchFocused = ref(false)
+const canManageWorkspace = computed(() => ['admin', 'project_manager', 'manager'].includes(currentUser.value?.role))
 </script>
 
 <template>
@@ -43,6 +44,7 @@ const searchFocused = ref(false)
       <!-- Quick add task -->
       <button 
         @click="openTaskModal(route.name === 'project-detail' ? route.params.id : '')"
+        v-if="canManageWorkspace"
         class="hidden sm:flex items-center gap-1.5 text-xs font-semibold bg-violet-50 text-violet-700 border border-violet-100 px-3 py-2 rounded-lg hover:bg-violet-100 transition-colors"
       >
         <Plus class="w-3.5 h-3.5" /> Nhiệm vụ
@@ -58,12 +60,15 @@ const searchFocused = ref(false)
         <!-- Avatar -->
         <button class="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
           <div class="hidden sm:block text-right">
-            <p class="text-xs font-semibold text-slate-900 leading-none">User</p>
-            <p class="text-[10px] text-slate-500 leading-none mt-1">Quản lý dự án</p>
+            <p class="text-xs font-semibold text-slate-900 leading-none">{{ currentUser && currentUser.name || 'User' }}</p>
+            <p class="text-[10px] text-slate-500 leading-none mt-1">{{ currentUser && currentUser.role || 'member' }}</p>
           </div>
           <div class="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center text-white text-xs font-bold shadow-sm">
-            US
+            {{ currentUser && currentUser.name ? currentUser.name.split(' ').map(part => part[0]).join('').slice(0, 2).toUpperCase() : 'RN' }}
           </div>
+        </button>
+        <button type="button" title="Đăng xuất" aria-label="Đăng xuất" class="rounded-lg p-2 text-slate-400 transition hover:bg-rose-50 hover:text-rose-600" @click="logout">
+          <LogOut class="h-4 w-4" />
         </button>
       </div>
     </div>

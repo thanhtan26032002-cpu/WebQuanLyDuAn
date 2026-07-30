@@ -14,12 +14,12 @@ const selectedFileName = ref('')
 const selectedFiles = ref([])
 
 const sources = [
-  { id: 'file', name: 'File dữ liệu', desc: 'JSON, CSV, Excel', icon: FileJson, color: 'text-violet-600', bg: 'bg-violet-100', border: 'border-violet-200' },
-  { id: 'github', name: 'GitHub', desc: 'Kho mã nguồn', icon: Code, color: 'text-slate-800', bg: 'bg-slate-200', border: 'border-slate-300' },
-  { id: 'gitlab', name: 'GitLab', desc: 'CI/CD & Issues', icon: Webhook, color: 'text-orange-600', bg: 'bg-orange-100', border: 'border-orange-200' },
-  { id: 'jira', name: 'Jira Software', desc: 'Nhập qua API Token', icon: Server, color: 'text-blue-600', bg: 'bg-blue-100', border: 'border-blue-200' },
-  { id: 'trello', name: 'Trello Boards', desc: 'Đồng bộ Workspace', icon: Columns, color: 'text-sky-600', bg: 'bg-sky-100', border: 'border-sky-200' },
-  { id: 'asana', name: 'Asana', desc: 'Nhập Project/Task', icon: FolderKanban, color: 'text-rose-600', bg: 'bg-rose-100', border: 'border-rose-200' },
+  { id: 'file', name: 'Tệp đính kèm', desc: 'Tạo dự án và lưu các tệp gốc', available: true, icon: FileJson, color: 'text-violet-600', bg: 'bg-violet-100', border: 'border-violet-200' },
+  { id: 'github', name: 'GitHub', desc: 'Kho mã nguồn', available: false, icon: Code, color: 'text-slate-800', bg: 'bg-slate-200', border: 'border-slate-300' },
+  { id: 'gitlab', name: 'GitLab', desc: 'CI/CD & Issues', available: false, icon: Webhook, color: 'text-orange-600', bg: 'bg-orange-100', border: 'border-orange-200' },
+  { id: 'jira', name: 'Jira Software', desc: 'Issues và sprint', available: false, icon: Server, color: 'text-blue-600', bg: 'bg-blue-100', border: 'border-blue-200' },
+  { id: 'trello', name: 'Trello Boards', desc: 'Bảng công việc', available: false, icon: Columns, color: 'text-sky-600', bg: 'bg-sky-100', border: 'border-sky-200' },
+  { id: 'asana', name: 'Asana', desc: 'Dự án và nhiệm vụ', available: false, icon: FolderKanban, color: 'text-rose-600', bg: 'bg-rose-100', border: 'border-rose-200' },
 ]
 
 const reset = () => {
@@ -131,8 +131,8 @@ const closeModal = () => {
       <!-- Header -->
       <div class="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-white z-10 shrink-0">
         <div>
-          <h2 class="text-xl font-bold text-slate-900">Tải dự án lên</h2>
-          <p class="text-sm text-slate-500 font-medium mt-0.5">Nhập dữ liệu dự án từ hệ thống khác</p>
+            <h2 class="text-xl font-bold text-slate-900">Tạo dự án từ tệp</h2>
+            <p class="text-sm text-slate-500 font-medium mt-0.5">Tạo dự án mới và lưu tệp nguồn để tham khảo</p>
         </div>
         <button 
           v-if="step === 1 || uploadComplete"
@@ -150,15 +150,18 @@ const closeModal = () => {
           <button
             v-for="source in sources"
             :key="source.id"
-            @click="selectedSource = source.id"
+            @click="source.available && (selectedSource = source.id)"
+            :disabled="!source.available"
             :class="[
               'p-4 rounded-2xl border-2 text-left transition-all duration-200 relative overflow-hidden group',
+              !source.available ? 'cursor-not-allowed opacity-55' : '',
               selectedSource === source.id ? 'border-violet-500 bg-violet-50/50 shadow-md shadow-violet-500/10' : 'border-slate-100 bg-white hover:border-slate-200 hover:bg-slate-50'
             ]"
           >
             <div v-if="selectedSource === source.id" class="absolute top-2 right-2 text-violet-600">
               <CheckCircle2 class="w-4 h-4" />
             </div>
+            <span v-else-if="!source.available" class="absolute right-2 top-2 rounded-full bg-slate-100 px-2 py-0.5 text-[9px] font-bold uppercase text-slate-500">Sắp có</span>
             <div :class="['w-10 h-10 rounded-xl flex items-center justify-center mb-3 transition-transform group-hover:scale-110', source.bg, source.color]">
               <component :is="source.icon" class="w-5 h-5" />
             </div>
@@ -223,23 +226,6 @@ const closeModal = () => {
           </div>
         </div>
 
-        <!-- URL/API Input for Third Party -->
-        <div v-else class="bg-slate-50 border border-slate-100 rounded-3xl p-6">
-          <div class="mb-4 flex flex-col items-center text-center">
-            <div class="w-12 h-12 rounded-full bg-white shadow-sm flex items-center justify-center mb-3 text-slate-400">
-              <Server class="w-5 h-5" />
-            </div>
-            <h4 class="text-base font-bold text-slate-900 mb-1">Kết nối qua API</h4>
-            <p class="text-sm text-slate-500">Nhập API Token hoặc URL dự án công khai</p>
-          </div>
-          
-          <div class="space-y-4 max-w-md mx-auto">
-            <div>
-              <label class="block text-xs font-semibold text-slate-700 mb-1.5 uppercase">API Token / Workspace URL</label>
-              <input type="text" placeholder="Ví dụ: https://trello.com/b/xyz123..." class="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:ring-4 focus:ring-violet-500/10 focus:border-violet-400 outline-none transition-all" />
-            </div>
-          </div>
-        </div>
       </div>
 
       <!-- Content Step 2: Uploading -->
@@ -264,12 +250,12 @@ const closeModal = () => {
         </div>
         
         <h3 class="text-xl font-bold text-slate-900 mb-2">
-          {{ uploadComplete ? 'Hoàn tất tải lên!' : 'Đang xử lý dữ liệu...' }}
+          {{ uploadComplete ? 'Đã tạo dự án!' : 'Đang tạo dự án và tải tệp...' }}
         </h3>
         <p class="text-slate-500 text-sm max-w-sm">
           {{ uploadComplete 
-            ? 'Dữ liệu dự án đã được đồng bộ thành công vào hệ thống. Bạn đã có thể bắt đầu làm việc.' 
-            : 'Vui lòng không đóng cửa sổ này trong khi chúng tôi đang đồng bộ các bản ghi nhiệm vụ và thành viên.' 
+            ? 'Dự án đã được tạo và các tệp nguồn đã được đính kèm thành công.'
+            : 'Vui lòng không đóng cửa sổ trong khi hệ thống tạo dự án và tải các tệp nguồn.'
           }}
         </p>
       </div>
@@ -294,7 +280,7 @@ const closeModal = () => {
               : 'bg-gradient-to-r from-violet-500 to-indigo-600 hover:shadow-violet-500/25 hover:shadow-lg hover:-translate-y-0.5'
           ]"
         >
-          Bắt đầu nạp dữ liệu
+          Tạo dự án
         </button>
         
         <button 

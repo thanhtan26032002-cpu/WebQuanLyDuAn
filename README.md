@@ -33,6 +33,12 @@
 ### 4. Quản Lý Nhân Sự & Phòng Ban
 - Tổ chức các thành viên vào các nhóm (Groups) hoặc phòng ban cụ thể để dễ dàng quản lý tài nguyên nhân sự.
 
+### 5. Vận hành chuyên nghiệp
+- Đăng nhập bằng API token và phân quyền `admin`, `project_manager`, `member`, `viewer` trên toàn bộ API.
+- Trang **Công việc của tôi**, báo cáo quá hạn/khối lượng/ước lượng so với thực tế và chế độ xem đã lưu.
+- Sức khỏe dự án, cập nhật định kỳ, cột mốc, phụ thuộc/chặn nhiệm vụ, người theo dõi và thông báo lưu trong database.
+- Nhiệm vụ lặp, mẫu dự án, nhật ký thời gian và các tự động hóa nhắc hạn/báo hoàn thành/bàn giao trạng thái.
+
 ---
 
 ## 🛠 Kiến Trúc Hệ Thống (Tech Stack)
@@ -65,7 +71,7 @@ Dự án được xây dựng dựa trên kiến trúc **Client - Server (SPA)**
    ```sql
    CREATE DATABASE web_quan_ly_du_an CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
    ```
-3. Import file `database.sql` (nằm ở thư mục gốc của repository) vào database vừa tạo để nạp cấu trúc bảng và dữ liệu mẫu.
+3. Cấu trúc dữ liệu được quản lý bằng Laravel migration ở bước tiếp theo; không cần import thủ công để cài mới.
 
 ### Bước 2: Thiết Lập Back-end (Laravel API)
 1. Di chuyển vào thư mục back-end:
@@ -91,7 +97,11 @@ Dự án được xây dựng dựa trên kiến trúc **Client - Server (SPA)**
    ```bash
    php artisan key:generate
    ```
-5. Khởi động API Server:
+5. Tạo/cập nhật cấu trúc database:
+   ```bash
+   php artisan migrate
+   ```
+6. Khởi động API Server:
    ```bash
    php artisan serve
    ```
@@ -106,9 +116,7 @@ Dự án được xây dựng dựa trên kiến trúc **Client - Server (SPA)**
    ```bash
    npm install
    ```
-3. Kiểm tra kết nối API: 
-   - Mở file `src/composables/useProjectWorkspace.js`.
-   - Đảm bảo hằng số `API_URL` khớp với địa chỉ Back-end của bạn (ví dụ: `const API_URL = 'http://127.0.0.1:8000/api'`).
+3. Kiểm tra kết nối API trong `front-end/.env` (xem `front-end/.env.example`) và đặt `VITE_API_URL` nếu API không chạy cùng host.
 4. Khởi động môi trường phát triển (Development Server):
    ```bash
    npm run dev
@@ -145,6 +153,9 @@ Dưới đây là luồng thao tác cơ bản để khai thác tối đa sức m
 ---
 
 ## 👨‍💻 Dành Cho Nhà Phát Triển (Developer Notes)
+
+- Chạy kiểm thử backend bằng `php artisan test`; kiểm tra bản production frontend bằng `npm run build`.
+- Scheduler phải chạy `php artisan schedule:work` (hoặc cron `schedule:run`) để tự động gửi nhắc hạn hằng ngày.
 
 - **Quy tắc tạo mã tự động:** Hệ thống sử dụng một chuỗi mã định danh duy nhất (`code`) thay vì Auto-increment ID. Logic này được quản lý thông qua trait `App\Traits\GeneratesCode` trên Back-end. Các thực thể sẽ có tiền tố riêng (ví dụ: `US...` cho User, `PJ...` cho Project, `AC...` cho Activity).
 - **Service Lõi:** Tham khảo `App\Services\ActivityService` để hiểu cơ chế trigger Hoạt động và Thông báo từ các Controller.

@@ -1,4 +1,7 @@
 import { computed, ref } from 'vue'
+import { apiFetch, clearAuthSession, hasAuthSession } from '../services/api'
+
+const fetch = apiFetch
 
 // ========== CẤU HÌNH HỆ THỐNG (Không còn phụ thuộc file dữ liệu ảo) ==========
 const navigationItems = [
@@ -71,6 +74,11 @@ function mapProject(p) {
     canRestore: p.can_restore ?? p.canRestore ?? false,
     memberIds: p.members ? p.members.map(m => m.code) : (p.memberIds || []),
     progress: p.progress || 0,
+    health: p.health || 'on_track',
+    updateCadence: p.update_cadence || p.updateCadence || 'weekly',
+    updates: p.updates || [],
+    milestones: p.milestones || [],
+    automations: p.automations || [],
     color: p.color || 'indigo',
     files: p.attachments ? p.attachments.map(mapAttachment) : (p.files || []),
   }
@@ -94,6 +102,7 @@ function mapWorkLog(log) {
     checklists: completedItems.map(item => item.id),
     files: log.files || [],
     createdAt: log.created_at || log.createdAt,
+    durationMinutes: log.duration_minutes ?? log.durationMinutes ?? null,
   }
 }
 
@@ -113,6 +122,17 @@ function mapTask(t) {
     dueDate: t.due_date || t.dueDate,
     type: t.type || 'task',
     estimatedHours: t.estimated_hours ?? t.estimatedHours ?? null,
+    actualMinutes: t.actual_minutes ?? t.actualMinutes ?? 0,
+    remainingHours: t.remaining_hours ?? t.remainingHours ?? null,
+    milestoneId: t.milestone_code || t.milestoneId || null,
+    isBlocked: Boolean(t.is_blocked ?? t.isBlocked),
+    blockedReason: t.blocked_reason || t.blockedReason || '',
+    blockedOverride: Boolean(t.blocked_override ?? t.blockedOverride),
+    recurrence: t.recurrence || null,
+    recurrenceUntil: t.recurrence_until || t.recurrenceUntil || null,
+    dependencies: t.dependencies || [],
+    blocking: t.blocking || [],
+    watchers: t.watchers || [],
     createdAt: t.created_at || t.createdAt,
     deletedAt: t.deleted_at || t.deletedAt || null,
     restoreUntil: t.restore_until || t.restoreUntil || null,
@@ -215,9 +235,12 @@ const comments = ref([])
 const activities = ref([])
 const users = ref([])
 const apiConnectionError = ref('')
+const isWorkspaceLoading = ref(false)
 
 // ========== FETCH DỮ LIỆU TỪ DATABASE ==========
 const loadDataFromAPI = async () => {
+  if (!hasAuthSession()) return
+  isWorkspaceLoading.value = true
   try {
     const [resProjects, resMembers, resGroups, resTasks, resActivities, resNotifications, resUsers, resCustomers] = await Promise.all([
       fetch(`${API_URL}/projects`).catch(() => null),
@@ -279,6 +302,8 @@ const loadDataFromAPI = async () => {
   } catch (error) {
     apiConnectionError.value = 'Không thể kết nối máy chủ. Vui lòng thử lại sau.'
     console.error('❌ Lỗi kết nối Database:', error)
+  } finally {
+    isWorkspaceLoading.value = false
   }
 }
 
@@ -299,10 +324,6 @@ const loadDataFromAPI = async () => {
 //     console.error(e)
 //   }
 // }
-
-// Tự động gọi khi khởi tạo
-loadDataFromAPI()
-
 
 const globalSearch = ref('')
 const darkMode = ref(false)
@@ -352,7 +373,40 @@ function closeAddMemberModal() {
 const notifications = ref([])
 
 // Lấy thông tin user đang đăng nhập từ localStorage
-const currentUser = ref(JSON.parse(localStorage.getItem('currentUser') || 'null') || { code: 'US0001', name: 'Quản trị viên' })
+const currentUser = ref(JSON.parse(localStorage.getItem('currentUser') || 'null'))
+
+async function refreshLiveData() {
+  if (!hasAuthSession()) return
+  try {
+    const [activityResponse, notificationResponse] = await Promise.all([
+      fetch(`${API_URL}/activities`),
+      fetch(`${API_URL}/notifications`),
+    ])
+    if (activityResponse.ok) activities.value = (await activityResponse.json()).map(mapActivity)
+    if (notificationResponse.ok) notifications.value = await notificationResponse.json()
+  } catch (error) {
+    console.error('Không thể làm mới dữ liệu trực tiếp:', error)
+  }
+}
+
+if (hasAuthSession()) {
+  loadDataFromAPI()
+  window.setInterval(refreshLiveData, 45000)
+}
+
+window.addEventListener('ringnet:unauthorized', () => {
+  clearAuthSession()
+  if (window.location.pathname !== '/login') window.location.assign('/login')
+})
+
+async function logout() {
+  try {
+    await fetch(`${API_URL}/logout`, { method: 'POST' })
+  } finally {
+    clearAuthSession()
+    window.location.assign('/login')
+  }
+}
 
 let toastTimer
 
@@ -548,12 +602,16 @@ export function useProjectWorkspace() {
           due_date: payload.dueDate || null,
           progress: Number(payload.progress || 0),
           member_ids: Array.isArray(payload.memberIds) ? payload.memberIds : [],
+          template: payload.template || 'blank',
           user_code: currentUser.value.code,
         })
       })
       if (res.ok) {
         const data = await res.json()
         const newProject = mapProject(data.project)
+        if (Array.isArray(data.project.tasks)) {
+          tasks.value.unshift(...data.project.tasks.map(mapTask))
+        }
         if (!newProject.files) newProject.files = []
         
         if (payload.files && payload.files.length > 0) {
@@ -700,6 +758,7 @@ export function useProjectWorkspace() {
         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
         body: JSON.stringify({
           project_code: payload.projectId || null,
+          milestone_code: payload.milestoneId || null,
           title: payload.title,
           description: payload.description || '',
           type: payload.type || 'task',
@@ -708,6 +767,9 @@ export function useProjectWorkspace() {
           start_date: payload.startDate || null,
           due_date: payload.dueDate || null,
           estimated_hours: payload.estimatedHours === '' ? null : payload.estimatedHours,
+          blocked_reason: payload.blockedReason || null,
+          recurrence: payload.recurrence || null,
+          recurrence_until: payload.recurrenceUntil || null,
           assignee_code: payload.assigneeId || null,
           tags: payload.tags !== undefined ? (Array.isArray(payload.tags) ? payload.tags.join(', ') : payload.tags) : null,
           user_code: currentUser.value.code,
@@ -771,6 +833,9 @@ export function useProjectWorkspace() {
       if (updates.projectId !== undefined || updates.project_code !== undefined) {
         payload.project_code = updates.project_code !== undefined ? updates.project_code : (updates.projectId || null)
       }
+      if (updates.milestoneId !== undefined || updates.milestone_code !== undefined) {
+        payload.milestone_code = updates.milestone_code !== undefined ? updates.milestone_code : (updates.milestoneId || null)
+      }
       if (updates.assigneeId !== undefined || updates.assignee_code !== undefined) {
         payload.assignee_code = updates.assignee_code !== undefined ? updates.assignee_code : (updates.assigneeId || null)
       }
@@ -786,6 +851,10 @@ export function useProjectWorkspace() {
       if (updates.tags !== undefined) {
         payload.tags = Array.isArray(updates.tags) ? updates.tags.join(', ') : (updates.tags || null)
       }
+      if (updates.blockedReason !== undefined) payload.blocked_reason = updates.blockedReason || null
+      if (updates.blockedOverride !== undefined) payload.blocked_override = Boolean(updates.blockedOverride)
+      if (updates.recurrence !== undefined) payload.recurrence = updates.recurrence || null
+      if (updates.recurrenceUntil !== undefined) payload.recurrence_until = updates.recurrenceUntil || null
 
       const res = await fetch(`${API_URL}/tasks/${taskId}`, {
         method: 'PUT',
@@ -937,6 +1006,7 @@ export function useProjectWorkspace() {
         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
         body: JSON.stringify({
           time: payload.time,
+          duration_minutes: payload.durationMinutes || null,
           note: payload.note || null,
           checklist_ids: payload.checklistIds || [],
           files: payload.files || [],
@@ -1335,6 +1405,82 @@ export function useProjectWorkspace() {
     return updateProjectMembers(projectId, project.memberIds.filter(id => id !== memberId))
   }
 
+  async function addProjectUpdate(projectId, payload) {
+    const res = await fetch(`${API_URL}/projects/${projectId}/updates`, {
+      method: 'POST', body: JSON.stringify(payload),
+    })
+    if (!res.ok) return { success: false, errors: await parseValidationErrors(res) }
+    const data = await res.json()
+    const project = projects.value.find(item => item.id === projectId)
+    if (project) {
+      project.health = payload.health
+      project.updates = [data.update, ...(project.updates || [])]
+    }
+    notify('Đã đăng cập nhật dự án')
+    return { success: true, update: data.update }
+  }
+
+  async function addProjectMilestone(projectId, payload) {
+    const res = await fetch(`${API_URL}/projects/${projectId}/milestones`, {
+      method: 'POST', body: JSON.stringify(payload),
+    })
+    if (!res.ok) return { success: false, errors: await parseValidationErrors(res) }
+    const data = await res.json()
+    const project = projects.value.find(item => item.id === projectId)
+    if (project) project.milestones = [...(project.milestones || []), data.milestone]
+    notify('Đã tạo cột mốc dự án')
+    return { success: true, milestone: data.milestone }
+  }
+
+  async function deleteProjectMilestone(projectId, milestoneId) {
+    const res = await fetch(`${API_URL}/projects/${projectId}/milestones/${milestoneId}`, { method: 'DELETE' })
+    if (!res.ok) return false
+    const project = projects.value.find(item => item.id === projectId)
+    if (project) project.milestones = (project.milestones || []).filter(item => item.code !== milestoneId)
+    tasks.value.filter(task => task.milestoneId === milestoneId).forEach(task => { task.milestoneId = null })
+    notify('Đã xóa cột mốc')
+    return true
+  }
+
+  async function setProjectAutomation(projectId, rule, enabled) {
+    const res = await fetch(`${API_URL}/projects/${projectId}/automations`, {
+      method: 'POST', body: JSON.stringify({ rule, enabled, config: {} }),
+    })
+    if (!res.ok) {
+      notify('Không thể cập nhật tự động hóa')
+      return false
+    }
+    const data = await res.json()
+    const project = projects.value.find(item => item.id === projectId)
+    if (project) {
+      project.automations = [...(project.automations || []).filter(item => item.rule !== rule), data.automation]
+    }
+    notify(enabled ? 'Đã bật tự động hóa' : 'Đã tắt tự động hóa')
+    return true
+  }
+
+  async function syncTaskDependencies(taskId, dependencyIds) {
+    const res = await fetch(`${API_URL}/tasks/${taskId}/dependencies`, {
+      method: 'PUT', body: JSON.stringify({ dependency_ids: dependencyIds }),
+    })
+    if (!res.ok) return { success: false, errors: await parseValidationErrors(res) }
+    const data = await res.json()
+    const task = tasks.value.find(item => item.id === taskId)
+    if (task) {
+      task.dependencies = data.dependencies || []
+      task.isBlocked = task.dependencies.some(item => item.status !== 'done') && !task.blockedOverride
+    }
+    return { success: true }
+  }
+
+  async function toggleTaskWatcher(taskId) {
+    const res = await fetch(`${API_URL}/tasks/${taskId}/watch`, { method: 'POST' })
+    if (!res.ok) return false
+    const data = await res.json()
+    notify(data.watching ? 'Đã theo dõi nhiệm vụ' : 'Đã bỏ theo dõi nhiệm vụ')
+    return data.watching
+  }
+
   function setTheme(isDark) {
     darkMode.value = isDark
     if (isDark) {
@@ -1389,7 +1535,11 @@ export function useProjectWorkspace() {
     comments,
     activities,
     apiConnectionError,
+    isWorkspaceLoading,
     currentUser,
+    loadDataFromAPI,
+    refreshLiveData,
+    logout,
     navigationItems,
     projectStatusMap,
     taskStatusMap,
@@ -1473,6 +1623,12 @@ export function useProjectWorkspace() {
     removeFileFromProject,
     updateProjectMembers,
     removeMemberFromProject,
+    addProjectUpdate,
+    addProjectMilestone,
+    deleteProjectMilestone,
+    setProjectAutomation,
+    syncTaskDependencies,
+    toggleTaskWatcher,
     setTheme,
     markNotificationAsRead,
     markAllNotificationsAsRead,

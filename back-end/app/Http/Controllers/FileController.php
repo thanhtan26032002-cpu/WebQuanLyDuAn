@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Attachment;
 use App\Models\Project;
 use App\Models\Task;
+use App\Services\AccessService;
 use App\Services\ActivityService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -19,23 +20,27 @@ class FileController extends Controller
             'file' => 'required|file|max:10240', // Max 10MB
             'target_type' => 'required|string|in:Project,Task,TaskComment',
             'target_code' => 'required|string',
-            'user_code' => 'nullable|exists:users,user_code',
         ]);
 
-        $targetExists = $validated['target_type'] === 'Project'
-            ? Project::whereKey($validated['target_code'])->exists()
-            : Task::whereKey($validated['target_code'])->exists();
+        $target = $validated['target_type'] === 'Project'
+            ? Project::whereKey($validated['target_code'])->first()
+            : Task::with('project')->whereKey($validated['target_code'])->first();
 
-        if (! $targetExists) {
+        if (! $target) {
             return response()->json([
                 'message' => 'Dự án hoặc nhiệm vụ đính kèm không tồn tại.',
             ], 422);
         }
+        AccessService::authorize(
+            $target instanceof Project
+                ? AccessService::canViewProject($request->user(), $target)
+                : AccessService::canViewTask($request->user(), $target)
+        );
 
         if ($request->hasFile('file')) {
             $file = $request->file('file');
             $fileName = Str::uuid().'_'.$file->getClientOriginalName();
-            $userCode = $validated['user_code'] ?? 'US0001';
+            $userCode = $request->user()->user_code;
 
             // Lưu file vào thư mục storage/app/public/attachments
             $path = $file->storeAs('attachments', $fileName, 'public');
@@ -67,9 +72,18 @@ class FileController extends Controller
         return response()->json(['message' => 'Không tìm thấy file'], 400);
     }
 
-    public function destroy(string $code)
+    public function destroy(Request $request, string $code)
     {
         $attachment = Attachment::findOrFail($code);
+        $target = $attachment->attachment_target_type === 'Project'
+            ? Project::find($attachment->attachment_target_code)
+            : Task::with('project')->find($attachment->attachment_target_code);
+        AccessService::authorize(
+            $attachment->attachment_uploaded_by === $request->user()->user_code
+            || AccessService::isAdmin($request->user())
+            || ($target instanceof Project && AccessService::canManageProject($request->user(), $target))
+            || ($target instanceof Task && AccessService::canEditTask($request->user(), $target))
+        );
         $relativePath = ltrim(str_replace('/storage/', '', $attachment->attachment_file_path), '/');
 
         if ($relativePath !== '') {

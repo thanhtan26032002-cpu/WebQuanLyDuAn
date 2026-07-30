@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { FolderKanban, Calendar, Clock, ArrowLeft, Plus, MoreVertical, ListTodo, Paperclip, MoreHorizontal, Check, Settings, ShieldAlert, LogOut, CheckCircle2, Users, CalendarDays, Tag, LayoutGrid, List, Activity, Building2, UserRound } from '@lucide/vue'
+import { FolderKanban, Calendar, Clock, ArrowLeft, Plus, MoreVertical, ListTodo, Paperclip, MoreHorizontal, Check, Settings, ShieldAlert, LogOut, CheckCircle2, Users, CalendarDays, Tag, LayoutGrid, List, Activity, Building2, UserRound, HeartPulse, Flag, Trash2, Zap } from '@lucide/vue'
 import draggable from 'vuedraggable'
 import { useProjectWorkspace } from '../composables/useProjectWorkspace'
 import TaskCard from '../components/common/TaskCard.vue'
@@ -11,7 +11,44 @@ import DownloadArchiveModal from '../components/modals/DownloadArchiveModal.vue'
 
 const route = useRoute()
 const router = useRouter()
-const { projects, tasks, members, activities, projectStatusMap, priorityMap, taskStatusMap, findMember, formatDate, getTaskDeadlineState, taskModalOpen, openTaskModal, projectSettingsModalOpen, fileUploadModalOpen, manageMembersModalOpen, editingProjectId, removeFileFromProject, removeMemberFromProject, moveTask, activeTaskId, downloadArchive, downloadSingleFile, activeMemberId, memberDetailModalOpen } = useProjectWorkspace()
+const { projects, tasks, members, activities, projectStatusMap, priorityMap, taskStatusMap, findMember, formatDate, getTaskDeadlineState, taskModalOpen, openTaskModal, projectSettingsModalOpen, fileUploadModalOpen, manageMembersModalOpen, editingProjectId, removeFileFromProject, removeMemberFromProject, moveTask, activeTaskId, downloadArchive, downloadSingleFile, activeMemberId, memberDetailModalOpen, addProjectUpdate, addProjectMilestone, deleteProjectMilestone, setProjectAutomation } = useProjectWorkspace()
+
+const updateDraft = ref({ health: 'on_track', completed: '', risks: '', next_steps: '' })
+const milestoneDraft = ref({ name: '', target_date: '' })
+const showUpdateForm = ref(false)
+const showMilestoneForm = ref(false)
+const savingPlanning = ref(false)
+const healthLabels = { on_track: 'Đúng tiến độ', at_risk: 'Có rủi ro', off_track: 'Chậm tiến độ' }
+const healthClasses = { on_track: 'bg-emerald-50 text-emerald-700', at_risk: 'bg-amber-50 text-amber-700', off_track: 'bg-rose-50 text-rose-700' }
+const automationRules = [
+  { rule: 'deadline_reminder', title: 'Nhắc trước hạn', description: 'Nhắc người phụ trách về nhiệm vụ sắp đến hạn.' },
+  { rule: 'completion_notify_manager', title: 'Báo quản lý khi hoàn thành', description: 'Gửi thông báo khi một nhiệm vụ được hoàn tất.' },
+  { rule: 'status_handover', title: 'Bàn giao theo trạng thái', description: 'Thông báo người theo dõi khi nhiệm vụ đổi trạng thái.' },
+]
+
+const automationEnabled = (rule) => Boolean(project.value?.automations?.find(item => item.rule === rule)?.enabled)
+const toggleAutomation = (rule) => setProjectAutomation(projectId.value, rule, !automationEnabled(rule))
+
+async function submitProjectUpdate() {
+  savingPlanning.value = true
+  const result = await addProjectUpdate(projectId.value, updateDraft.value)
+  savingPlanning.value = false
+  if (result.success) {
+    showUpdateForm.value = false
+    updateDraft.value = { health: project.value.health, completed: '', risks: '', next_steps: '' }
+  }
+}
+
+async function submitMilestone() {
+  if (!milestoneDraft.value.name.trim()) return
+  savingPlanning.value = true
+  const result = await addProjectMilestone(projectId.value, milestoneDraft.value)
+  savingPlanning.value = false
+  if (result.success) {
+    showMilestoneForm.value = false
+    milestoneDraft.value = { name: '', target_date: '' }
+  }
+}
 
 const deadlineDateClass = (task) => {
   const state = getTaskDeadlineState(task.dueDate, task.status)
@@ -233,6 +270,50 @@ const projectStatusClasses = {
         </div>
       </div>
     </div>
+
+    <div class="grid gap-6 lg:grid-cols-2">
+      <section class="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
+        <header class="flex items-start justify-between gap-4">
+          <div><h2 class="flex items-center gap-2 text-lg font-bold"><HeartPulse class="h-5 w-5 text-violet-500" /> Sức khỏe dự án</h2><p class="mt-1 text-sm text-slate-500">Tình trạng, rủi ro và bước tiếp theo.</p></div>
+          <span :class="['rounded-full px-3 py-1 text-xs font-bold', healthClasses[project.health] || healthClasses.on_track]">{{ healthLabels[project.health] || healthLabels.on_track }}</span>
+        </header>
+        <button v-if="!showUpdateForm" class="mt-5 w-full rounded-xl border border-dashed border-violet-200 bg-violet-50/50 py-2.5 text-sm font-semibold text-violet-700 hover:bg-violet-50" @click="showUpdateForm = true; updateDraft.health = project.health">+ Đăng cập nhật định kỳ</button>
+        <form v-else class="mt-5 space-y-3 rounded-xl bg-slate-50 p-4" @submit.prevent="submitProjectUpdate">
+          <select v-model="updateDraft.health" class="w-full rounded-lg border border-slate-200 bg-white p-2.5 text-sm font-semibold"><option value="on_track">Đúng tiến độ</option><option value="at_risk">Có rủi ro</option><option value="off_track">Chậm tiến độ</option></select>
+          <textarea v-model="updateDraft.completed" rows="2" placeholder="Những việc đã hoàn thành" class="w-full rounded-lg border border-slate-200 p-3 text-sm"></textarea>
+          <textarea v-model="updateDraft.risks" rows="2" placeholder="Rủi ro hoặc vướng mắc" class="w-full rounded-lg border border-slate-200 p-3 text-sm"></textarea>
+          <textarea v-model="updateDraft.next_steps" rows="2" placeholder="Việc tiếp theo" class="w-full rounded-lg border border-slate-200 p-3 text-sm"></textarea>
+          <div class="flex justify-end gap-2"><button type="button" class="px-3 py-2 text-sm text-slate-500" @click="showUpdateForm = false">Hủy</button><button :disabled="savingPlanning" class="rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Đăng cập nhật</button></div>
+        </form>
+        <div v-if="project.updates?.length" class="mt-5 space-y-3">
+          <article v-for="update in project.updates.slice(0, 3)" :key="update.code" class="rounded-xl border border-slate-100 p-4 text-sm">
+            <div class="flex justify-between"><span :class="['rounded px-2 py-1 text-[10px] font-bold', healthClasses[update.health]]">{{ healthLabels[update.health] }}</span><span class="text-xs text-slate-400">{{ formatDate(update.created_at) }}</span></div>
+            <p v-if="update.completed" class="mt-3 text-slate-700"><b>Đã làm:</b> {{ update.completed }}</p><p v-if="update.risks" class="mt-1 text-slate-600"><b>Rủi ro:</b> {{ update.risks }}</p><p v-if="update.next_steps" class="mt-1 text-slate-600"><b>Tiếp theo:</b> {{ update.next_steps }}</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
+        <header class="flex items-start justify-between gap-4"><div><h2 class="flex items-center gap-2 text-lg font-bold"><Flag class="h-5 w-5 text-violet-500" /> Cột mốc</h2><p class="mt-1 text-sm text-slate-500">Các giai đoạn chính của dự án.</p></div><button class="rounded-lg bg-violet-50 px-3 py-2 text-sm font-semibold text-violet-700" @click="showMilestoneForm = !showMilestoneForm">+ Thêm</button></header>
+        <form v-if="showMilestoneForm" class="mt-4 flex flex-col gap-2 rounded-xl bg-slate-50 p-3 sm:flex-row" @submit.prevent="submitMilestone"><input v-model="milestoneDraft.name" required placeholder="Tên cột mốc" class="min-w-0 flex-1 rounded-lg border border-slate-200 p-2.5 text-sm" /><input v-model="milestoneDraft.target_date" type="date" class="rounded-lg border border-slate-200 p-2.5 text-sm" /><button class="rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white">Lưu</button></form>
+        <div v-if="project.milestones?.length" class="mt-5 space-y-3">
+          <article v-for="milestone in project.milestones" :key="milestone.code" class="group rounded-xl border border-slate-100 p-4">
+            <div class="flex items-start justify-between gap-3"><div><p class="font-semibold text-slate-800">{{ milestone.name }}</p><p class="mt-0.5 text-xs text-slate-500">{{ formatDate(milestone.target_date) }}</p></div><button title="Xóa cột mốc" aria-label="Xóa cột mốc" class="rounded-lg p-1.5 text-slate-300 opacity-0 hover:bg-rose-50 hover:text-rose-500 group-hover:opacity-100" @click="deleteProjectMilestone(project.id, milestone.code)"><Trash2 class="h-4 w-4" /></button></div>
+            <div class="mt-3 h-2 overflow-hidden rounded-full bg-slate-100"><div class="h-full rounded-full bg-violet-500" :style="{ width: `${milestone.progress || 0}%` }"></div></div><p class="mt-1 text-right text-[10px] font-bold text-slate-400">{{ milestone.progress || 0 }}%</p>
+          </article>
+        </div><p v-else class="mt-8 text-center text-sm text-slate-400">Chưa có cột mốc nào.</p>
+      </section>
+    </div>
+
+    <section class="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
+      <header><h2 class="flex items-center gap-2 text-lg font-bold text-slate-900"><Zap class="h-5 w-5 text-violet-500" /> Tự động hóa đơn giản</h2><p class="mt-1 text-sm text-slate-500">Giảm thao tác lặp lại nhưng vẫn giữ quy trình dễ kiểm soát.</p></header>
+      <div class="mt-5 grid gap-3 md:grid-cols-3">
+        <button v-for="item in automationRules" :key="item.rule" type="button" class="flex items-start justify-between gap-4 rounded-xl border p-4 text-left transition" :class="automationEnabled(item.rule) ? 'border-violet-200 bg-violet-50/60' : 'border-slate-100 hover:border-slate-200'" @click="toggleAutomation(item.rule)">
+          <span><strong class="block text-sm text-slate-800">{{ item.title }}</strong><span class="mt-1 block text-xs leading-5 text-slate-500">{{ item.description }}</span></span>
+          <span :class="['mt-0.5 flex h-6 w-11 shrink-0 rounded-full p-0.5 transition', automationEnabled(item.rule) ? 'justify-end bg-violet-500' : 'justify-start bg-slate-200']"><span class="h-5 w-5 rounded-full bg-white shadow-sm"></span></span>
+        </button>
+      </div>
+    </section>
 
     <!-- Grid Members & Files -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">

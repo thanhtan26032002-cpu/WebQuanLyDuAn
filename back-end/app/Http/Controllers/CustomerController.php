@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Customer;
+use App\Services\AccessService;
 use Illuminate\Http\Request;
 
 class CustomerController extends Controller
@@ -14,6 +15,7 @@ class CustomerController extends Controller
 
     public function store(Request $request)
     {
+        AccessService::authorize(AccessService::canManagePeople($request->user()));
         foreach (['company', 'email', 'phone', 'address', 'notes'] as $field) {
             if ($request->has($field) && trim((string) $request->input($field)) === '') {
                 $request->merge([$field => null]);

@@ -1,16 +1,9 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
-import { X, CalendarDays, Flag, CheckCircle2, MessageSquare, Paperclip, Send, Clock, User, Download, FileText, Trash2, Edit2, Check, ListChecks, Plus } from '@lucide/vue'
+import { X, CalendarDays, Flag, CheckCircle2, MessageSquare, Paperclip, Send, Clock, User, Download, FileText, Trash2, Edit2, Check, ListChecks, Plus, Link2, Bell, Ban } from '@lucide/vue'
 import { useProjectWorkspace } from '../../composables/useProjectWorkspace'
 import UserAvatar from './UserAvatar.vue'
 import DownloadArchiveModal from '../modals/DownloadArchiveModal.vue'
-
-const props = defineProps({
-  task: {
-    type: Object,
-    required: true
-  }
-})
 
 const { 
   tasks, projects, members, comments, 
@@ -18,7 +11,8 @@ const {
   taskModalOpen, activeTaskId, 
   findMember, findProject, formatDate, getTaskDeadlineState, updateTask, loadComments, addComment, uploadFile,
   downloadArchive, downloadSingleFile, deleteTask, notify,
-  addTaskChecklist, updateTaskChecklist, deleteTaskChecklist, addTaskWorkLog
+  addTaskChecklist, updateTaskChecklist, deleteTaskChecklist, addTaskWorkLog,
+  syncTaskDependencies, toggleTaskWatcher, currentUser
 } = useProjectWorkspace()
 
 const isDownloadModalOpen = ref(false)
@@ -64,6 +58,9 @@ const newComment = ref('')
 const isEditing = ref(false)
 const editedTask = ref({})
 const isConfirmingDelete = ref(false)
+const selectedDependencyIds = ref([])
+const watching = ref(false)
+const availableDependencies = computed(() => tasks.value.filter(item => item.id !== task.value?.id && item.projectId === task.value?.projectId))
 
 const startEditing = () => {
   if (!task.value) return
@@ -80,6 +77,8 @@ watch(activeTaskId, async (newVal) => {
     if (task.value) {
       editedTask.value = JSON.parse(JSON.stringify(task.value))
       editedTask.value.tagsInput = Array.isArray(task.value?.tags) ? task.value.tags.join(', ') : (task.value?.tags || '')
+      selectedDependencyIds.value = (task.value.dependencies || []).map(item => item.code || item.id)
+      watching.value = (task.value.watchers || []).some(item => item.code === currentUser.value?.code)
     }
     await loadComments(newVal)
   }
@@ -88,6 +87,14 @@ watch(activeTaskId, async (newVal) => {
 const closePanel = () => {
   activeTaskId.value = null
   isEditing.value = false
+}
+
+const saveDependencies = async () => {
+  await syncTaskDependencies(task.value.id, selectedDependencyIds.value)
+}
+
+const toggleWatching = async () => {
+  watching.value = await toggleTaskWatcher(task.value.id)
 }
 
 const handleDelete = async () => {
@@ -113,6 +120,10 @@ const handleSave = () => {
     startDate: editedTask.value.startDate || null,
     dueDate: editedTask.value.dueDate || null,
     estimatedHours: editedTask.value.estimatedHours || null,
+    milestoneId: editedTask.value.milestoneId || null,
+    blockedReason: editedTask.value.blockedReason || null,
+    recurrence: editedTask.value.recurrence || null,
+    recurrenceUntil: editedTask.value.recurrenceUntil || null,
     tags: tagsArray
   })
   isEditing.value = false
@@ -191,6 +202,7 @@ const removeChecklist = async (id) => {
 // WorkLog logic
 const showWorkLogForm = ref(false)
 const newWorkLogTime = ref('')
+const newWorkLogDuration = ref('')
 const newWorkLogNote = ref('')
 const newWorkLogFiles = ref([])
 const newWorkLogChecklists = ref([])
@@ -207,6 +219,7 @@ const addWorkLog = async () => {
   if (!newWorkLogTime.value) return
   const result = await addTaskWorkLog(task.value.id, {
     time: newWorkLogTime.value,
+    durationMinutes: newWorkLogDuration.value ? Math.round(Number(newWorkLogDuration.value) * 60) : null,
     note: newWorkLogNote.value,
     checklistIds: [...newWorkLogChecklists.value],
     files: [...newWorkLogFiles.value],
@@ -215,6 +228,7 @@ const addWorkLog = async () => {
   
   showWorkLogForm.value = false
   newWorkLogTime.value = ''
+  newWorkLogDuration.value = ''
   newWorkLogNote.value = ''
   newWorkLogFiles.value = []
   newWorkLogChecklists.value = []
@@ -310,6 +324,15 @@ const formatDateTime = (isoStr) => {
         <div class="flex items-center gap-2">
           <button
             v-if="!isEditing && !isConfirmingDelete"
+            @click="toggleWatching"
+            :class="['p-2 rounded-xl transition-colors', watching ? 'bg-violet-50 text-violet-600' : 'text-slate-400 hover:bg-violet-50 hover:text-violet-600']"
+            :title="watching ? 'Bỏ theo dõi nhiệm vụ' : 'Theo dõi nhiệm vụ'"
+            :aria-label="watching ? 'Bỏ theo dõi nhiệm vụ' : 'Theo dõi nhiệm vụ'"
+          >
+            <Bell class="w-5 h-5" />
+          </button>
+          <button
+            v-if="!isEditing && !isConfirmingDelete"
             @click="isConfirmingDelete = true"
             class="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors"
             title="Xóa nhiệm vụ"
@@ -346,6 +369,13 @@ const formatDateTime = (isoStr) => {
 
       <!-- Content -->
       <div class="flex-1 overflow-y-auto px-6 py-6 custom-scrollbar">
+        <div v-if="task.isBlocked" class="mb-5 flex items-start gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-rose-700">
+          <Ban class="mt-0.5 h-5 w-5 shrink-0" />
+          <div>
+            <p class="text-sm font-bold">Nhiệm vụ đang bị chặn</p>
+            <p class="mt-0.5 text-xs">{{ task.blockedReason || 'Một nhiệm vụ phụ thuộc chưa hoàn thành.' }}</p>
+          </div>
+        </div>
         <!-- Title & Status -->
         <div class="mb-8">
           <template v-if="!isEditing">
@@ -474,10 +504,14 @@ const formatDateTime = (isoStr) => {
           
           <!-- Log Form -->
           <div v-if="showWorkLogForm && task.assigneeId" class="bg-violet-50 border border-violet-100 p-4 rounded-xl mb-4 animate-in slide-in-from-top-2 duration-200 space-y-4">
-            <div class="flex gap-3">
+            <div class="grid grid-cols-1 gap-3 sm:grid-cols-[112px_120px_1fr]">
               <div class="w-28 shrink-0">
                 <label class="text-xs font-semibold text-slate-600 block mb-1">Giờ hoàn thành</label>
                 <input type="time" v-model="newWorkLogTime" class="w-full bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-violet-400" />
+              </div>
+              <div>
+                <label class="text-xs font-semibold text-slate-600 block mb-1">Thời lượng (giờ)</label>
+                <input type="number" min="0" step="0.25" v-model="newWorkLogDuration" placeholder="1.5" class="w-full bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-violet-400" />
               </div>
               <div class="flex-1">
                 <label class="text-xs font-semibold text-slate-600 block mb-1">Ghi chú công việc</label>
@@ -525,7 +559,7 @@ const formatDateTime = (isoStr) => {
                 <div class="flex-1 min-w-0">
                   <div class="flex justify-between items-start mb-1">
                     <p class="text-sm font-semibold text-slate-900">{{ findMember(log.memberId).name }}</p>
-                    <span class="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">{{ log.time }}</span>
+                    <span class="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">{{ log.time }}<template v-if="log.durationMinutes"> · {{ (log.durationMinutes / 60).toFixed(1) }} giờ</template></span>
                   </div>
                   <p class="text-xs text-slate-500 mb-2">{{ formatDate(log.date) }} • {{ log.note || 'Hoàn thành công việc' }}</p>
                   
@@ -617,7 +651,7 @@ const formatDateTime = (isoStr) => {
           </div>
         </div>
 
-        <div class="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div class="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div class="rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
             <span class="mb-2 block text-xs font-medium uppercase tracking-wide text-slate-500">Loại nhiệm vụ</span>
             <select v-if="isEditing" v-model="editedTask.type" class="w-full rounded-lg border-none bg-slate-100 px-3 py-2 text-sm font-semibold focus:ring-2 focus:ring-violet-500">
@@ -634,6 +668,54 @@ const formatDateTime = (isoStr) => {
             <span class="mb-2 block text-xs font-medium uppercase tracking-wide text-slate-500">Ước lượng</span>
             <input v-if="isEditing" v-model="editedTask.estimatedHours" type="number" min="0" step="0.5" class="w-full rounded-lg border-none bg-slate-100 px-3 py-2 text-sm font-semibold focus:ring-2 focus:ring-violet-500" />
             <p v-else class="text-sm font-bold text-slate-800">{{ task.estimatedHours ? `${task.estimatedHours} giờ` : 'Chưa ước lượng' }}</p>
+          </div>
+          <div class="rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
+            <span class="mb-2 block text-xs font-medium uppercase tracking-wide text-slate-500">Thực tế / còn lại</span>
+            <p class="text-sm font-bold text-slate-800">{{ ((task.actualMinutes || 0) / 60).toFixed(1) }} giờ / {{ task.remainingHours ?? '—' }} giờ</p>
+          </div>
+        </div>
+
+        <!-- Planning & dependencies -->
+        <div class="mb-8 rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
+          <h3 class="mb-3 flex items-center gap-2 text-sm font-bold text-slate-900">
+            <Link2 class="h-4 w-4 text-slate-400" /> Phụ thuộc và kế hoạch
+          </h3>
+          <div class="space-y-4">
+            <div>
+              <label class="mb-1.5 block text-xs font-semibold text-slate-600">Nhiệm vụ phải hoàn thành trước</label>
+              <select v-model="selectedDependencyIds" multiple class="min-h-24 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:border-violet-400 focus:outline-none">
+                <option v-for="item in availableDependencies" :key="item.id" :value="item.id">{{ item.title }} — {{ taskStatusMap[item.status]?.label }}</option>
+              </select>
+              <div class="mt-2 flex items-center justify-between gap-3">
+                <p class="text-[11px] text-slate-400">Giữ Ctrl/Cmd để chọn nhiều nhiệm vụ.</p>
+                <button @click="saveDependencies" class="rounded-lg bg-violet-50 px-3 py-1.5 text-xs font-semibold text-violet-700 hover:bg-violet-100">Lưu phụ thuộc</button>
+              </div>
+            </div>
+            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div>
+                <label class="mb-1.5 block text-xs font-semibold text-slate-600">Mốc dự án</label>
+                <select v-if="isEditing" v-model="editedTask.milestoneId" class="w-full rounded-lg border-none bg-slate-100 px-3 py-2 text-sm font-semibold focus:ring-2 focus:ring-violet-500">
+                  <option :value="null">— Không có mốc —</option>
+                  <option v-for="milestone in project?.milestones || []" :key="milestone.code" :value="milestone.code">{{ milestone.name }}</option>
+                </select>
+                <p v-else class="text-sm font-semibold text-slate-700">{{ project?.milestones?.find(item => item.code === task.milestoneId)?.name || 'Chưa gắn mốc' }}</p>
+              </div>
+              <div>
+                <label class="mb-1.5 block text-xs font-semibold text-slate-600">Lặp lại</label>
+                <select v-if="isEditing" v-model="editedTask.recurrence" class="w-full rounded-lg border-none bg-slate-100 px-3 py-2 text-sm font-semibold focus:ring-2 focus:ring-violet-500">
+                  <option :value="null">Không lặp</option>
+                  <option value="daily">Hàng ngày</option>
+                  <option value="weekly">Hàng tuần</option>
+                  <option value="monthly">Hàng tháng</option>
+                </select>
+                <p v-else class="text-sm font-semibold text-slate-700">{{ { daily: 'Hàng ngày', weekly: 'Hàng tuần', monthly: 'Hàng tháng' }[task.recurrence] || 'Không lặp' }}</p>
+              </div>
+            </div>
+            <div>
+              <label class="mb-1.5 block text-xs font-semibold text-slate-600">Lý do bị chặn</label>
+              <textarea v-if="isEditing" v-model="editedTask.blockedReason" rows="2" placeholder="Mô tả trở ngại đang ngăn công việc tiếp tục..." class="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:border-violet-400 focus:outline-none"></textarea>
+              <p v-else class="text-sm text-slate-600">{{ task.blockedReason || 'Không có trở ngại được ghi nhận.' }}</p>
+            </div>
           </div>
         </div>
 

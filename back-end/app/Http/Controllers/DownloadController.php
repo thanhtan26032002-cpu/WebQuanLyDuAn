@@ -3,6 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\Attachment;
+use App\Models\Project;
+use App\Models\Task;
+use App\Services\AccessService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\File;
 use ZipArchive;
@@ -21,6 +24,15 @@ class DownloadController extends Controller
         $targetCode = $request->target_code;
         $fileName = $request->file_name;
         $format = $request->format ?? '.zip';
+
+        $target = $targetType === 'Project'
+            ? Project::findOrFail($targetCode)
+            : Task::with('project')->findOrFail($targetCode);
+        AccessService::authorize(
+            $target instanceof Project
+                ? AccessService::canViewProject($request->user(), $target)
+                : AccessService::canViewTask($request->user(), $target)
+        );
 
         if (! in_array($format, ['.zip', '.tar', '.tar.gz'])) {
             $format = '.zip';

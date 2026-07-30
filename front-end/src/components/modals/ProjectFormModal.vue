@@ -9,6 +9,7 @@ const selectedFiles = ref([])
 
 const form = reactive({
   name: '',
+  template: 'blank',
   description: '',
   color: 'indigo',
   status: 'planning',
@@ -56,6 +57,15 @@ const colors = [
 const errors = ref({})
 const modalBody = ref(null)
 const errorMessages = computed(() => [...new Set(Object.values(errors.value).filter(Boolean))])
+const hasUnsavedChanges = computed(() => Boolean(
+  form.name.trim() || form.description.trim() || form.customerId || form.managerId || form.dueDate ||
+  form.memberIds.length || selectedFiles.value.length || form.template !== 'blank'
+))
+
+function closeModal() {
+  if (hasUnsavedChanges.value && !window.confirm('Bạn có thay đổi chưa lưu. Vẫn đóng cửa sổ tạo dự án?')) return
+  projectModalOpen.value = false
+}
 
 function showErrors(nextErrors) {
   errors.value = nextErrors
@@ -85,6 +95,7 @@ async function submit() {
   } else if (res && res.success) {
     // modal is closed in useProjectWorkspace
     form.name = ''
+    form.template = 'blank'
     form.description = ''
     form.customerId = ''
     form.managerId = ''
@@ -108,7 +119,7 @@ const removeSelectedFile = (idx) => {
 
 // Close on escape
 const onKeydown = (e) => {
-  if (e.key === 'Escape') projectModalOpen.value = false
+  if (e.key === 'Escape') closeModal()
 }
 onMounted(() => document.addEventListener('keydown', onKeydown))
 onUnmounted(() => document.removeEventListener('keydown', onKeydown))
@@ -118,7 +129,7 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
   <Teleport to="body">
     <div class="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-200">
       <!-- Backdrop -->
-      <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" @click="projectModalOpen = false"></div>
+      <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" @click="closeModal"></div>
       
       <!-- Modal Content -->
       <form @submit.prevent="submit" class="relative bg-white rounded-2xl shadow-2xl w-full max-w-xl flex flex-col max-h-full overflow-hidden animate-in zoom-in-95 duration-200">
@@ -134,7 +145,7 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
               <p class="text-sm text-slate-500">Thiết lập mục tiêu, thành viên và tiến độ ban đầu.</p>
             </div>
           </div>
-          <button type="button" @click="projectModalOpen = false" class="text-slate-400 hover:text-slate-700 p-2 rounded-xl hover:bg-slate-100 transition-colors">
+          <button type="button" @click="closeModal" class="text-slate-400 hover:text-slate-700 p-2 rounded-xl hover:bg-slate-100 transition-colors">
             <X class="w-5 h-5" />
           </button>
         </header>
@@ -146,6 +157,16 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
             <ul class="mt-1 list-disc space-y-0.5 pl-5">
               <li v-for="message in errorMessages" :key="message">{{ message }}</li>
             </ul>
+          </div>
+          <div class="space-y-2">
+            <label class="block text-sm font-semibold text-slate-700">Mẫu khởi đầu</label>
+            <select v-model="form.template" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-800 outline-none focus:border-violet-300 focus:ring-4 focus:ring-violet-100">
+              <option value="blank">Dự án trống</option>
+              <option value="software">Phát triển phần mềm · 4 bước</option>
+              <option value="marketing">Chiến dịch marketing · 4 bước</option>
+              <option value="operations">Cải tiến vận hành · 4 bước</option>
+            </select>
+            <p class="text-xs text-slate-500">Mẫu sẽ tạo sẵn các nhiệm vụ và ước lượng để bạn bắt đầu nhanh hơn.</p>
           </div>
           <div class="space-y-2">
             <label class="block text-sm font-semibold text-slate-700">Tên dự án *</label>
@@ -289,7 +310,7 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
 
         <!-- Footer -->
         <footer class="p-5 border-t border-slate-100 flex justify-end gap-3 bg-slate-50/50">
-          <button type="button" @click="projectModalOpen = false" class="px-5 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors">
+          <button type="button" @click="closeModal" class="px-5 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors">
             Hủy
           </button>
           <button type="submit" class="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-violet-500 to-indigo-600 text-white rounded-xl text-sm font-medium shadow-md shadow-violet-500/25 hover:shadow-premium transition-all">

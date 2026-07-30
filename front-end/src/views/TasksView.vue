@@ -1,16 +1,60 @@
 <script setup>
-import { computed, ref } from 'vue'
-import { Plus, Search, List, KanbanSquare, MoreHorizontal, Check, CheckSquare, CalendarDays } from '@lucide/vue'
+import { computed, onMounted, ref } from 'vue'
+import { Plus, Search, List, KanbanSquare, MoreHorizontal, Check, CheckSquare, CalendarDays, BookmarkPlus, Trash2 } from '@lucide/vue'
 import draggable from 'vuedraggable'
 import TaskCard from '../components/common/TaskCard.vue'
 import UserAvatar from '../components/common/UserAvatar.vue'
 import TaskCalendar from '../components/common/TaskCalendar.vue'
 import { useProjectWorkspace } from '../composables/useProjectWorkspace'
+import { apiFetch, parseApiError } from '../services/api'
 
 const statusFilter = ref('all')
 const priorityFilter = ref('all')
 const viewMode = ref('kanban')
-const { tasks, globalSearch, taskModalOpen, priorityMap, taskStatusMap, findMember, findProject, formatDate, getTaskDeadlineState, toggleTaskComplete, activeTaskId, moveTask } = useProjectWorkspace()
+const { tasks, globalSearch, taskModalOpen, priorityMap, taskStatusMap, findMember, findProject, formatDate, getTaskDeadlineState, toggleTaskComplete, activeTaskId, moveTask, notify } = useProjectWorkspace()
+const savedViews = ref([])
+const selectedSavedView = ref('')
+const newViewName = ref('')
+
+const loadSavedViews = async () => {
+  const response = await apiFetch('/api/saved-views')
+  if (response.ok) savedViews.value = await response.json()
+}
+
+const applySavedView = () => {
+  const view = savedViews.value.find(item => item.code === selectedSavedView.value)
+  if (!view) return
+  statusFilter.value = view.filters?.status || 'all'
+  priorityFilter.value = view.filters?.priority || 'all'
+  viewMode.value = view.filters?.viewMode || 'kanban'
+  globalSearch.value = view.filters?.search || ''
+}
+
+const saveCurrentView = async () => {
+  const name = newViewName.value.trim()
+  if (!name) return notify('Vui lòng nhập tên chế độ xem')
+  const response = await apiFetch('/api/saved-views', {
+    method: 'POST',
+    body: JSON.stringify({ name, scope: 'tasks', filters: { status: statusFilter.value, priority: priorityFilter.value, viewMode: viewMode.value, search: globalSearch.value } })
+  })
+  if (!response.ok) return notify(await parseApiError(response, 'Không thể lưu chế độ xem'))
+  const payload = await response.json()
+  savedViews.value.push(payload.view)
+  selectedSavedView.value = payload.view.code
+  newViewName.value = ''
+  notify('Đã lưu chế độ xem')
+}
+
+const deleteSavedView = async () => {
+  if (!selectedSavedView.value) return
+  const response = await apiFetch(`/api/saved-views/${selectedSavedView.value}`, { method: 'DELETE' })
+  if (!response.ok) return notify(await parseApiError(response, 'Không thể xóa chế độ xem'))
+  savedViews.value = savedViews.value.filter(item => item.code !== selectedSavedView.value)
+  selectedSavedView.value = ''
+  notify('Đã xóa chế độ xem')
+}
+
+onMounted(loadSavedViews)
 
 const deadlineDateClass = (task) => {
   const state = getTaskDeadlineState(task.dueDate, task.status)
@@ -119,6 +163,20 @@ const getTasksByStatus = (statusId) => {
           </button>
         </div>
       </div>
+    </div>
+
+    <div class="flex flex-col gap-2 rounded-2xl border border-slate-100 bg-white p-3 shadow-sm sm:flex-row sm:items-center">
+      <select v-model="selectedSavedView" @change="applySavedView" class="min-w-48 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none focus:border-violet-300">
+        <option value="">Chế độ xem đã lưu</option>
+        <option v-for="view in savedViews" :key="view.code" :value="view.code">{{ view.name }}</option>
+      </select>
+      <input v-model="newViewName" @keyup.enter="saveCurrentView" placeholder="Tên bộ lọc hiện tại..." class="min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-violet-300" />
+      <button @click="saveCurrentView" class="inline-flex items-center justify-center gap-2 rounded-xl bg-violet-50 px-3 py-2 text-sm font-semibold text-violet-700 hover:bg-violet-100">
+        <BookmarkPlus class="h-4 w-4" /> Lưu chế độ xem
+      </button>
+      <button @click="deleteSavedView" :disabled="!selectedSavedView" title="Xóa chế độ xem đang chọn" class="inline-flex items-center justify-center rounded-xl p-2 text-slate-400 hover:bg-rose-50 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-40">
+        <Trash2 class="h-4 w-4" />
+      </button>
     </div>
 
     <!-- Table View -->

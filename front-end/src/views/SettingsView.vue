@@ -1,7 +1,8 @@
 <script setup>
-import { ref, watch } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import { User, Bell, Palette, Moon, Sun, CheckCircle2 } from '@lucide/vue'
 import { useProjectWorkspace } from '../composables/useProjectWorkspace'
+import { apiFetch, parseApiError } from '../services/api'
 
 const activeTab = ref('profile')
 const { darkMode, setTheme, notify, currentUser, updateUserProfile, BASE_URL } = useProjectWorkspace()
@@ -95,19 +96,29 @@ const tabs = [
   { id: 'appearance', label: 'Giao diện', icon: Palette }
 ]
 
-const savedNotifications = JSON.parse(localStorage.getItem('notificationSettings')) || [
-  { id: 'email', title: 'Thông báo qua email', desc: 'Nhận bản tóm tắt hoạt động qua email.', checked: true },
-  { id: 'push', title: 'Thông báo đẩy', desc: 'Hiển thị thông báo ngay trên thiết bị.', checked: true },
+const notifications = ref([
+  { id: 'assignment', title: 'Phân công nhiệm vụ', desc: 'Khi bạn được giao một nhiệm vụ mới.', checked: true },
   { id: 'deadline', title: 'Nhắc hạn nhiệm vụ', desc: 'Nhắc bạn trước khi nhiệm vụ đến hạn.', checked: true },
-  { id: 'mention', title: 'Khi được đề cập', desc: 'Khi đồng đội nhắc đến tên của bạn.', checked: false },
-  { id: 'report', title: 'Báo cáo tiến độ', desc: 'Nhận báo cáo vào mỗi sáng thứ Hai.', checked: true }
-]
-const notifications = ref(savedNotifications)
+  { id: 'comments', title: 'Bình luận mới', desc: 'Khi có bình luận mới trong nhiệm vụ bạn theo dõi.', checked: true },
+  { id: 'mentions', title: 'Khi được đề cập', desc: 'Khi đồng đội nhắc đến tên của bạn.', checked: true },
+  { id: 'blocked', title: 'Công việc bị chặn', desc: 'Khi một trở ngại ảnh hưởng đến nhiệm vụ.', checked: true }
+])
 
-const toggleNotification = (item) => {
-  localStorage.setItem('notificationSettings', JSON.stringify(notifications.value))
+const loadNotificationPreferences = async () => {
+  const response = await apiFetch('/api/notification-preferences')
+  if (!response.ok) return
+  const preferences = await response.json()
+  notifications.value.forEach(item => { item.checked = preferences[item.id] ?? true })
+}
+
+const toggleNotification = async (item) => {
+  const preferences = Object.fromEntries(notifications.value.map(setting => [setting.id, Boolean(setting.checked)]))
+  const response = await apiFetch('/api/notification-preferences', { method: 'PUT', body: JSON.stringify(preferences) })
+  if (!response.ok) return notify(await parseApiError(response, 'Không thể lưu tùy chọn thông báo'))
   notify(item.checked ? `Đã bật: ${item.title}` : `Đã tắt: ${item.title}`)
 }
+
+onMounted(loadNotificationPreferences)
 
 const colors = [
   { id: 'violet', bg: 'bg-[#8b5cf6]', ring: 'ring-[#8b5cf6]' },

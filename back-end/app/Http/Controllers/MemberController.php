@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Group;
 use App\Models\Member;
+use App\Services\AccessService;
 use App\Services\GroupMembershipService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -13,7 +14,7 @@ class MemberController extends Controller
     // Lấy danh sách toàn bộ thành viên
     public function index()
     {
-        $members = Member::select('member_code', 'member_name', 'member_email', 'member_avatar', 'member_color', 'member_role', 'member_phone', 'member_department', 'member_join_date', 'member_bio', 'member_online')->get();
+        $members = Member::select('member_code', 'member_name', 'member_email', 'member_avatar', 'member_color', 'member_role', 'member_phone', 'member_department', 'member_join_date', 'member_bio', 'member_online', 'member_weekly_capacity_hours')->get();
 
         return response()->json($members);
     }
@@ -21,6 +22,7 @@ class MemberController extends Controller
     // Thêm thành viên mới
     public function store(Request $request)
     {
+        AccessService::authorize(AccessService::canManagePeople($request->user()));
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:members,member_email',
@@ -30,6 +32,7 @@ class MemberController extends Controller
             'bio' => 'nullable|string|max:1000',
             'color' => 'nullable|string|max:30',
             'group_code' => 'nullable|exists:groups,group_code',
+            'weekly_capacity_hours' => 'nullable|numeric|min:1|max:168',
         ], [
             'phone.required' => 'Vui lòng nhập số điện thoại.',
             'phone.regex' => 'Số điện thoại phải gồm từ 9 đến 15 chữ số và chỉ có thể bắt đầu bằng dấu +.',
@@ -48,6 +51,7 @@ class MemberController extends Controller
             $member->member_bio = $validated['bio'] ?? null;
             $member->member_color = $validated['color'] ?? 'blue';
             $member->member_join_date = now()->toDateString();
+            $member->member_weekly_capacity_hours = $validated['weekly_capacity_hours'] ?? 40;
             $member->save();
 
             GroupMembershipService::assign($member->member_code, $groupCode);
@@ -64,6 +68,7 @@ class MemberController extends Controller
 
     public function update(Request $request, string $code)
     {
+        AccessService::authorize(AccessService::canManagePeople($request->user()));
         $member = Member::findOrFail($code);
         $validated = $request->validate([
             'name' => 'sometimes|required|string|max:255',
@@ -75,6 +80,7 @@ class MemberController extends Controller
             'color' => 'nullable|string|max:30',
             'online' => 'nullable|boolean',
             'group_code' => 'sometimes|nullable|exists:groups,group_code',
+            'weekly_capacity_hours' => 'nullable|numeric|min:1|max:168',
         ], [
             'phone.required' => 'Vui lòng nhập số điện thoại.',
             'phone.regex' => 'Số điện thoại phải gồm từ 9 đến 15 chữ số và chỉ có thể bắt đầu bằng dấu +.',

@@ -17,6 +17,23 @@ class CoreApiTest extends TestCase
 {
     use RefreshDatabase;
 
+    private User $apiUser;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $plainToken = 'core-api-test-token';
+        $this->apiUser = User::create([
+            'user_name' => 'Quản trị viên',
+            'user_email' => 'authenticated-admin@example.com',
+            'user_password' => Hash::make('test-password'),
+            'user_role' => 'admin',
+            'user_api_token' => hash('sha256', $plainToken),
+        ]);
+        $this->withToken($plainToken);
+    }
+
     public function test_project_and_task_workflow_uses_the_deployment_schema(): void
     {
         $user = User::create([
@@ -84,7 +101,7 @@ class CoreApiTest extends TestCase
         $this->getJson('/api/activities')
             ->assertOk()
             ->assertJsonCount(4)
-            ->assertJsonPath('0.user.code', $user->user_code)
+            ->assertJsonPath('0.user.code', $this->apiUser->user_code)
             ->assertJsonPath('0.user.name', 'Quản trị viên');
 
         $this->assertDatabaseHas('tasks', [

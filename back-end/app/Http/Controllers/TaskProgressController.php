@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Task;
 use App\Models\TaskChecklist;
 use App\Models\TaskWorkLog;
+use App\Services\AccessService;
 use App\Services\ActivityService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -13,7 +14,8 @@ class TaskProgressController extends Controller
 {
     public function storeChecklist(Request $request, string $taskCode)
     {
-        $task = Task::findOrFail($taskCode);
+        $task = Task::with('project')->findOrFail($taskCode);
+        AccessService::authorize(AccessService::canEditTask($request->user(), $task));
         $validated = $request->validate([
             'text' => 'required|string|max:255',
         ]);
@@ -32,7 +34,8 @@ class TaskProgressController extends Controller
 
     public function updateChecklist(Request $request, string $taskCode, string $checklistCode)
     {
-        $task = Task::findOrFail($taskCode);
+        $task = Task::with('project')->findOrFail($taskCode);
+        AccessService::authorize(AccessService::canEditTask($request->user(), $task));
         $checklist = $task->checklists()->whereKey($checklistCode)->firstOrFail();
         $validated = $request->validate([
             'text' => 'sometimes|required|string|max:255',
@@ -54,9 +57,10 @@ class TaskProgressController extends Controller
         ]);
     }
 
-    public function destroyChecklist(string $taskCode, string $checklistCode)
+    public function destroyChecklist(Request $request, string $taskCode, string $checklistCode)
     {
-        $task = Task::findOrFail($taskCode);
+        $task = Task::with('project')->findOrFail($taskCode);
+        AccessService::authorize(AccessService::canEditTask($request->user(), $task));
         $checklist = $task->checklists()->whereKey($checklistCode)->firstOrFail();
         $checklist->delete();
 
@@ -68,7 +72,8 @@ class TaskProgressController extends Controller
 
     public function storeWorkLog(Request $request, string $taskCode)
     {
-        $task = Task::findOrFail($taskCode);
+        $task = Task::with('project')->findOrFail($taskCode);
+        AccessService::authorize(AccessService::canEditTask($request->user(), $task));
 
         if (! $task->task_assignee_code) {
             return response()->json([
@@ -81,6 +86,7 @@ class TaskProgressController extends Controller
 
         $validated = $request->validate([
             'time' => 'required|date_format:H:i',
+            'duration_minutes' => 'nullable|integer|min:1|max:1440',
             'note' => 'nullable|string|max:5000',
             'checklist_ids' => 'sometimes|array',
             'checklist_ids.*' => 'string|distinct',
@@ -91,7 +97,6 @@ class TaskProgressController extends Controller
             'files.*.url' => 'nullable|string|max:1000',
             'files.*.uploadedBy' => 'nullable|string|max:50',
             'files.*.uploadedAt' => 'nullable|string|max:100',
-            'user_code' => 'nullable|exists:users,user_code',
         ]);
 
         $checklistIds = $validated['checklist_ids'] ?? [];
@@ -116,6 +121,7 @@ class TaskProgressController extends Controller
                 'worklog_task_code' => $task->task_code,
                 'worklog_reporter_code' => $task->task_assignee_code,
                 'worklog_time' => $validated['time'],
+                'worklog_duration_minutes' => $validated['duration_minutes'] ?? null,
                 'worklog_note' => $validated['note'] ?? null,
                 'worklog_date' => now()->toDateString(),
                 'worklog_completed_items' => $completedItems,
@@ -133,7 +139,7 @@ class TaskProgressController extends Controller
         });
 
         ActivityService::log(
-            $validated['user_code'] ?? 'US0001',
+            $request->user()->user_code,
             'báo cáo tiến độ',
             'Task',
             $task->task_code,
