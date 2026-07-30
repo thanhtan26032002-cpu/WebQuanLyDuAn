@@ -27,6 +27,19 @@ class ProjectController extends Controller
         return response()->json($projects);
     }
 
+    public function trash()
+    {
+        $projects = Project::onlyTrashed()
+            ->where('project_deleted_at', '>=', now()->subDays(30))
+            ->withCount('tasks')
+            ->with(['customer', 'manager'])
+            ->orderBy('project_deleted_at', 'desc')
+            ->get()
+            ->map(fn (Project $project) => $this->trashItem($project));
+
+        return response()->json($projects);
+    }
+
     // Lấy chi tiết 1 dự án
     public function show($code)
     {
@@ -142,7 +155,36 @@ class ProjectController extends Controller
         );
 
         return response()->json([
-            'message' => 'Đã xóa dự án thành công',
+            'message' => 'Đã chuyển dự án vào thùng rác. Có thể khôi phục trong 30 ngày.',
+        ]);
+    }
+
+    public function restore(Request $request, $code)
+    {
+        $project = Project::onlyTrashed()->findOrFail($code);
+        $restoreUntil = $project->project_deleted_at->copy()->addDays(30);
+
+        if (now()->greaterThan($restoreUntil)) {
+            return response()->json([
+                'message' => 'Dự án đã bị xóa quá 30 ngày và không thể khôi phục.',
+            ], 410);
+        }
+
+        $project->restore();
+
+        ActivityService::log(
+            $request->input('user_code', 'US0001'),
+            'khôi phục dự án',
+            'Project',
+            $project->project_code,
+            'Đã khôi phục dự án: '.$project->project_name
+        );
+
+        $project->load('customer', 'manager', 'members', 'attachments');
+
+        return response()->json([
+            'message' => 'Đã khôi phục dự án.',
+            'project' => $project,
         ]);
     }
 
@@ -179,5 +221,15 @@ class ProjectController extends Controller
         }
 
         return $validated;
+    }
+
+    private function trashItem(Project $project): array
+    {
+        $restoreUntil = $project->project_deleted_at->copy()->addDays(30);
+
+        return array_merge($project->toArray(), [
+            'restore_until' => $restoreUntil->toISOString(),
+            'can_restore' => now()->lessThanOrEqualTo($restoreUntil),
+        ]);
     }
 }

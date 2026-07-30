@@ -6,6 +6,7 @@ const routes = [
   { path: '/tasks', name: 'tasks', component: () => import('../views/TasksView.vue'), meta: { title: 'Nhiệm vụ' } },
   { path: '/team', name: 'team', component: () => import('../views/TeamView.vue'), meta: { title: 'Nhóm' } },
   { path: '/calendar', name: 'calendar', component: () => import('../views/CalendarView.vue'), meta: { title: 'Lịch' } },
+  { path: '/trash', name: 'trash', component: () => import('../views/TrashView.vue'), meta: { title: 'Thùng rác' } },
   { path: '/settings', name: 'settings', component: () => import('../views/SettingsView.vue'), meta: { title: 'Cài đặt' } },
   { path: '/:pathMatch(.*)*', name: 'not-found', component: () => import('../views/NotFoundView.vue'), meta: { title: 'Không tìm thấy' } },
 ]

@@ -24,6 +24,8 @@ Route::middleware('api.token')->group(function () {
 // Tạm thời để public (không bọc auth:sanctum) để Front-end dễ gọi
 Route::get('/projects', [ProjectController::class, 'index']);
 Route::post('/projects', [ProjectController::class, 'store']);
+Route::get('/projects-trash', [ProjectController::class, 'trash']);
+Route::post('/projects/{id}/restore', [ProjectController::class, 'restore']);
 Route::get('/projects/{id}', [ProjectController::class, 'show']);
 Route::put('/projects/{id}', [ProjectController::class, 'update']);
 Route::delete('/projects/{id}', [ProjectController::class, 'destroy']);
@@ -34,6 +36,8 @@ Route::post('/customers', [CustomerController::class, 'store']);
 
 Route::get('/tasks', [TaskController::class, 'index']);
 Route::post('/tasks', [TaskController::class, 'store']);
+Route::get('/tasks-trash', [TaskController::class, 'trash']);
+Route::post('/tasks/{id}/restore', [TaskController::class, 'restore']);
 Route::put('/tasks/{id}', [TaskController::class, 'update']);
 Route::patch('/tasks/{id}/status', [TaskController::class, 'updateStatus']);
 Route::delete('/tasks/{id}', [TaskController::class, 'destroy']);

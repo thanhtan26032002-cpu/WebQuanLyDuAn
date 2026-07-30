@@ -97,11 +97,13 @@ async function submit() {
   }
 }
 
-function confirmDelete() {
+async function confirmDelete() {
   const pId = editingProjectId.value
-  projectSettingsModalOpen.value = false
-  deleteProject(pId)
-  router.push('/projects')
+  const deleted = await deleteProject(pId)
+  if (deleted) {
+    projectSettingsModalOpen.value = false
+    router.push('/projects')
+  }
 }
 
 // Close on escape
@@ -250,7 +252,7 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
             <div class="p-4 bg-rose-50 border border-rose-100 rounded-xl flex items-center justify-between gap-4">
               <div>
                 <strong class="block text-sm text-rose-900">Xóa dự án này</strong>
-                <span class="text-xs text-rose-700">Hành động này sẽ xóa toàn bộ nhiệm vụ và tệp đính kèm. Không thể hoàn tác.</span>
+                <span class="text-xs text-rose-700">Dự án sẽ biến mất khỏi giao diện hoạt động nhưng dữ liệu vẫn được giữ lại. Bạn có thể khôi phục trong 30 ngày.</span>
               </div>
               <button 
                 v-if="!isDeleting" 

@@ -66,6 +66,9 @@ function mapProject(p) {
     customer: p.customer || null,
     manager: p.manager || null,
     createdAt: p.created_at || p.createdAt,
+    deletedAt: p.deleted_at || p.deletedAt || null,
+    restoreUntil: p.restore_until || p.restoreUntil || null,
+    canRestore: p.can_restore ?? p.canRestore ?? false,
     memberIds: p.members ? p.members.map(m => m.code) : (p.memberIds || []),
     progress: p.progress || 0,
     color: p.color || 'indigo',
@@ -90,6 +93,9 @@ function mapTask(t) {
     type: t.type || 'task',
     estimatedHours: t.estimated_hours ?? t.estimatedHours ?? null,
     createdAt: t.created_at || t.createdAt,
+    deletedAt: t.deleted_at || t.deletedAt || null,
+    restoreUntil: t.restore_until || t.restoreUntil || null,
+    canRestore: t.can_restore ?? t.canRestore ?? false,
     tags: parsedTags,
     progress: t.progress || 0,
     files: t.attachments ? t.attachments.map(mapAttachment) : (t.files || []),
@@ -179,6 +185,8 @@ function validateCustomerDraft(payload) {
 // ========== STATE (Khởi tạo rỗng, dữ liệu sẽ được tải từ DB) ==========
 const projects = ref([])
 const tasks = ref([])
+const deletedProjects = ref([])
+const deletedTasks = ref([])
 const members = ref([])
 const groups = ref([])
 const customers = ref([])
@@ -482,6 +490,27 @@ export function useProjectWorkspace() {
 
   // ========== DỰ ÁN (Projects) - Gọi API ==========
 
+  async function loadTrash() {
+    try {
+      const [projectResponse, taskResponse] = await Promise.all([
+        fetch(`${API_URL}/projects-trash`, { headers: { 'Accept': 'application/json' } }),
+        fetch(`${API_URL}/tasks-trash`, { headers: { 'Accept': 'application/json' } }),
+      ])
+
+      if (!projectResponse.ok || !taskResponse.ok) {
+        notify('Không thể tải dữ liệu trong thùng rác')
+        return false
+      }
+
+      deletedProjects.value = (await projectResponse.json()).map(mapProject)
+      deletedTasks.value = (await taskResponse.json()).map(mapTask)
+      return true
+    } catch {
+      notify('Lỗi kết nối: Không thể tải thùng rác')
+      return false
+    }
+  }
+
   async function addProject(payload) {
     try {
       const res = await fetch(`${API_URL}/projects`, {
@@ -593,6 +622,7 @@ export function useProjectWorkspace() {
 
   async function deleteProject(projectId) {
     try {
+      const deletedProject = projects.value.find(p => p.id === projectId)
       const res = await fetch(`${API_URL}/projects/${projectId}`, {
         method: 'DELETE',
         headers: { 'Accept': 'application/json' }
@@ -600,11 +630,43 @@ export function useProjectWorkspace() {
       if (res.ok) {
         projects.value = projects.value.filter(p => p.id !== projectId)
         tasks.value = tasks.value.filter(t => t.projectId !== projectId)
+        if (deletedProject && !deletedProjects.value.some(p => p.id === projectId)) {
+          deletedProjects.value.unshift({ ...deletedProject, deletedAt: new Date().toISOString(), canRestore: true })
+        }
         //refreshActivitiesAndNotifications()
-        notify('Đã xóa dự án thành công')
+        notify('Đã chuyển dự án vào thùng rác')
+        return true
       }
     } catch (e) {
       notify('Lỗi kết nối: Không thể xóa dự án')
+    }
+    return false
+  }
+
+  async function restoreProject(projectId) {
+    try {
+      const res = await fetch(`${API_URL}/projects/${projectId}/restore`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({ user_code: currentUser.value.code }),
+      })
+      if (!res.ok) {
+        notify(res.status === 410 ? 'Dự án đã quá hạn khôi phục 30 ngày' : 'Không thể khôi phục dự án')
+        return false
+      }
+
+      const data = await res.json()
+      projects.value.unshift(mapProject(data.project))
+      deletedProjects.value = deletedProjects.value.filter(project => project.id !== projectId)
+
+      const taskResponse = await fetch(`${API_URL}/tasks`)
+      if (taskResponse.ok) tasks.value = (await taskResponse.json()).map(mapTask)
+
+      notify('Đã khôi phục dự án')
+      return true
+    } catch {
+      notify('Lỗi kết nối: Không thể khôi phục dự án')
+      return false
     }
   }
 
@@ -727,20 +789,51 @@ export function useProjectWorkspace() {
 
   async function deleteTask(taskId) {
     try {
+      const deletedTask = tasks.value.find(t => t.id === taskId)
       const res = await fetch(`${API_URL}/tasks/${taskId}`, {
         method: 'DELETE',
         headers: { 'Accept': 'application/json' }
       })
       if (res.ok) {
         tasks.value = tasks.value.filter(t => t.id !== taskId)
+        if (deletedTask && !deletedTasks.value.some(t => t.id === taskId)) {
+          deletedTasks.value.unshift({ ...deletedTask, deletedAt: new Date().toISOString(), canRestore: true })
+        }
         if (activeTaskId.value === taskId) {
           activeTaskId.value = null
         }
         //refreshActivitiesAndNotifications()
-        notify('Đã xóa nhiệm vụ')
+        notify('Đã chuyển nhiệm vụ vào thùng rác')
+        return true
       }
     } catch (e) {
       notify('Lỗi kết nối: Không thể xóa nhiệm vụ')
+    }
+    return false
+  }
+
+  async function restoreTask(taskId) {
+    try {
+      const res = await fetch(`${API_URL}/tasks/${taskId}/restore`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({ user_code: currentUser.value.code }),
+      })
+      if (!res.ok) {
+        if (res.status === 410) notify('Nhiệm vụ đã quá hạn khôi phục 30 ngày')
+        else if (res.status === 409) notify('Hãy khôi phục dự án chứa nhiệm vụ này trước')
+        else notify('Không thể khôi phục nhiệm vụ')
+        return false
+      }
+
+      const data = await res.json()
+      tasks.value.unshift(mapTask(data.task))
+      deletedTasks.value = deletedTasks.value.filter(task => task.id !== taskId)
+      notify('Đã khôi phục nhiệm vụ')
+      return true
+    } catch {
+      notify('Lỗi kết nối: Không thể khôi phục nhiệm vụ')
+      return false
     }
   }
 
@@ -1160,6 +1253,8 @@ export function useProjectWorkspace() {
   return {
     projects,
     tasks,
+    deletedProjects,
+    deletedTasks,
     members,
     groups,
     customers,
@@ -1218,6 +1313,8 @@ export function useProjectWorkspace() {
     addProject,
     updateProject,
     deleteProject,
+    restoreProject,
+    loadTrash,
     loadUsers,
     updateUserProfile,
     downloadArchive,
@@ -1228,6 +1325,7 @@ export function useProjectWorkspace() {
     updateTask,
     updateTaskStatus,
     deleteTask,
+    restoreTask,
     loadComments,
     addComment,
     uploadFile,

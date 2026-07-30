@@ -81,7 +81,9 @@ CREATE TABLE IF NOT EXISTS `projects` (
   `project_manager_code` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `project_created_at` timestamp NULL DEFAULT NULL,
   `project_updated_at` timestamp NULL DEFAULT NULL,
+  `project_deleted_at` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`project_code`),
+  KEY `projects_project_deleted_at_index` (`project_deleted_at`),
   FOREIGN KEY (`project_created_by`) REFERENCES `users` (`user_code`) ON DELETE CASCADE,
   FOREIGN KEY (`project_customer_code`) REFERENCES `customers` (`customer_code`) ON DELETE SET NULL,
   FOREIGN KEY (`project_manager_code`) REFERENCES `members` (`member_code`) ON DELETE SET NULL
@@ -115,7 +117,9 @@ CREATE TABLE IF NOT EXISTS `tasks` (
   `task_tags` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `task_created_at` timestamp NULL DEFAULT NULL,
   `task_updated_at` timestamp NULL DEFAULT NULL,
+  `task_deleted_at` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`task_code`),
+  KEY `tasks_task_deleted_at_index` (`task_deleted_at`),
   FOREIGN KEY (`task_project_code`) REFERENCES `projects` (`project_code`) ON DELETE CASCADE,
   FOREIGN KEY (`task_assignee_code`) REFERENCES `members` (`member_code`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

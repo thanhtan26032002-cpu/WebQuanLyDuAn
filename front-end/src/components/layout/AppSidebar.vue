@@ -7,6 +7,7 @@ import {
   CheckSquare,
   Users,
   Calendar as CalendarIcon,
+  Trash2,
   Settings,
   Plus,
 } from "@lucide/vue";
@@ -32,6 +33,7 @@ const navigation = computed(() => [
   },
   { name: "Nhóm", href: "/team", icon: Users },
   { name: "Lịch", href: "/calendar", icon: CalendarIcon },
+  { name: "Thùng rác", href: "/trash", icon: Trash2 },
 ]);
 
 const isActive = (path) => {

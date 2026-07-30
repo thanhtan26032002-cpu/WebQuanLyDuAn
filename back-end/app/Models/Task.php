@@ -4,12 +4,13 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use App\Traits\GeneratesCode;
 use App\Traits\MapsAttributes;
 
 class Task extends Model
 {
-    use HasFactory, GeneratesCode, MapsAttributes;
+    use HasFactory, GeneratesCode, MapsAttributes, SoftDeletes;
 
     protected $primaryKey = 'task_code';
     public $incrementing = false;
@@ -17,6 +18,11 @@ class Task extends Model
 
     const CREATED_AT = 'task_created_at';
     const UPDATED_AT = 'task_updated_at';
+    const DELETED_AT = 'task_deleted_at';
+
+    protected $casts = [
+        'task_deleted_at' => 'datetime',
+    ];
 
     protected $fillable = [
         'task_project_code', 'task_title', 'task_description', 'task_status', 
@@ -47,6 +53,7 @@ class Task extends Model
             'task_estimated_hours' => 'estimated_hours',
             'task_created_at' => 'created_at',
             'task_updated_at' => 'updated_at',
+            'task_deleted_at' => 'deleted_at',
         ];
     }
 

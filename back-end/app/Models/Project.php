@@ -4,12 +4,13 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use App\Traits\GeneratesCode;
 use App\Traits\MapsAttributes;
 
 class Project extends Model
 {
-    use HasFactory, GeneratesCode, MapsAttributes;
+    use HasFactory, GeneratesCode, MapsAttributes, SoftDeletes;
 
     protected $primaryKey = 'project_code';
     public $incrementing = false;
@@ -17,6 +18,11 @@ class Project extends Model
 
     const CREATED_AT = 'project_created_at';
     const UPDATED_AT = 'project_updated_at';
+    const DELETED_AT = 'project_deleted_at';
+
+    protected $casts = [
+        'project_deleted_at' => 'datetime',
+    ];
 
     protected $fillable = [
         'project_name', 'project_description', 'project_color', 'project_status',
@@ -45,6 +51,7 @@ class Project extends Model
             'project_manager_code' => 'manager_code',
             'project_created_at' => 'created_at',
             'project_updated_at' => 'updated_at',
+            'project_deleted_at' => 'deleted_at',
         ];
     }
 

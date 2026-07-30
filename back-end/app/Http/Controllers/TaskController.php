@@ -3,19 +3,38 @@
 namespace App\Http\Controllers;
 
 use App\Models\Member;
+use App\Models\Project;
 use App\Models\Task;
 use App\Models\TaskComment;
 use App\Models\User;
 use App\Services\ActivityService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 
 class TaskController extends Controller
 {
     // Lấy danh sách tasks
     public function index()
     {
-        $tasks = Task::with(['assignee:member_code,member_name,member_avatar', 'attachments'])->get();
+        $tasks = Task::where(function ($query) {
+            $query->whereNull('task_project_code')->orWhereHas('project');
+        })->with(['assignee:member_code,member_name,member_avatar', 'attachments'])->get();
+
+        return response()->json($tasks);
+    }
+
+    public function trash()
+    {
+        $tasks = Task::onlyTrashed()
+            ->where('task_deleted_at', '>=', now()->subDays(30))
+            ->with([
+                'assignee:member_code,member_name,member_avatar',
+                'project' => fn ($query) => $query->withTrashed(),
+            ])
+            ->orderBy('task_deleted_at', 'desc')
+            ->get()
+            ->map(fn (Task $task) => $this->trashItem($task));
 
         return response()->json($tasks);
     }
@@ -26,7 +45,7 @@ class TaskController extends Controller
         $input = $this->normalizeOptionalFields($request->all());
 
         $validator = Validator::make($input, [
-            'project_code' => 'nullable|exists:projects,project_code',
+            'project_code' => ['nullable', Rule::exists('projects', 'project_code')->whereNull('project_deleted_at')],
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
             'type' => 'nullable|string|in:task,analysis,ui_ux,frontend,backend,api,database,devops,testing,security,documentation,research,maintenance,bug,feature,milestone',
@@ -98,7 +117,7 @@ class TaskController extends Controller
             'progress' => 'nullable|integer|min:0|max:100',
             'estimated_hours' => 'nullable|numeric|min:0|max:99999.99',
             'assignee_code' => 'nullable|exists:members,member_code',
-            'project_code' => 'nullable|exists:projects,project_code',
+            'project_code' => ['nullable', Rule::exists('projects', 'project_code')->whereNull('project_deleted_at')],
             'tags' => 'nullable|string|max:500',
         ]);
 
@@ -170,7 +189,45 @@ class TaskController extends Controller
         );
 
         return response()->json([
-            'message' => 'Đã xóa nhiệm vụ',
+            'message' => 'Đã chuyển nhiệm vụ vào thùng rác. Có thể khôi phục trong 30 ngày.',
+        ]);
+    }
+
+    public function restore(Request $request, $code)
+    {
+        $task = Task::onlyTrashed()->findOrFail($code);
+        $restoreUntil = $task->task_deleted_at->copy()->addDays(30);
+
+        if (now()->greaterThan($restoreUntil)) {
+            return response()->json([
+                'message' => 'Nhiệm vụ đã bị xóa quá 30 ngày và không thể khôi phục.',
+            ], 410);
+        }
+
+        if ($task->task_project_code) {
+            $project = Project::withTrashed()->find($task->task_project_code);
+            if ($project?->trashed()) {
+                return response()->json([
+                    'message' => 'Hãy khôi phục dự án chứa nhiệm vụ này trước.',
+                ], 409);
+            }
+        }
+
+        $task->restore();
+
+        ActivityService::log(
+            $request->input('user_code', 'US0001'),
+            'khôi phục nhiệm vụ',
+            'Task',
+            $task->task_code,
+            'Đã khôi phục nhiệm vụ: '.$task->task_title
+        );
+
+        $task->load(['assignee:member_code,member_name,member_avatar', 'attachments']);
+
+        return response()->json([
+            'message' => 'Đã khôi phục nhiệm vụ.',
+            'task' => $task,
         ]);
     }
 
@@ -239,5 +296,15 @@ class TaskController extends Controller
         }
 
         return $input;
+    }
+
+    private function trashItem(Task $task): array
+    {
+        $restoreUntil = $task->task_deleted_at->copy()->addDays(30);
+
+        return array_merge($task->toArray(), [
+            'restore_until' => $restoreUntil->toISOString(),
+            'can_restore' => now()->lessThanOrEqualTo($restoreUntil),
+        ]);
     }
 }

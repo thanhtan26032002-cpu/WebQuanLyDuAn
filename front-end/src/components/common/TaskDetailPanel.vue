@@ -17,7 +17,7 @@ const {
   projectStatusMap, priorityMap, taskStatusMap, 
   taskModalOpen, activeTaskId, 
   findMember, findProject, formatDate, getTaskDeadlineState, updateTask, loadComments, addComment, uploadFile,
-  downloadArchive, downloadSingleFile
+  downloadArchive, downloadSingleFile, deleteTask
 } = useProjectWorkspace()
 
 const isDownloadModalOpen = ref(false)
@@ -62,6 +62,7 @@ const deadlineInfo = computed(() => {
 const newComment = ref('')
 const isEditing = ref(false)
 const editedTask = ref({})
+const isConfirmingDelete = ref(false)
 
 const startEditing = () => {
   if (!task.value) return
@@ -73,6 +74,7 @@ const startEditing = () => {
 watch(activeTaskId, async (newVal) => {
   if (newVal) {
     isEditing.value = false
+    isConfirmingDelete.value = false
     if (task.value) {
       editedTask.value = JSON.parse(JSON.stringify(task.value))
       editedTask.value.tagsInput = Array.isArray(task.value?.tags) ? task.value.tags.join(', ') : (task.value?.tags || '')
@@ -84,6 +86,12 @@ watch(activeTaskId, async (newVal) => {
 const closePanel = () => {
   activeTaskId.value = null
   isEditing.value = false
+}
+
+const handleDelete = async () => {
+  if (!task.value) return
+  const deleted = await deleteTask(task.value.id)
+  if (deleted) isConfirmingDelete.value = false
 }
 
 const handleSave = () => {
@@ -324,15 +332,28 @@ const formatDateTime = (isoStr) => {
           <p v-else class="text-sm font-medium text-slate-500">{{ project?.name || 'Không có dự án' }}</p>
         </div>
         <div class="flex items-center gap-2">
+          <button
+            v-if="!isEditing && !isConfirmingDelete"
+            @click="isConfirmingDelete = true"
+            class="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors"
+            title="Xóa nhiệm vụ"
+          >
+            <Trash2 class="w-5 h-5" />
+          </button>
+          <template v-else-if="isConfirmingDelete">
+            <span class="text-xs font-medium text-rose-600">Chuyển vào thùng rác?</span>
+            <button @click="isConfirmingDelete = false" class="px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded-lg">Hủy</button>
+            <button @click="handleDelete" class="px-2.5 py-1.5 text-xs font-medium text-white bg-rose-600 hover:bg-rose-700 rounded-lg">Xác nhận</button>
+          </template>
           <button 
-            v-if="!isEditing"
+            v-if="!isEditing && !isConfirmingDelete"
             @click="startEditing"
             class="p-2 text-slate-400 hover:text-violet-600 hover:bg-violet-50 rounded-xl transition-colors"
           >
             <Edit2 class="w-5 h-5" />
           </button>
           <button 
-            v-else
+            v-else-if="isEditing"
             @click="handleSave"
             class="flex items-center gap-1.5 px-3 py-1.5 bg-violet-600 text-white font-medium text-sm rounded-lg hover:bg-violet-700 transition-colors shadow-sm"
           >

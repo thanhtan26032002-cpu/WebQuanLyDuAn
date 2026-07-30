@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Models\Member;
+use App\Models\Project;
+use App\Models\Task;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -363,5 +365,97 @@ class CoreApiTest extends TestCase
             'member_name' => 'Số điện thoại hợp lệ',
             'member_phone' => '+84901234567',
         ]);
+    }
+
+    public function test_projects_and_tasks_are_soft_deleted_and_restorable_for_30_days(): void
+    {
+        User::create([
+            'user_name' => 'Admin',
+            'user_email' => 'soft-delete@example.com',
+            'user_password' => Hash::make('test-password'),
+        ]);
+
+        $this->postJson('/api/projects', [
+            'name' => 'Restorable project',
+            'user_code' => 'US0001',
+        ])->assertCreated();
+
+        $this->postJson('/api/tasks', [
+            'project_code' => 'PJ0001',
+            'title' => 'Restorable task',
+            'user_code' => 'US0001',
+        ])->assertCreated();
+
+        $this->deleteJson('/api/tasks/TK0001')->assertOk();
+        $this->getJson('/api/tasks')->assertJsonCount(0);
+        $this->getJson('/api/tasks-trash')
+            ->assertOk()
+            ->assertJsonPath('0.code', 'TK0001')
+            ->assertJsonPath('0.can_restore', true);
+
+        $this->postJson('/api/tasks/TK0001/restore', ['user_code' => 'US0001'])
+            ->assertOk()
+            ->assertJsonPath('task.code', 'TK0001');
+
+        $this->deleteJson('/api/projects/PJ0001')->assertOk();
+        $this->getJson('/api/projects')->assertJsonCount(0);
+        $this->getJson('/api/tasks')->assertJsonCount(0);
+        $this->getJson('/api/projects-trash')
+            ->assertOk()
+            ->assertJsonPath('0.code', 'PJ0001')
+            ->assertJsonPath('0.can_restore', true);
+
+        $this->assertNotNull(Project::withTrashed()->find('PJ0001')->project_deleted_at);
+        $this->assertNull(Task::find('TK0001')->task_deleted_at);
+
+        $this->postJson('/api/projects/PJ0001/restore', ['user_code' => 'US0001'])
+            ->assertOk()
+            ->assertJsonPath('project.code', 'PJ0001');
+
+        $this->getJson('/api/tasks')->assertJsonCount(1);
+    }
+
+    public function test_restore_is_rejected_after_30_days(): void
+    {
+        User::create([
+            'user_name' => 'Admin',
+            'user_email' => 'expired-delete@example.com',
+            'user_password' => Hash::make('test-password'),
+        ]);
+
+        $this->postJson('/api/projects', [
+            'name' => 'Expired project',
+            'user_code' => 'US0001',
+        ])->assertCreated();
+        $this->deleteJson('/api/projects/PJ0001')->assertOk();
+
+        Project::onlyTrashed()->whereKey('PJ0001')->update([
+            'project_deleted_at' => now()->subDays(31),
+        ]);
+
+        $this->getJson('/api/projects-trash')
+            ->assertOk()
+            ->assertJsonCount(0);
+        $this->postJson('/api/projects/PJ0001/restore')
+            ->assertStatus(410);
+
+        $this->assertTrue(Project::withTrashed()->find('PJ0001')->trashed());
+
+        $this->postJson('/api/tasks', [
+            'title' => 'Expired task',
+            'user_code' => 'US0001',
+        ])->assertCreated();
+        $this->deleteJson('/api/tasks/TK0001')->assertOk();
+        Task::onlyTrashed()->whereKey('TK0001')->update([
+            'task_deleted_at' => now()->subDays(31),
+        ]);
+
+        $this->getJson('/api/tasks-trash')
+            ->assertOk()
+            ->assertJsonCount(0);
+        $this->postJson('/api/tasks/TK0001/restore')
+            ->assertStatus(410);
+
+        $this->assertTrue(Task::withTrashed()->find('TK0001')->trashed());
     }
 }
