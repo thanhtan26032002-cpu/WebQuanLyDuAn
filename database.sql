@@ -21,6 +21,7 @@ DROP TABLE IF EXISTS `activities`;
 CREATE TABLE `activities` (
   `activity_code` varchar(50) NOT NULL,
   `activity_user_code` varchar(50) NOT NULL,
+  `activity_project_code` varchar(50) DEFAULT NULL,
   `activity_action` varchar(255) NOT NULL,
   `activity_target_type` varchar(255) NOT NULL,
   `activity_target_code` varchar(50) NOT NULL,
@@ -29,7 +30,9 @@ CREATE TABLE `activities` (
   `activity_updated_at` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`activity_code`),
   KEY `activity_user_code` (`activity_user_code`),
-  CONSTRAINT `activities_ibfk_1` FOREIGN KEY (`activity_user_code`) REFERENCES `users` (`user_code`) ON DELETE CASCADE
+  KEY `activities_project_created_index` (`activity_project_code`,`activity_created_at`),
+  CONSTRAINT `activities_ibfk_1` FOREIGN KEY (`activity_user_code`) REFERENCES `users` (`user_code`) ON DELETE CASCADE,
+  CONSTRAINT `activities_activity_project_code_foreign` FOREIGN KEY (`activity_project_code`) REFERENCES `projects` (`project_code`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `attachments`;

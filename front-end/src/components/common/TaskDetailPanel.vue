@@ -811,9 +811,7 @@ const formatDateTime = (isoStr) => {
           
           <!-- Comment input -->
           <div class="flex gap-3 mb-6">
-            <div class="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 text-white flex items-center justify-center font-bold text-xs shrink-0">
-              US
-            </div>
+            <UserAvatar :member-id="currentUserCode" size="sm" :show-popover="false" />
             <div class="flex-1 relative">
               <input type="file" ref="fileInput" class="hidden" @change="handleFileUpload" />
               <textarea 
@@ -851,9 +849,7 @@ const formatDateTime = (isoStr) => {
           <!-- Comments list -->
           <div class="space-y-6">
             <div v-for="comment in taskComments" :key="comment.id" class="flex gap-3">
-              <div :class="['w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0 mt-0.5 shadow-sm bg-violet-500']">
-                {{ comment.user?.name ? comment.user.name.substring(0, 2).toUpperCase() : '??' }}
-              </div>
+              <UserAvatar :member-id="comment.userId" size="sm" :show-popover="false" class="mt-0.5" />
               <div class="flex-1">
                 <div class="bg-slate-50 border border-slate-100 rounded-2xl rounded-tl-none p-3 shadow-sm inline-block max-w-full">
                   <div class="flex items-center gap-2 mb-1">

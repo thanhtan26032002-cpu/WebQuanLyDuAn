@@ -280,6 +280,16 @@ class TaskController extends Controller
             $task->task_code,
             "Đã cập nhật nhiệm vụ: {$task->task_title}"
         );
+        if ($previousProjectCode && $previousProjectCode !== $task->task_project_code) {
+            ActivityService::log(
+                $userCode,
+                'chuyển nhiệm vụ khỏi dự án',
+                'Task',
+                $task->task_code,
+                'Nhiệm vụ đã được chuyển sang dự án khác hoặc chuyển thành nhiệm vụ độc lập.',
+                $previousProjectCode
+            );
+        }
 
         return response()->json([
             'message' => 'Đã cập nhật nhiệm vụ',

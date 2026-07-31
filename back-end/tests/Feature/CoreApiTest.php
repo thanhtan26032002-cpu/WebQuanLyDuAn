@@ -100,7 +100,7 @@ class CoreApiTest extends TestCase
 
         $this->getJson('/api/activities')
             ->assertOk()
-            ->assertJsonCount(4)
+            ->assertJsonCount(5)
             ->assertJsonPath('0.user.code', $this->apiUser->user_code)
             ->assertJsonPath('0.user.name', 'Quản trị viên');
 

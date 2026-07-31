@@ -35,6 +35,10 @@ export async function apiFetch(input, options = {}) {
   if (token) headers.set('Authorization', `Bearer ${token}`)
 
   const response = await window.fetch(input, { ...options, headers })
+  const method = String(options.method || 'GET').toUpperCase()
+  if (response.ok && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
+    window.dispatchEvent(new CustomEvent('ringnet:activity-changed'))
+  }
   if (response.status === 401 && !String(input).endsWith('/login')) {
     clearAuthSession()
     window.dispatchEvent(new CustomEvent('ringnet:unauthorized'))

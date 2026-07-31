@@ -6,6 +6,7 @@ use App\Models\Task;
 use App\Models\TaskDependency;
 use App\Models\TaskWatcher;
 use App\Services\AccessService;
+use App\Services\ActivityService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -50,6 +51,14 @@ class TaskRelationsController extends Controller
             }
         });
 
+        ActivityService::log(
+            $request->user()->user_code,
+            'cập nhật quan hệ phụ thuộc',
+            'Task',
+            $taskCode,
+            'Nhiệm vụ đang phụ thuộc vào '.$dependencyIds->count().' nhiệm vụ khác.'
+        );
+
         return response()->json([
             'message' => 'Đã cập nhật quan hệ phụ thuộc.',
             'dependencies' => $task->fresh()->dependencies()->get(),
@@ -75,6 +84,13 @@ class TaskRelationsController extends Controller
             ]);
             $watching = true;
         }
+
+        ActivityService::log(
+            $request->user()->user_code,
+            $watching ? 'theo dõi nhiệm vụ' : 'bỏ theo dõi nhiệm vụ',
+            'Task',
+            $taskCode
+        );
 
         return response()->json(['watching' => $watching]);
     }

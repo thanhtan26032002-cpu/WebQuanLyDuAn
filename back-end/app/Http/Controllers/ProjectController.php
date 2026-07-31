@@ -312,6 +312,14 @@ class ProjectController extends Controller
         $project->members()->sync($memberIds);
         $project->load('members');
 
+        ActivityService::log(
+            $request->user()->user_code,
+            'cập nhật thành viên dự án',
+            'Project',
+            $project->project_code,
+            'Danh sách thành viên hiện có '.count($memberIds).' người.'
+        );
+
         return response()->json([
             'message' => 'Đã cập nhật thành viên dự án',
             'project' => $project,

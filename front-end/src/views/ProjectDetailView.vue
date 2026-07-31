@@ -1,17 +1,18 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { FolderKanban, Calendar, Clock, ArrowLeft, Plus, MoreVertical, ListTodo, Paperclip, MoreHorizontal, Check, Settings, ShieldAlert, LogOut, CheckCircle2, Users, CalendarDays, Tag, LayoutGrid, List, Activity, Building2, UserRound, HeartPulse, Flag, Trash2, Zap } from '@lucide/vue'
 import draggable from 'vuedraggable'
 import { useProjectWorkspace } from '../composables/useProjectWorkspace'
 import TaskCard from '../components/common/TaskCard.vue'
 import TaskCalendar from '../components/common/TaskCalendar.vue'
-import { ref } from 'vue'
 import DownloadArchiveModal from '../components/modals/DownloadArchiveModal.vue'
+import UserAvatar from '../components/common/UserAvatar.vue'
+import { apiFetch } from '../services/api'
 
 const route = useRoute()
 const router = useRouter()
-const { projects, tasks, members, activities, projectStatusMap, priorityMap, taskStatusMap, findMember, formatDate, getTaskDeadlineState, taskModalOpen, openTaskModal, projectSettingsModalOpen, fileUploadModalOpen, manageMembersModalOpen, editingProjectId, removeFileFromProject, removeMemberFromProject, moveTask, activeTaskId, downloadArchive, downloadSingleFile, activeMemberId, memberDetailModalOpen, addProjectUpdate, addProjectMilestone, deleteProjectMilestone, setProjectAutomation, currentUser } = useProjectWorkspace()
+const { projects, tasks, members, projectStatusMap, priorityMap, taskStatusMap, findMember, formatDate, getTaskDeadlineState, taskModalOpen, openTaskModal, projectSettingsModalOpen, fileUploadModalOpen, manageMembersModalOpen, editingProjectId, removeFileFromProject, removeMemberFromProject, moveTask, activeTaskId, downloadArchive, downloadSingleFile, activeMemberId, memberDetailModalOpen, addProjectUpdate, addProjectMilestone, deleteProjectMilestone, setProjectAutomation, currentUser } = useProjectWorkspace()
 
 const updateDraft = ref({ health: 'on_track', completed: '', risks: '', next_steps: '' })
 const milestoneDraft = ref({ name: '', target_date: '' })
@@ -127,8 +128,71 @@ const confirmRemoveMember = (memberId) => {
 }
 const projectMembers = computed(() => project.value ? project.value.memberIds.map(id => findMember(id)) : [])
 const projectFiles = computed(() => project.value?.files || [])
-const projectActivities = computed(() => activities.value.filter(a => a.projectId === projectId.value).slice(0, 5))
+const projectActivities = ref([])
+const activityMeta = ref({ currentPage: 0, lastPage: 1, total: 0 })
+const activitiesLoading = ref(false)
 const showProjectActivities = ref(false)
+
+const mapProjectActivity = (activity) => {
+  const actorName = activity.user?.name || 'Người dùng hệ thống'
+  return {
+    ...activity,
+    id: activity.code,
+    userId: activity.user?.code || activity.user_code || null,
+    action: activity.action,
+    target: activity.target_label || '',
+    detail: activity.detail,
+    createdAt: activity.created_at,
+    actor: {
+      name: actorName,
+      color: activity.user?.color || 'slate',
+      avatar: activity.user?.avatar || null,
+    },
+  }
+}
+
+const loadProjectActivityPage = async (page = 1) => {
+  if (!projectId.value || activitiesLoading.value) return
+  activitiesLoading.value = true
+  try {
+    const response = await apiFetch(`/api/projects/${projectId.value}/activities?per_page=50&page=${page}`)
+    if (!response.ok) return
+    const payload = await response.json()
+    const mapped = (payload.data || []).map(mapProjectActivity)
+    projectActivities.value = page === 1
+      ? mapped
+      : [...projectActivities.value, ...mapped.filter(item => !projectActivities.value.some(existing => existing.id === item.id))]
+    activityMeta.value = {
+      currentPage: payload.current_page || page,
+      lastPage: payload.last_page || 1,
+      total: payload.total || mapped.length,
+    }
+  } finally {
+    activitiesLoading.value = false
+  }
+}
+
+const toggleProjectActivities = async () => {
+  showProjectActivities.value = !showProjectActivities.value
+  if (showProjectActivities.value) await loadProjectActivityPage(1)
+}
+
+let activityRefreshTimer
+const handleActivityChanged = () => {
+  window.clearTimeout(activityRefreshTimer)
+  activityRefreshTimer = window.setTimeout(() => loadProjectActivityPage(1), 250)
+}
+
+watch(projectId, () => {
+  projectActivities.value = []
+  activityMeta.value = { currentPage: 0, lastPage: 1, total: 0 }
+  loadProjectActivityPage(1)
+}, { immediate: true })
+onMounted(() => window.addEventListener('ringnet:activity-changed', handleActivityChanged))
+onUnmounted(() => {
+  window.removeEventListener('ringnet:activity-changed', handleActivityChanged)
+  window.clearTimeout(activityRefreshTimer)
+})
 
 // Calculate time ago string
 const timeAgo = (dateStr) => {
@@ -407,10 +471,10 @@ const projectStatusClasses = {
             <Activity class="w-5 h-5 text-violet-500" /> Nhật ký hoạt động
           </h2>
           <button
-            @click="showProjectActivities = !showProjectActivities"
+            @click="toggleProjectActivities"
             class="text-xs font-semibold text-violet-600 hover:text-violet-700 bg-violet-50 hover:bg-violet-100 px-2.5 py-1 rounded-lg transition-colors cursor-pointer shadow-2xs"
           >
-            {{ showProjectActivities ? 'Ẩn' : 'Xem' }}
+            {{ showProjectActivities ? 'Ẩn' : `Xem (${activityMeta.total})` }}
           </button>
         </div>
         
@@ -419,14 +483,8 @@ const projectStatusClasses = {
           <div class="space-y-6 relative">
             <div v-for="activity in projectActivities" :key="activity.id" class="flex gap-4">
               <!-- Avatar Node -->
-              <div
-                :class="[
-                  'relative z-10 w-10 h-10 rounded-full flex items-center justify-center shrink-0 border-4 border-white shadow-sm ring-1 ring-slate-100 text-xs font-bold text-white',
-                  `bg-${activity.actor?.color || 'slate'}-500`
-                ]"
-              >
-                {{ activity.actor?.initials || 'HT' }}
-              </div>
+              <UserAvatar v-if="activity.userId" :member-id="activity.userId" size="md" :show-popover="false" class="relative z-10 ring-4 ring-white rounded-full" />
+              <div v-else class="relative z-10 w-10 h-10 rounded-full flex items-center justify-center shrink-0 border-4 border-white bg-slate-500 shadow-sm text-xs font-bold text-white">HT</div>
               <!-- Content -->
               <div class="pt-2">
                 <p class="text-sm text-slate-900">
@@ -441,6 +499,14 @@ const projectStatusClasses = {
               </div>
             </div>
           </div>
+          <button
+            v-if="activityMeta.currentPage < activityMeta.lastPage"
+            :disabled="activitiesLoading"
+            class="mt-6 w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 text-sm font-semibold text-slate-600 hover:border-violet-200 hover:text-violet-700 disabled:opacity-50"
+            @click="loadProjectActivityPage(activityMeta.currentPage + 1)"
+          >
+            {{ activitiesLoading ? 'Đang tải...' : `Xem thêm (${projectActivities.length}/${activityMeta.total})` }}
+          </button>
         </div>
         <div v-else class="text-center py-8 text-slate-400 text-sm font-medium">
           Chưa có hoạt động nào (hoặc đang ẩn).

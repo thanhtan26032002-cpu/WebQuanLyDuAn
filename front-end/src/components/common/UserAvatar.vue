@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { Mail, Phone, Briefcase } from '@lucide/vue'
 import { useProjectWorkspace } from '../../composables/useProjectWorkspace'
 
@@ -22,11 +22,14 @@ const { findMember } = useProjectWorkspace()
 const member = computed(() => findMember(props.memberId))
 
 const isHovered = ref(false)
+const imageFailed = ref(false)
+const avatarUrl = computed(() => imageFailed.value ? null : member.value?.avatar)
 
 const sizeClasses = {
   sm: 'w-7 h-7 text-[10px]',
   md: 'w-10 h-10 text-xs',
-  lg: 'w-16 h-16 text-lg'
+  lg: 'w-16 h-16 text-lg',
+  card: 'w-12 h-12 text-sm',
 }
 
 const bgClasses = {
@@ -45,10 +48,6 @@ const bgClasses = {
 }
 </script>
 
-<script>
-import { computed } from 'vue'
-</script>
-
 <template>
   <div 
     class="relative inline-block"
@@ -63,7 +62,14 @@ import { computed } from 'vue'
         sizeClasses[size]
       ]"
     >
-      {{ member.initials }}
+      <img
+        v-if="avatarUrl"
+        :src="avatarUrl"
+        :alt="`Ảnh đại diện của ${member.name}`"
+        class="h-full w-full rounded-full object-cover"
+        @error="imageFailed = true"
+      />
+      <span v-else>{{ member.initials }}</span>
     </div>
 
     <!-- Popover -->
@@ -83,7 +89,8 @@ import { computed } from 'vue'
       >
         <div class="flex items-start gap-3 mb-3">
           <div :class="['w-12 h-12 rounded-full flex items-center justify-center font-bold text-white shrink-0 shadow-sm', bgClasses[member?.color] || 'bg-blue-500']">
-            {{ member.initials }}
+            <img v-if="avatarUrl" :src="avatarUrl" :alt="`Ảnh đại diện của ${member.name}`" class="h-full w-full rounded-full object-cover" />
+            <span v-else>{{ member.initials }}</span>
           </div>
           <div>
             <h4 class="font-bold text-slate-900 leading-tight">{{ member.name }}</h4>
@@ -93,7 +100,7 @@ import { computed } from 'vue'
         </div>
         
         <div class="space-y-2 mt-3 pt-3 border-t border-slate-100/50">
-          <a :href="'mailto:' + member.email" class="flex items-center gap-2 text-xs text-slate-600 hover:text-violet-600 transition-colors pointer-events-auto">
+          <a v-if="member.email" :href="'mailto:' + member.email" class="flex items-center gap-2 text-xs text-slate-600 hover:text-violet-600 transition-colors pointer-events-auto">
             <Mail class="w-3.5 h-3.5 text-slate-400" /> {{ member.email }}
           </a>
           <div v-if="member.phone" class="flex items-center gap-2 text-xs text-slate-600">

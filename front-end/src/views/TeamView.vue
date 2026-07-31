@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import { Users, UserPlus, MoreHorizontal, Mail, ArrowRight, ListTodo, Hash, Plus } from '@lucide/vue'
 import { useProjectWorkspace } from '../composables/useProjectWorkspace'
+import UserAvatar from '../components/common/UserAvatar.vue'
 
 const { members, groups, tasks, activeMemberId, memberDetailModalOpen, openAddMemberModal, addGroupModalOpen, editGroupModalOpen, activeEditGroupId, assignMemberToGroup, currentUser } = useProjectWorkspace()
 const canManageTeam = computed(() => currentUser.value?.role === 'admin')
@@ -172,9 +173,7 @@ const taskCount = (memberId, status) => tasks.value.filter((task) => task.assign
             <div class="flex items-center justify-between">
               <div class="flex items-center gap-4">
                 <div class="relative">
-                  <div :class="['w-12 h-12 rounded-xl flex items-center justify-center text-sm font-bold text-white shadow-sm', `bg-gradient-to-br from-${member.color}-400 to-${member.color}-600`]">
-                    {{ member.initials }}
-                  </div>
+                  <UserAvatar :member-id="member.id" size="card" :show-popover="false" />
                   <div :class="['absolute -bottom-1 -right-1 w-3.5 h-3.5 border-2 border-white rounded-full', member.online ? 'bg-emerald-500' : 'bg-slate-300']"></div>
                 </div>
                 <div>
@@ -234,9 +233,7 @@ const taskCount = (memberId, status) => tasks.value.filter((task) => task.assign
           class="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 hover:shadow-md transition-shadow cursor-grab active:cursor-grabbing flex items-center gap-3"
           @click="openMemberDetail(member.id)"
         >
-          <div :class="['w-10 h-10 rounded-xl flex items-center justify-center text-xs font-bold text-white shadow-sm shrink-0', `bg-gradient-to-br from-${member.color}-400 to-${member.color}-600`]">
-            {{ member.initials }}
-          </div>
+          <UserAvatar :member-id="member.id" size="md" :show-popover="false" />
           <div class="min-w-0 flex-1">
             <h3 class="font-bold text-slate-900 text-sm truncate">{{ member.name }}</h3>
             <p class="text-xs text-slate-500 truncate">{{ member.role }}</p>

@@ -161,9 +161,10 @@ function mapActivity(a) {
     userId: actorCode,
     targetType: a.target_type || a.targetType,
     targetId: a.target_code || a.targetId,
-    projectId: (a.target_type || a.targetType)?.toLowerCase() === 'project'
+    projectId: a.project_code || a.projectId || ((a.target_type || a.targetType)?.toLowerCase() === 'project'
       ? (a.target_code || a.targetId)
-      : null,
+      : null),
+    target: a.target_label || a.target || '',
     createdAt: a.created_at || a.createdAt,
     actor: {
       id: actorCode,

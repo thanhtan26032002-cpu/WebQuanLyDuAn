@@ -4,20 +4,30 @@ namespace App\Services;
 
 use App\Models\Activity;
 use App\Models\Notification;
+use App\Models\Task;
 
 class ActivityService
 {
     /**
      * Ghi nhận một hoạt động vào hệ thống.
      */
-    public static function log($userCode, $action, $targetType, $targetCode, $detail = null)
+    public static function log($userCode, $action, $targetType, $targetCode, $detail = null, $projectCode = null)
     {
         if (! $userCode) {
             throw new \InvalidArgumentException('Activity actor is required.');
         }
 
+        if (! $projectCode) {
+            $projectCode = match ($targetType) {
+                'Project' => $targetCode,
+                'Task', 'TaskComment' => Task::withTrashed()->whereKey($targetCode)->value('task_project_code'),
+                default => null,
+            };
+        }
+
         return Activity::create([
             'activity_user_code' => $userCode,
+            'activity_project_code' => $projectCode,
             'activity_action' => $action,
             'activity_target_type' => $targetType,
             'activity_target_code' => $targetCode,

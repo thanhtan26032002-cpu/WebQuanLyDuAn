@@ -26,6 +26,7 @@ class TaskProgressController extends Controller
             'checklist_text' => trim($validated['text']),
             'checklist_is_completed' => false,
         ]);
+        ActivityService::log($request->user()->user_code, 'thêm công việc con', 'Task', $taskCode, $checklist->checklist_text);
 
         return response()->json([
             'message' => 'Đã thêm công việc con.',
@@ -52,6 +53,7 @@ class TaskProgressController extends Controller
             $checklist->checklist_is_completed = $validated['completed'];
         }
         $checklist->save();
+        ActivityService::log($request->user()->user_code, 'cập nhật công việc con', 'Task', $taskCode, $checklist->checklist_text);
 
         return response()->json([
             'message' => 'Đã cập nhật công việc con.',
@@ -66,7 +68,9 @@ class TaskProgressController extends Controller
         AccessService::authorize(AccessService::canContributeToTask($request->user(), $task));
         $this->ensureTaskIsActive($task);
         $checklist = $task->checklists()->whereKey($checklistCode)->firstOrFail();
+        $checklistText = $checklist->checklist_text;
         $checklist->delete();
+        ActivityService::log($request->user()->user_code, 'xóa công việc con', 'Task', $taskCode, $checklistText);
 
         return response()->json([
             'message' => 'Đã xóa công việc con.',

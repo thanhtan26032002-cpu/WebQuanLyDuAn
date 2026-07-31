@@ -37,6 +37,7 @@ Route::middleware('api.token')->group(function () {
         Route::post('/projects/{id}/restore', [ProjectController::class, 'restore']);
         Route::put('/projects/{id}/members', [ProjectController::class, 'syncMembers']);
         Route::post('/projects/{id}/updates', [ProjectPlanningController::class, 'storeUpdate']);
+        Route::get('/projects/{id}/activities', [ActivityController::class, 'project']);
         Route::post('/projects/{id}/milestones', [ProjectPlanningController::class, 'storeMilestone']);
         Route::put('/projects/{id}/milestones/{milestone}', [ProjectPlanningController::class, 'updateMilestone']);
         Route::delete('/projects/{id}/milestones/{milestone}', [ProjectPlanningController::class, 'destroyMilestone']);

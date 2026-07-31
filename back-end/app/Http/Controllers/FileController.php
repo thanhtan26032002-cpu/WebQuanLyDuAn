@@ -95,6 +95,13 @@ class FileController extends Controller
             Storage::disk('public')->delete($relativePath);
         }
 
+        ActivityService::log(
+            $request->user()->user_code,
+            'xóa tệp đính kèm',
+            $attachment->attachment_target_type,
+            $attachment->attachment_target_code,
+            'Đã xóa tệp: '.$attachment->attachment_file_name
+        );
         $attachment->delete();
 
         return response()->json(['message' => 'Đã xóa tệp đính kèm']);

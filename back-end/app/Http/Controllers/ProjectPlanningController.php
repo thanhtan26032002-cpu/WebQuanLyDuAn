@@ -58,6 +58,8 @@ class ProjectPlanningController extends Controller
             'milestone_sort_order' => ((int) $project->milestones()->max('milestone_sort_order')) + 1,
         ]);
 
+        ActivityService::log($request->user()->user_code, 'tạo cột mốc', 'Project', $projectCode, 'Đã tạo cột mốc: '.$milestone->milestone_name);
+
         return response()->json(['message' => 'Đã tạo cột mốc.', 'milestone' => $milestone->load('tasks')], 201);
     }
 
@@ -75,6 +77,8 @@ class ProjectPlanningController extends Controller
         ]);
         $milestone->update(ProjectMilestone::mapToDbAttributes($validated));
 
+        ActivityService::log($request->user()->user_code, 'cập nhật cột mốc', 'Project', $projectCode, 'Đã cập nhật cột mốc: '.$milestone->milestone_name);
+
         return response()->json(['message' => 'Đã cập nhật cột mốc.', 'milestone' => $milestone->fresh()->load('tasks')]);
     }
 
@@ -83,8 +87,11 @@ class ProjectPlanningController extends Controller
         $project = Project::findOrFail($projectCode);
         AccessService::authorize(AccessService::canManageProject($request->user(), $project));
         $milestone = $project->milestones()->whereKey($milestoneCode)->firstOrFail();
+        $milestoneName = $milestone->milestone_name;
         $milestone->tasks()->update(['task_milestone_code' => null]);
         $milestone->delete();
+
+        ActivityService::log($request->user()->user_code, 'xóa cột mốc', 'Project', $projectCode, 'Đã xóa cột mốc: '.$milestoneName);
 
         return response()->json(['message' => 'Đã xóa cột mốc.']);
     }
@@ -111,6 +118,14 @@ class ProjectPlanningController extends Controller
         $automation = ProjectAutomation::updateOrCreate(
             ['automation_project_code' => $projectCode, 'automation_rule' => $validated['rule']],
             ['automation_enabled' => $validated['enabled'] ?? true, 'automation_config' => $validated['config'] ?? []]
+        );
+
+        ActivityService::log(
+            $request->user()->user_code,
+            ($automation->automation_enabled ? 'bật' : 'tắt').' tự động hóa',
+            'Project',
+            $projectCode,
+            'Quy tắc: '.$automation->automation_rule
         );
 
         return response()->json(['message' => 'Đã lưu tự động hóa.', 'automation' => $automation], 201);

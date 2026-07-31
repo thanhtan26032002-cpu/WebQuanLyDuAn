@@ -2,23 +2,26 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
 use App\Traits\GeneratesCode;
 use App\Traits\MapsAttributes;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 
 class Activity extends Model
 {
-    use HasFactory, GeneratesCode, MapsAttributes;
+    use GeneratesCode, HasFactory, MapsAttributes;
 
     protected $primaryKey = 'activity_code';
+
     public $incrementing = false;
+
     protected $keyType = 'string';
 
     const CREATED_AT = 'activity_created_at';
+
     const UPDATED_AT = 'activity_updated_at';
 
-    protected $fillable = ['activity_user_code', 'activity_action', 'activity_target_type', 'activity_target_code', 'activity_detail'];
+    protected $fillable = ['activity_user_code', 'activity_project_code', 'activity_action', 'activity_target_type', 'activity_target_code', 'activity_detail'];
 
     public function getCodePrefix()
     {
@@ -30,6 +33,7 @@ class Activity extends Model
         return [
             'activity_code' => 'code',
             'activity_user_code' => 'user_code',
+            'activity_project_code' => 'project_code',
             'activity_action' => 'action',
             'activity_target_type' => 'target_type',
             'activity_target_code' => 'target_code',

@@ -28,8 +28,10 @@ class MemberController extends Controller
                 'name' => $user->user_name,
                 'avatar' => $user->user_avatar,
                 'color' => $user->user_color,
+                'role' => $user->user_role,
                 'job_title' => $user->user_job_title,
                 'department' => $user->user_department,
+                'join_date' => $user->user_join_date,
                 'online' => $user->user_online,
                 'profile_limited' => true,
             ];

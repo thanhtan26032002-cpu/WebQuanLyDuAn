@@ -116,6 +116,11 @@ const displayInitials = computed(() => {
 
 const errors = ref({})
 const phonePattern = /^\+?[0-9]{9,15}$/
+const formatJoinDate = (value) => {
+  if (!value) return 'Chưa cập nhật'
+  const date = new Date(`${String(value).split('T')[0]}T00:00:00`)
+  return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat('vi-VN').format(date)
+}
 
 const startEditing = () => {
   if (!member.value || !canEditMember.value || member.value.profileLimited) return
@@ -187,7 +192,8 @@ const save = async () => {
 
         <div class="absolute -bottom-10 left-6">
           <div :class="['w-24 h-24 rounded-2xl shadow-lg border-4 border-white flex items-center justify-center text-4xl font-bold text-white transition-all duration-300 bg-gradient-to-br', memberThemeClasses[displayColor]?.avatar || 'from-blue-400 to-blue-600']">
-            {{ displayInitials }}
+            <img v-if="member.avatar" :src="member.avatar" :alt="`Ảnh đại diện của ${member.name}`" class="h-full w-full rounded-xl object-cover" />
+            <span v-else>{{ displayInitials }}</span>
           </div>
           <div :class="['absolute -bottom-2 -right-2 w-6 h-6 border-4 border-white rounded-full', member.online ? 'bg-emerald-500' : 'bg-slate-300']"></div>
         </div>
@@ -214,15 +220,15 @@ const save = async () => {
         <template v-if="!isEditing">
           <div class="mb-6">
             <h2 class="text-2xl font-bold text-slate-900 leading-tight mb-1">{{ member.name }}</h2>
-            <p class="text-violet-600 font-medium">{{ member.role }}</p>
-            <p class="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-400">{{ systemRoleLabels[member.systemRole] || 'Nhân viên' }}</p>
+            <p class="text-violet-600 font-medium">Chức vụ: {{ member.role }}</p>
+            <p class="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-400">Vai trò: {{ systemRoleLabels[member.systemRole] || 'Nhân viên' }}</p>
           </div>
           
           <div v-if="!member.profileLimited" class="mb-6">
             <p class="text-sm text-slate-600 leading-relaxed">{{ member.bio || 'Chưa có tiểu sử.' }}</p>
           </div>
           <div v-else class="mb-6 rounded-xl border border-violet-100 bg-violet-50 px-4 py-3 text-sm text-violet-700">
-            Bạn đang xem hồ sơ cơ bản. Email, điện thoại và thông tin riêng tư chỉ hiển thị cho chính chủ hoặc người quản lý.
+            Hồ sơ công khai gồm tên, chức vụ, vai trò, phòng ban và ngày tham gia. Email, điện thoại và tiểu sử chỉ hiển thị cho chính chủ hoặc người có quyền quản lý.
           </div>
 
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
@@ -244,7 +250,16 @@ const save = async () => {
                 <p class="text-sm font-medium text-slate-900 truncate">{{ member.phone || 'Chưa cập nhật' }}</p>
               </div>
             </div>
-            <div v-if="!member.profileLimited" class="flex items-center gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100">
+            <div class="flex items-center gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100">
+              <div class="w-8 h-8 rounded-lg bg-white shadow-sm flex items-center justify-center text-slate-400 shrink-0">
+                <Briefcase class="w-4 h-4" />
+              </div>
+              <div class="min-w-0">
+                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Chức vụ</p>
+                <p class="text-sm font-medium text-slate-900 truncate">{{ member.role || 'Chưa cập nhật' }}</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100">
               <div class="w-8 h-8 rounded-lg bg-white shadow-sm flex items-center justify-center text-slate-400 shrink-0">
                 <Briefcase class="w-4 h-4" />
               </div>
@@ -255,11 +270,20 @@ const save = async () => {
             </div>
             <div class="flex items-center gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100">
               <div class="w-8 h-8 rounded-lg bg-white shadow-sm flex items-center justify-center text-slate-400 shrink-0">
+                <User class="w-4 h-4" />
+              </div>
+              <div class="min-w-0">
+                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Vai trò hệ thống</p>
+                <p class="text-sm font-medium text-slate-900 truncate">{{ systemRoleLabels[member.systemRole] || 'Nhân viên' }}</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100">
+              <div class="w-8 h-8 rounded-lg bg-white shadow-sm flex items-center justify-center text-slate-400 shrink-0">
                 <CalendarDays class="w-4 h-4" />
               </div>
               <div class="min-w-0">
                 <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Ngày tham gia</p>
-                <p class="text-sm font-medium text-slate-900 truncate">{{ member.joinDate }}</p>
+                <p class="text-sm font-medium text-slate-900 truncate">{{ formatJoinDate(member.joinDate) }}</p>
               </div>
             </div>
           </div>

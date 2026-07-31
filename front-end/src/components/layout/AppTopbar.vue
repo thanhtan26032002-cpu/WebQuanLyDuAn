@@ -4,11 +4,13 @@ import { useRoute } from 'vue-router'
 import { Search, Menu, X, Plus, LogOut } from '@lucide/vue'
 import { useProjectWorkspace } from '../../composables/useProjectWorkspace'
 import NotificationDropdown from './NotificationDropdown.vue'
+import UserAvatar from '../common/UserAvatar.vue'
 
 const route = useRoute()
 const { sidebarOpen, globalSearchModalOpen, openTaskModal, currentUser, logout } = useProjectWorkspace()
 const searchFocused = ref(false)
 const canManageWorkspace = computed(() => ['admin', 'project_manager', 'manager'].includes(currentUser.value?.role))
+const systemRoleLabels = { admin: 'Quản trị viên', project_manager: 'Quản lý dự án', member: 'Nhân viên' }
 </script>
 
 <template>
@@ -61,11 +63,9 @@ const canManageWorkspace = computed(() => ['admin', 'project_manager', 'manager'
         <button class="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
           <div class="hidden sm:block text-right">
             <p class="text-xs font-semibold text-slate-900 leading-none">{{ currentUser && currentUser.name || 'User' }}</p>
-            <p class="text-[10px] text-slate-500 leading-none mt-1">{{ currentUser && currentUser.role || 'member' }}</p>
+            <p class="text-[10px] text-slate-500 leading-none mt-1">{{ systemRoleLabels[currentUser?.role] || 'Nhân viên' }}</p>
           </div>
-          <div class="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center text-white text-xs font-bold shadow-sm">
-            {{ currentUser && currentUser.name ? currentUser.name.split(' ').map(part => part[0]).join('').slice(0, 2).toUpperCase() : 'RN' }}
-          </div>
+          <UserAvatar v-if="currentUser?.code" :member-id="currentUser.code" size="sm" :show-popover="false" />
         </button>
         <button type="button" title="Đăng xuất" aria-label="Đăng xuất" class="rounded-lg p-2 text-slate-400 transition hover:bg-rose-50 hover:text-rose-600" @click="logout">
           <LogOut class="h-4 w-4" />

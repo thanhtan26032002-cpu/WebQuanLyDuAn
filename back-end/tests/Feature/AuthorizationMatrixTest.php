@@ -48,6 +48,18 @@ class AuthorizationMatrixTest extends TestCase
             'member_ids' => [$otherManager->user_code, $employee->user_code],
         ])->assertCreated()->json('project');
 
+        $this->withToken($employeeToken)->getJson('/api/members')
+            ->assertOk()
+            ->assertJsonFragment([
+                'code' => $manager->user_code,
+                'name' => $manager->user_name,
+                'role' => 'project_manager',
+                'job_title' => 'Quản lý',
+                'department' => 'Nội bộ',
+                'join_date' => now()->toDateString(),
+                'profile_limited' => true,
+            ]);
+
         foreach ([
             ['/api/projects', ['name' => 'Không được tạo']],
             ['/api/tasks', ['title' => 'Không được tạo']],
@@ -150,6 +162,16 @@ class AuthorizationMatrixTest extends TestCase
             ->assertJsonPath('0.can_restore_by_user', false);
         $this->withToken($employeeToken)->postJson('/api/tasks/'.$task['code'].'/restore')->assertForbidden();
         $this->withToken($managerToken)->postJson('/api/tasks/'.$task['code'].'/restore')->assertOk();
+
+        $this->withToken($employeeToken)->getJson('/api/projects/'.$project['code'].'/activities')
+            ->assertOk()
+            ->assertJsonPath('total', fn ($total) => $total >= 8)
+            ->assertJsonFragment(['action' => 'tạo nhiệm vụ'])
+            ->assertJsonFragment(['action' => 'thêm công việc con'])
+            ->assertJsonFragment(['action' => 'báo cáo tiến độ'])
+            ->assertJsonFragment(['action' => 'chuyển trạng thái'])
+            ->assertJsonFragment(['action' => 'xóa nhiệm vụ'])
+            ->assertJsonFragment(['action' => 'khôi phục nhiệm vụ']);
     }
 
     public function test_standalone_tasks_have_an_owner_and_deadline_automation_respects_preferences(): void
@@ -211,6 +233,7 @@ class AuthorizationMatrixTest extends TestCase
             'user_phone' => '0901234567',
             'user_department' => 'Nội bộ',
             'user_job_title' => $role === 'member' ? 'Nhân viên' : 'Quản lý',
+            'user_join_date' => now()->toDateString(),
             'user_profile_completed_at' => now(),
             'user_api_token' => hash('sha256', $plainToken),
         ]);
