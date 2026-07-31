@@ -54,6 +54,7 @@ const getLocalDateKey = (dateValue = new Date()) => {
 
 const todayKey = getLocalDateKey();
 const currentUserCode = computed(() => currentUser.value?.code || "");
+const isCompanyOverview = computed(() => currentUser.value?.role === "admin");
 const canManageWorkspace = computed(() =>
   ["admin", "project_manager", "manager"].includes(currentUser.value?.role),
 );
@@ -79,8 +80,17 @@ const myTasks = computed(() => {
   );
 });
 
+// Quản trị viên giám sát toàn công ty; các vai trò khác chỉ xem phạm vi cá nhân.
+// myProjects/myTasks vẫn được giữ riêng cho popup nhắc hạn cá nhân.
+const overviewProjects = computed(() =>
+  isCompanyOverview.value ? projects.value : myProjects.value,
+);
+const overviewTasks = computed(() =>
+  isCompanyOverview.value ? tasks.value : myTasks.value,
+);
+
 const todayTasks = computed(() =>
-  myTasks.value.filter(
+  overviewTasks.value.filter(
     (task) =>
       Boolean(task.dueDate) &&
       getLocalDateKey(task.dueDate) === todayKey &&
@@ -88,7 +98,7 @@ const todayTasks = computed(() =>
   ),
 );
 const todayProjects = computed(() =>
-  myProjects.value.filter(
+  overviewProjects.value.filter(
     (project) =>
       Boolean(project.dueDate) &&
       getLocalDateKey(project.dueDate) === todayKey &&
@@ -99,12 +109,14 @@ const todayDueCount = computed(
   () => todayTasks.value.length + todayProjects.value.length,
 );
 
-const completedMyTasks = computed(
-  () => myTasks.value.filter((task) => task.status === "done").length,
+const completedOverviewTasks = computed(
+  () => overviewTasks.value.filter((task) => task.status === "done").length,
 );
-const myTaskCompletionRate = computed(() =>
-  myTasks.value.length
-    ? Math.round((completedMyTasks.value / myTasks.value.length) * 100)
+const overviewTaskCompletionRate = computed(() =>
+  overviewTasks.value.length
+    ? Math.round(
+        (completedOverviewTasks.value / overviewTasks.value.length) * 100,
+      )
     : 0,
 );
 
@@ -174,33 +186,39 @@ const stats = computed(() => [
     icon: FolderKanban,
     color: "text-violet-600",
     bg: "bg-violet-100",
-    value: myProjects.value.length,
-    label: "Dự án của tôi",
-    helper: "Được giao hoặc phụ trách",
+    value: overviewProjects.value.length,
+    label: isCompanyOverview.value ? "Dự án toàn công ty" : "Dự án của tôi",
+    helper: isCompanyOverview.value
+      ? "Tất cả dự án đang hiển thị trong hệ thống"
+      : "Được giao hoặc phụ trách",
   },
   {
     icon: Clock,
     color: "text-amber-600",
     bg: "bg-amber-100",
-    value: myTasks.value.length,
-    label: "Nhiệm vụ của tôi",
-    helper: "Được phân công trực tiếp",
+    value: overviewTasks.value.length,
+    label: isCompanyOverview.value ? "Nhiệm vụ toàn công ty" : "Nhiệm vụ của tôi",
+    helper: isCompanyOverview.value
+      ? "Tất cả nhiệm vụ thuộc phạm vi công ty"
+      : "Được phân công trực tiếp",
   },
   {
     icon: CheckCircle2,
     color: "text-emerald-600",
     bg: "bg-emerald-100",
-    value: completedMyTasks.value,
+    value: completedOverviewTasks.value,
     label: "Nhiệm vụ hoàn thành",
-    helper: `Trên tổng số ${myTasks.value.length} nhiệm vụ`,
+    helper: `Trên tổng số ${overviewTasks.value.length} nhiệm vụ`,
   },
   {
     icon: Target,
     color: "text-sky-600",
     bg: "bg-sky-100",
-    value: `${myTaskCompletionRate.value}%`,
+    value: `${overviewTaskCompletionRate.value}%`,
     label: "Tỷ lệ hoàn thành",
-    helper: "Tiến độ nhiệm vụ cá nhân",
+    helper: isCompanyOverview.value
+      ? "Tiến độ nhiệm vụ toàn công ty"
+      : "Tiến độ nhiệm vụ cá nhân",
   },
 ]);
 
@@ -211,7 +229,7 @@ const columns = ref([
 ]);
 
 const getTasksByStatus = (status) => {
-  return myTasks.value.filter((t) => t.status === status);
+  return overviewTasks.value.filter((t) => t.status === status);
 };
 
 const onTaskChange = (event, newStatus) => {
@@ -251,13 +269,17 @@ const showRecentActivities = ref(false);
           Xin chào, {{ currentUserName }} 👋
         </h1>
         <p class="text-slate-500 text-sm">
-          Bạn đang phụ trách hoặc được phân công
+          {{
+            isCompanyOverview
+              ? "Toàn công ty hiện có"
+              : "Bạn đang phụ trách hoặc được phân công"
+          }}
           <strong class="font-semibold text-indigo-700">
-            {{ myProjects.length }} dự án
+            {{ overviewProjects.length }} dự án
           </strong>
           và
           <strong class="font-semibold text-rose-700">
-            {{ myTasks.length }} nhiệm vụ
+            {{ overviewTasks.length }} nhiệm vụ
           </strong>.
         </p>
       </div>
@@ -297,7 +319,7 @@ const showRecentActivities = ref(false);
           <div
             class="rounded-full bg-slate-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-400"
           >
-            Cá nhân
+            {{ isCompanyOverview ? "Toàn công ty" : "Cá nhân" }}
           </div>
         </div>
         <h3 class="text-3xl font-display font-bold text-slate-900 mb-1">
@@ -315,7 +337,13 @@ const showRecentActivities = ref(false);
         <div>
           <div class="flex items-end justify-between mb-4">
             <div>
-              <h2 class="text-lg font-bold text-slate-900">Bảng nhiệm vụ của tôi</h2>
+              <h2 class="text-lg font-bold text-slate-900">
+                {{
+                  isCompanyOverview
+                    ? "Bảng nhiệm vụ toàn công ty"
+                    : "Bảng nhiệm vụ của tôi"
+                }}
+              </h2>
               <p class="text-sm text-slate-500">
                 Kéo thả để thay đổi trạng thái
               </p>
@@ -377,7 +405,13 @@ const showRecentActivities = ref(false);
         <div>
           <div class="flex items-end justify-between mb-4">
             <div>
-              <h2 class="text-lg font-bold text-slate-900">Dự án của tôi gần đây</h2>
+              <h2 class="text-lg font-bold text-slate-900">
+                {{
+                  isCompanyOverview
+                    ? "Dự án toàn công ty gần đây"
+                    : "Dự án của tôi gần đây"
+                }}
+              </h2>
               <p class="text-sm text-slate-500">
                 Các dự án gần đây đang hoạt động
               </p>
@@ -391,7 +425,7 @@ const showRecentActivities = ref(false);
           </div>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <ProjectCard
-              v-for="project in myProjects.slice(0, 2)"
+              v-for="project in overviewProjects.slice(0, 2)"
               :key="project.id"
               :project="project"
             />
@@ -415,7 +449,11 @@ const showRecentActivities = ref(false);
                 >
                   <CalendarDays class="w-4.5 h-4.5 text-rose-500" />
                 </span>
-                Đến hạn hôm nay
+                {{
+                  isCompanyOverview
+                    ? "Đến hạn hôm nay toàn công ty"
+                    : "Đến hạn hôm nay"
+                }}
               </h2>
               <p class="text-xs text-slate-500 mt-1 ml-10">
                 Ưu tiên xử lý trước khi kết thúc ngày
@@ -567,7 +605,11 @@ const showRecentActivities = ref(false);
                 Không có hạn chót hôm nay
               </p>
               <p class="text-xs text-slate-500">
-                Bạn không có dự án hoặc nhiệm vụ nào cần hoàn thành trong ngày.
+                {{
+                  isCompanyOverview
+                    ? "Toàn công ty không có dự án hoặc nhiệm vụ nào cần hoàn thành trong ngày."
+                    : "Bạn không có dự án hoặc nhiệm vụ nào cần hoàn thành trong ngày."
+                }}
               </p>
             </div>
           </div>
@@ -579,7 +621,12 @@ const showRecentActivities = ref(false);
         >
           <div class="px-5 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
             <h2 class="font-bold text-slate-900 flex items-center gap-2">
-              <Activity class="w-5 h-5 text-violet-500" /> Hoạt động gần đây
+              <Activity class="w-5 h-5 text-violet-500" />
+              {{
+                isCompanyOverview
+                  ? "Hoạt động toàn công ty gần đây"
+                  : "Hoạt động gần đây"
+              }}
             </h2>
             <button
               @click="showRecentActivities = !showRecentActivities"

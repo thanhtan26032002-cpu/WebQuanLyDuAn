@@ -92,6 +92,55 @@ class AuthorizationMatrixTest extends TestCase
         $this->assertSame('admin', $admin->user_role);
     }
 
+    public function test_admin_overview_sources_cover_the_company_while_managers_remain_scoped(): void
+    {
+        [, $adminToken] = $this->user('admin', 'overview-admin@example.com');
+        [$firstManager, $firstManagerToken] = $this->user('project_manager', 'overview-manager-a@example.com');
+        [$secondManager, $secondManagerToken] = $this->user('project_manager', 'overview-manager-b@example.com');
+
+        $firstProject = $this->withToken($firstManagerToken)->postJson('/api/projects', [
+            'name' => 'Dự án phòng Kỹ thuật',
+            'manager_code' => $firstManager->user_code,
+        ])->assertCreated()->json('project');
+        $secondProject = $this->withToken($secondManagerToken)->postJson('/api/projects', [
+            'name' => 'Dự án phòng Vận hành',
+            'manager_code' => $secondManager->user_code,
+        ])->assertCreated()->json('project');
+
+        $this->withToken($firstManagerToken)->postJson('/api/tasks', [
+            'project_code' => $firstProject['code'],
+            'title' => 'Nhiệm vụ của phòng Kỹ thuật',
+        ])->assertCreated();
+        $this->withToken($secondManagerToken)->postJson('/api/tasks', [
+            'project_code' => $secondProject['code'],
+            'title' => 'Nhiệm vụ của phòng Vận hành',
+        ])->assertCreated();
+
+        $this->withToken($adminToken)->getJson('/api/projects')
+            ->assertOk()
+            ->assertJsonCount(2)
+            ->assertJsonFragment(['name' => 'Dự án phòng Kỹ thuật'])
+            ->assertJsonFragment(['name' => 'Dự án phòng Vận hành']);
+        $this->withToken($adminToken)->getJson('/api/tasks')
+            ->assertOk()
+            ->assertJsonCount(2)
+            ->assertJsonFragment(['title' => 'Nhiệm vụ của phòng Kỹ thuật'])
+            ->assertJsonFragment(['title' => 'Nhiệm vụ của phòng Vận hành']);
+        $this->withToken($adminToken)->getJson('/api/activities')
+            ->assertOk()
+            ->assertJsonFragment(['detail' => 'Đã tạo nhiệm vụ mới: Nhiệm vụ của phòng Kỹ thuật'])
+            ->assertJsonFragment(['detail' => 'Đã tạo nhiệm vụ mới: Nhiệm vụ của phòng Vận hành']);
+
+        $this->withToken($firstManagerToken)->getJson('/api/projects')
+            ->assertOk()
+            ->assertJsonCount(1)
+            ->assertJsonFragment(['code' => $firstProject['code']]);
+        $this->withToken($firstManagerToken)->getJson('/api/tasks')
+            ->assertOk()
+            ->assertJsonCount(1)
+            ->assertJsonFragment(['title' => 'Nhiệm vụ của phòng Kỹ thuật']);
+    }
+
     public function test_task_accountability_completion_and_restore_rules_are_consistent(): void
     {
         [$manager, $managerToken] = $this->user('project_manager', 'task-manager@example.com');
