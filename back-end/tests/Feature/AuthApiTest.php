@@ -58,7 +58,10 @@ class AuthApiTest extends TestCase
             'password' => 'secure-password',
         ])->assertCreated()->json();
 
-        User::whereKey($admin['user']['code'])->update(['user_role' => 'admin']);
+        User::whereKey($admin['user']['code'])->update([
+            'user_role' => 'admin',
+            'user_profile_completed_at' => now(),
+        ]);
 
         $employee = $this->postJson('/api/register', [
             'name' => 'Employee',
@@ -114,7 +117,10 @@ class AuthApiTest extends TestCase
             'password' => 'secure-password',
         ])->assertCreated()->json();
 
-        User::whereKey($admin['user']['code'])->update(['user_role' => 'admin']);
+        User::whereKey($admin['user']['code'])->update([
+            'user_role' => 'admin',
+            'user_profile_completed_at' => now(),
+        ]);
 
         $employee = $this->postJson('/api/register', [
             'name' => 'Employee',
@@ -209,6 +215,12 @@ class AuthApiTest extends TestCase
             'password' => 'secure-password',
         ])->assertCreated()->json();
         User::whereKey($manager['user']['code'])->update(['user_role' => 'project_manager']);
+        User::whereIn('user_code', [
+            $admin['user']['code'],
+            $employee['user']['code'],
+            $outsider['user']['code'],
+            $manager['user']['code'],
+        ])->update(['user_profile_completed_at' => now()]);
 
         $project = $this->withToken($admin['token'])->postJson('/api/projects', [
             'name' => 'Dự án chỉ quản trị viên quản lý',
@@ -259,12 +271,13 @@ class AuthApiTest extends TestCase
             'title' => 'Không được sửa dự án ngoài phạm vi quản lý',
         ])->assertForbidden();
 
-        $this->withToken($employee['token'])->getJson('/api/tasks')
+        $employeeTasksUrl = '/api/tasks?assignee_code='.$employee['user']['code'];
+        $this->withToken($employee['token'])->getJson($employeeTasksUrl)
             ->assertOk()
             ->assertJsonCount(1)
             ->assertJsonPath('0.title', 'Việc của nhân viên');
 
-        $employeeTaskCode = $this->withToken($employee['token'])->getJson('/api/tasks')->json('0.code');
+        $employeeTaskCode = $this->withToken($employee['token'])->getJson($employeeTasksUrl)->json('0.code');
         $this->withToken($employee['token'])->patchJson("/api/tasks/{$employeeTaskCode}/status", [
             'status' => 'in_progress',
         ])->assertOk();
@@ -302,6 +315,7 @@ class AuthApiTest extends TestCase
             'email' => 'grouped-work@example.com',
             'password' => 'secure-password',
         ])->assertCreated()->json();
+        User::whereKey($employee['user']['code'])->update(['user_profile_completed_at' => now()]);
 
         $other = User::create([
             'user_name' => 'Người khác',

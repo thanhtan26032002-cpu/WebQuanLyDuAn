@@ -39,6 +39,9 @@ export async function apiFetch(input, options = {}) {
     clearAuthSession()
     window.dispatchEvent(new CustomEvent('ringnet:unauthorized'))
   }
+  if (response.status === 428 && window.location.pathname !== '/complete-profile') {
+    window.location.assign('/complete-profile')
+  }
 
   return response
 }

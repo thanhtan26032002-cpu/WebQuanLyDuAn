@@ -8,22 +8,24 @@ use App\Models\Task;
 use App\Services\AccessService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\File;
+use Illuminate\Validation\Rule;
 use ZipArchive;
 
 class DownloadController extends Controller
 {
     public function downloadArchive(Request $request)
     {
-        $request->validate([
-            'target_type' => 'required|string',
+        $validated = $request->validate([
+            'target_type' => ['required', Rule::in(['Project', 'Task'])],
             'target_code' => 'required|string',
-            'file_name' => 'required|string',
+            'file_name' => 'required|string|max:120',
+            'format' => ['nullable', Rule::in(['.zip', '.tar', '.tar.gz'])],
         ]);
 
-        $targetType = $request->target_type;
-        $targetCode = $request->target_code;
-        $fileName = $request->file_name;
-        $format = $request->format ?? '.zip';
+        $targetType = $validated['target_type'];
+        $targetCode = $validated['target_code'];
+        $fileName = preg_replace('/[^\pL\pN _.-]+/u', '', $validated['file_name']) ?: 'tai-lieu';
+        $format = $validated['format'] ?? '.zip';
 
         $target = $targetType === 'Project'
             ? Project::findOrFail($targetCode)
@@ -33,10 +35,6 @@ class DownloadController extends Controller
                 ? AccessService::canViewProject($request->user(), $target)
                 : AccessService::canViewTask($request->user(), $target)
         );
-
-        if (! in_array($format, ['.zip', '.tar', '.tar.gz'])) {
-            $format = '.zip';
-        }
 
         // Remove any extension from input file_name to avoid double extensions
         $fileName = preg_replace('/(\.zip|\.tar|\.tar\.gz)$/i', '', $fileName);

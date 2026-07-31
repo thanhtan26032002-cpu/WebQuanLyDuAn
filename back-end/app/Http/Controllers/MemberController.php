@@ -15,7 +15,7 @@ class MemberController extends Controller
 {
     public function index(Request $request)
     {
-        $canSeePrivateProfiles = AccessService::canManagePeople($request->user());
+        $canSeePrivateProfiles = AccessService::canViewPrivateProfiles($request->user());
         $currentUserCode = $request->user()->user_code;
 
         $users = User::orderBy('user_name')->get()->map(function (User $user) use ($canSeePrivateProfiles, $currentUserCode) {
@@ -40,13 +40,14 @@ class MemberController extends Controller
 
     public function store(Request $request)
     {
-        AccessService::authorize(AccessService::canManagePeople($request->user()));
+        AccessService::authorize(
+            AccessService::canManageOrganization($request->user()),
+            'Chỉ quản trị viên mới được tạo tài khoản cho nhân sự khác.'
+        );
         $validated = $request->validate($this->rules(null, true), $this->messages());
 
         $groupCode = $validated['group_code'] ?? null;
-        $systemRole = AccessService::isAdmin($request->user())
-            ? ($validated['system_role'] ?? 'member')
-            : 'member';
+        $systemRole = $validated['system_role'] ?? 'member';
 
         $user = DB::transaction(function () use ($validated, $groupCode, $systemRole) {
             $user = User::create([
@@ -80,12 +81,22 @@ class MemberController extends Controller
     public function update(Request $request, string $code)
     {
         $user = User::findOrFail($code);
-        $canManage = AccessService::canManagePeople($request->user());
-        AccessService::authorize($canManage || $request->user()->user_code === $code);
+        $isAdmin = AccessService::canManageOrganization($request->user());
+        $isSelf = $request->user()->user_code === $code;
+        AccessService::authorize($isAdmin || $isSelf);
 
         $validated = $request->validate($this->rules($code, false), $this->messages());
-        if (! AccessService::isAdmin($request->user())) {
-            unset($validated['system_role']);
+        if (! $isAdmin) {
+            unset(
+                $validated['system_role'],
+                $validated['group_code'],
+                $validated['online'],
+                $validated['weekly_capacity_hours'],
+                $validated['password']
+            );
+        }
+        if ($isSelf) {
+            unset($validated['password']);
         }
         if (
             isset($validated['system_role'])
@@ -97,7 +108,7 @@ class MemberController extends Controller
             ], 422);
         }
 
-        $shouldUpdateGroup = $canManage && array_key_exists('group_code', $validated);
+        $shouldUpdateGroup = $isAdmin && array_key_exists('group_code', $validated);
         $groupCode = $validated['group_code'] ?? null;
         unset($validated['group_code']);
 

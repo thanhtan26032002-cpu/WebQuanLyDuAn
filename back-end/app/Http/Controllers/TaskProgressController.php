@@ -7,6 +7,7 @@ use App\Models\TaskChecklist;
 use App\Models\TaskWorkLog;
 use App\Services\AccessService;
 use App\Services\ActivityService;
+use App\Services\ProjectProgressService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -16,6 +17,7 @@ class TaskProgressController extends Controller
     {
         $task = Task::with('project')->findOrFail($taskCode);
         AccessService::authorize(AccessService::canContributeToTask($request->user(), $task));
+        $this->ensureTaskIsActive($task);
         $validated = $request->validate([
             'text' => 'required|string|max:255',
         ]);
@@ -36,6 +38,7 @@ class TaskProgressController extends Controller
     {
         $task = Task::with('project')->findOrFail($taskCode);
         AccessService::authorize(AccessService::canContributeToTask($request->user(), $task));
+        $this->ensureTaskIsActive($task);
         $checklist = $task->checklists()->whereKey($checklistCode)->firstOrFail();
         $validated = $request->validate([
             'text' => 'sometimes|required|string|max:255',
@@ -61,6 +64,7 @@ class TaskProgressController extends Controller
     {
         $task = Task::with('project')->findOrFail($taskCode);
         AccessService::authorize(AccessService::canContributeToTask($request->user(), $task));
+        $this->ensureTaskIsActive($task);
         $checklist = $task->checklists()->whereKey($checklistCode)->firstOrFail();
         $checklist->delete();
 
@@ -83,6 +87,10 @@ class TaskProgressController extends Controller
                 ],
             ], 422);
         }
+        AccessService::authorize(
+            $task->task_assignee_code === $request->user()->user_code,
+            'Chỉ người đang phụ trách nhiệm vụ mới được báo cáo tiến độ.'
+        );
 
         $validated = $request->validate([
             'time' => 'required|date_format:H:i',
@@ -167,7 +175,13 @@ class TaskProgressController extends Controller
         $progress = $total ? (int) round(($completed / $total) * 100) : 0;
 
         $task->update(['task_progress' => $progress]);
+        ProjectProgressService::sync($task->task_project_code);
 
         return $progress;
+    }
+
+    private function ensureTaskIsActive(Task $task): void
+    {
+        abort_if($task->task_status === 'done', 409, 'Hãy mở lại nhiệm vụ trước khi thay đổi công việc con.');
     }
 }

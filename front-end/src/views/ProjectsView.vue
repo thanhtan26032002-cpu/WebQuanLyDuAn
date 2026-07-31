@@ -5,7 +5,8 @@ import ProjectCard from '../components/common/ProjectCard.vue'
 import { useProjectWorkspace } from '../composables/useProjectWorkspace'
 
 const activeFilter = ref('all')
-const { projects, globalSearch, projectModalOpen, notify, importProjectModalOpen } = useProjectWorkspace()
+const { projects, globalSearch, projectModalOpen, notify, importProjectModalOpen, currentUser } = useProjectWorkspace()
+const canCreateProjects = computed(() => ['admin', 'project_manager', 'manager'].includes(currentUser.value?.role))
 
 const filters = [
   { id: 'all', label: 'Tất cả' }, 
@@ -40,7 +41,7 @@ const filteredProjects = computed(() => projects.value.filter((project) => {
         <h1 class="text-3xl font-bold text-slate-900 mb-1">Dự án</h1>
         <p class="text-slate-500 text-sm">{{ projects.length }} dự án · {{ filteredProjects.length }} đang hiển thị</p>
       </div>
-      <div class="flex items-center gap-3 shrink-0">
+      <div v-if="canCreateProjects" class="flex items-center gap-3 shrink-0">
         <button 
           @click="importProjectModalOpen = true"
           class="bg-white border border-slate-200 text-slate-700 px-5 py-2.5 rounded-xl font-medium hover:bg-slate-50 transition-all flex items-center gap-2"
@@ -86,6 +87,7 @@ const filteredProjects = computed(() => projects.value.filter((project) => {
       <ProjectCard v-for="project in filteredProjects" :key="project.id" :project="project" />
       
       <button 
+        v-if="canCreateProjects"
         @click="projectModalOpen = true"
         class="border-2 border-dashed border-slate-200 rounded-2xl flex flex-col items-center justify-center p-8 text-slate-500 hover:text-violet-600 hover:border-violet-300 hover:bg-violet-50 transition-all group min-h-[260px]"
       >

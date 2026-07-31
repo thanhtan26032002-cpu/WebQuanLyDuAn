@@ -18,7 +18,7 @@ class GroupController extends Controller
 
     public function store(Request $request)
     {
-        AccessService::authorize(AccessService::canManagePeople($request->user()));
+        AccessService::authorize(AccessService::canManageOrganization($request->user()));
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string|max:2000',
@@ -34,7 +34,7 @@ class GroupController extends Controller
 
     public function update(Request $request, string $code)
     {
-        AccessService::authorize(AccessService::canManagePeople($request->user()));
+        AccessService::authorize(AccessService::canManageOrganization($request->user()));
         $group = Group::findOrFail($code);
         $validated = $request->validate([
             'name' => 'sometimes|required|string|max:255',
@@ -50,7 +50,7 @@ class GroupController extends Controller
 
     public function destroy(Request $request, string $code)
     {
-        AccessService::authorize(AccessService::canManagePeople($request->user()));
+        AccessService::authorize(AccessService::canManageOrganization($request->user()));
         Group::findOrFail($code)->delete();
 
         return response()->json(['message' => 'Đã xóa nhóm']);
@@ -58,7 +58,7 @@ class GroupController extends Controller
 
     public function assignMember(Request $request, string $memberCode)
     {
-        AccessService::authorize(AccessService::canManagePeople($request->user()));
+        AccessService::authorize(AccessService::canManageOrganization($request->user()));
         User::findOrFail($memberCode);
         $validated = $request->validate([
             'group_code' => 'nullable|exists:groups,group_code',

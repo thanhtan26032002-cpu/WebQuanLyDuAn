@@ -23,7 +23,10 @@ class ProfessionalFeaturesTest extends TestCase
             'password' => 'secure-password',
         ])->assertCreated()->json('token');
 
-        User::where('user_email', 'admin@ringnet.test')->update(['user_role' => 'admin']);
+        User::where('user_email', 'admin@ringnet.test')->update([
+            'user_role' => 'admin',
+            'user_profile_completed_at' => now(),
+        ]);
 
         $this->withToken($this->token);
     }
@@ -82,6 +85,7 @@ class ProfessionalFeaturesTest extends TestCase
 
     public function test_recurring_tasks_and_actual_work_duration_are_persisted(): void
     {
+        $workerToken = 'professional-worker-token';
         $member = User::create([
             'user_name' => 'Người thực hiện',
             'user_email' => 'worker@ringnet.test',
@@ -91,6 +95,7 @@ class ProfessionalFeaturesTest extends TestCase
             'user_department' => 'Phát triển',
             'user_job_title' => 'Developer',
             'user_profile_completed_at' => now(),
+            'user_api_token' => hash('sha256', $workerToken),
         ]);
 
         $this->postJson('/api/tasks', [
@@ -101,13 +106,13 @@ class ProfessionalFeaturesTest extends TestCase
             'recurrence' => 'weekly',
         ])->assertCreated();
 
-        $this->postJson('/api/tasks/TK0001/work-logs', [
+        $this->withToken($workerToken)->postJson('/api/tasks/TK0001/work-logs', [
             'time' => '10:30',
             'duration_minutes' => 90,
             'note' => 'Đã tổng hợp số liệu.',
         ])->assertCreated()->assertJsonPath('work_log.duration_minutes', 90);
 
-        $this->patchJson('/api/tasks/TK0001/status', ['status' => 'done'])->assertOk();
+        $this->withToken($workerToken)->patchJson('/api/tasks/TK0001/status', ['status' => 'done'])->assertOk();
 
         $this->assertDatabaseCount('tasks', 2);
         $this->assertDatabaseHas('tasks', [
@@ -115,7 +120,7 @@ class ProfessionalFeaturesTest extends TestCase
             'task_status' => 'todo',
             'task_due_date' => now()->addWeek()->toDateString(),
         ]);
-        $this->getJson('/api/reports')
+        $this->withToken($this->token)->getJson('/api/reports')
             ->assertOk()
             ->assertJsonPath('estimate_vs_actual.0.actual_hours', 1.5);
     }
@@ -131,6 +136,7 @@ class ProfessionalFeaturesTest extends TestCase
             'email' => 'outsider@ringnet.test',
             'password' => 'secure-password',
         ])->assertCreated()->json('token');
+        User::where('user_email', 'outsider@ringnet.test')->update(['user_profile_completed_at' => now()]);
 
         $this->withToken($memberToken)
             ->getJson("/api/projects/{$project['code']}")

@@ -28,12 +28,13 @@ const isTaskAssignee = computed(() => task.value?.assigneeId === currentUserCode
 const canManageTask = computed(() => {
   if (!task.value || !currentUserCode.value) return false
   if (currentUserRole.value === 'admin') return true
-  if (!task.value.projectId) return currentUserRole.value === 'project_manager'
-  if (project.value?.created_by === currentUserCode.value) return true
-  return currentUserRole.value === 'project_manager'
-    && (project.value?.managerId === currentUserCode.value || project.value?.memberIds?.includes(currentUserCode.value))
+  if (currentUserRole.value !== 'project_manager') return false
+  if (!task.value.projectId) return task.value.created_by === currentUserCode.value
+  return project.value?.created_by === currentUserCode.value
+    || project.value?.managerId === currentUserCode.value
 })
 const canContributeToTask = computed(() => canManageTask.value || isTaskAssignee.value)
+const canModifyChecklist = computed(() => canContributeToTask.value && task.value?.status !== 'done')
 
 const deadlineInfo = computed(() => {
   const state = getTaskDeadlineState(task.value?.dueDate, task.value?.status)
@@ -206,11 +207,11 @@ const addChecklist = async () => {
   if (result.success) newChecklistText.value = ''
 }
 const toggleChecklist = async (item) => {
-  if (!canContributeToTask.value) return
+  if (!canModifyChecklist.value) return
   await updateTaskChecklist(task.value.id, item.id, { completed: !item.completed })
 }
 const removeChecklist = async (id) => {
-  if (!canContributeToTask.value) return
+  if (!canModifyChecklist.value) return
   await deleteTaskChecklist(task.value.id, id)
 }
 
@@ -223,8 +224,8 @@ const newWorkLogFiles = ref([])
 const newWorkLogChecklists = ref([])
 
 const openWorkLogForm = () => {
-  if (!canContributeToTask.value) {
-    notify('Bạn không có quyền báo cáo tiến độ cho nhiệm vụ này')
+  if (!isTaskAssignee.value) {
+    notify('Chỉ người đang phụ trách nhiệm vụ mới được báo cáo tiến độ')
     return
   }
   if (!task.value?.assigneeId) {
@@ -235,7 +236,7 @@ const openWorkLogForm = () => {
 }
 
 const addWorkLog = async () => {
-  if (!newWorkLogTime.value || !canContributeToTask.value) return
+  if (!newWorkLogTime.value || !isTaskAssignee.value) return
   const result = await addTaskWorkLog(task.value.id, {
     time: newWorkLogTime.value,
     durationMinutes: newWorkLogDuration.value ? Math.round(Number(newWorkLogDuration.value) * 60) : null,
@@ -469,7 +470,7 @@ const formatDateTime = (isoStr) => {
               <div v-for="item in task.checklists || []" :key="item.id" class="flex items-start gap-3 group">
                 <button 
                   @click="toggleChecklist(item)"
-                  :disabled="!canContributeToTask"
+                  :disabled="!canModifyChecklist"
                   :class="['mt-0.5 shrink-0 w-5 h-5 rounded flex items-center justify-center border transition-colors', item.completed ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-300 hover:border-violet-400 text-transparent']"
                 >
                   <Check class="w-3.5 h-3.5" />
@@ -477,14 +478,14 @@ const formatDateTime = (isoStr) => {
                 <span :class="['text-sm flex-1 pt-0.5 transition-colors', item.completed ? 'text-slate-400 line-through' : 'text-slate-700']">
                   {{ item.text }}
                 </span>
-                <button v-if="canContributeToTask" @click="removeChecklist(item.id)" class="opacity-0 group-hover:opacity-100 p-1 text-slate-300 hover:text-rose-500 transition-all">
+                <button v-if="canModifyChecklist" @click="removeChecklist(item.id)" class="opacity-0 group-hover:opacity-100 p-1 text-slate-300 hover:text-rose-500 transition-all">
                   <X class="w-4 h-4" />
                 </button>
               </div>
             </div>
             
             <!-- Add new -->
-            <div v-if="canContributeToTask" class="flex items-center gap-2 mt-2">
+            <div v-if="canModifyChecklist" class="flex items-center gap-2 mt-2">
               <input 
                 v-model="newChecklistText" 
                 @keyup.enter="addChecklist"
@@ -510,8 +511,8 @@ const formatDateTime = (isoStr) => {
             </h3>
             <button 
               @click="openWorkLogForm"
-              :disabled="!task.assigneeId || !canContributeToTask"
-              :title="!task.assigneeId ? 'Cần phân công người phụ trách trước' : canContributeToTask ? 'Thêm báo cáo tiến độ' : 'Bạn không có quyền báo cáo tiến độ'"
+              :disabled="!task.assigneeId || !isTaskAssignee"
+              :title="!task.assigneeId ? 'Cần phân công người phụ trách trước' : isTaskAssignee ? 'Thêm báo cáo tiến độ' : 'Chỉ người đang phụ trách mới được báo cáo tiến độ'"
               class="text-xs font-medium text-violet-600 hover:text-violet-700 bg-violet-50 hover:bg-violet-100 px-2 py-1 rounded flex items-center gap-1 transition-colors disabled:text-slate-400 disabled:bg-slate-100 disabled:cursor-not-allowed"
             >
               <Plus class="w-3.5 h-3.5" /> Báo cáo tiến độ

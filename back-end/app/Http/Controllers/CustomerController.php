@@ -3,19 +3,32 @@
 namespace App\Http\Controllers;
 
 use App\Models\Customer;
+use App\Models\Project;
 use App\Services\AccessService;
 use Illuminate\Http\Request;
 
 class CustomerController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        return response()->json(Customer::withCount('projects')->orderBy('customer_name')->get());
+        if (AccessService::canCreateProjects($request->user())) {
+            return response()->json(Customer::withCount('projects')->orderBy('customer_name')->get());
+        }
+
+        $customerCodes = AccessService::scopeProjects(Project::query(), $request->user())
+            ->whereNotNull('project_customer_code')
+            ->pluck('project_customer_code');
+
+        return response()->json(
+            Customer::whereIn('customer_code', $customerCodes)
+                ->orderBy('customer_name')
+                ->get(['customer_code', 'customer_name', 'customer_company'])
+        );
     }
 
     public function store(Request $request)
     {
-        AccessService::authorize(AccessService::canManagePeople($request->user()));
+        AccessService::authorize(AccessService::canCreateProjects($request->user()));
         foreach (['company', 'email', 'phone', 'address', 'notes'] as $field) {
             if ($request->has($field) && trim((string) $request->input($field)) === '') {
                 $request->merge([$field => null]);

@@ -29,6 +29,7 @@ class CoreApiTest extends TestCase
             'user_password' => Hash::make('test-password'),
             'user_role' => 'admin',
             'user_api_token' => hash('sha256', $plainToken),
+            'user_profile_completed_at' => now(),
         ]);
         $this->withToken($plainToken);
     }
@@ -251,6 +252,7 @@ class CoreApiTest extends TestCase
             'member_name' => 'Quản lý dự án',
             'member_email' => 'manager@example.com',
         ]);
+        $manager->update(['user_role' => 'project_manager']);
 
         $customer = $this->postJson('/api/customers', [
             'name' => 'Nguyễn Văn Khách',
@@ -518,12 +520,14 @@ class CoreApiTest extends TestCase
             'member_name' => 'Assigned member',
             'member_email' => 'assigned-progress@example.com',
         ]);
+        $memberToken = 'assigned-progress-token';
+        $member->update(['user_api_token' => hash('sha256', $memberToken)]);
 
         $this->putJson('/api/tasks/TK0001', [
             'assignee_code' => $member->user_code,
         ])->assertOk();
 
-        $this->postJson('/api/tasks/TK0001/work-logs', [
+        $this->withToken($memberToken)->postJson('/api/tasks/TK0001/work-logs', [
             'time' => '14:30',
             'note' => 'Completed API integration',
             'checklist_ids' => ['CK0001'],
@@ -535,7 +539,7 @@ class CoreApiTest extends TestCase
             'user_code' => 'US0001',
         ])->assertCreated()
             ->assertJsonPath('work_log.code', 'WL0001')
-            ->assertJsonPath('work_log.reporter_code', $this->apiUser->user_code)
+            ->assertJsonPath('work_log.reporter_code', $member->user_code)
             ->assertJsonPath('work_log.completed_items.0.id', 'CK0001')
             ->assertJsonPath('checklists.0.completed', true)
             ->assertJsonPath('progress', 100);
@@ -554,7 +558,7 @@ class CoreApiTest extends TestCase
         $this->assertDatabaseHas('task_work_logs', [
             'worklog_code' => 'WL0001',
             'worklog_task_code' => 'TK0001',
-            'worklog_reporter_code' => $this->apiUser->user_code,
+            'worklog_reporter_code' => $member->user_code,
         ]);
     }
 

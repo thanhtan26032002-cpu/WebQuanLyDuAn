@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Notification;
 use App\Models\Task;
+use App\Models\User;
 
 class AutomationService
 {
@@ -25,8 +26,18 @@ class AutomationService
         $handover = $rules->firstWhere('automation_rule', 'status_handover');
         if ($handover) {
             $config = $handover->automation_config ?? [];
-            if (($config['status'] ?? null) === $task->task_status && ! empty($config['assignee_code'])) {
-                $task->update(['task_assignee_code' => $config['assignee_code']]);
+            $nextAssignee = ! empty($config['assignee_code']) ? User::find($config['assignee_code']) : null;
+            if (($config['status'] ?? null) === $task->task_status && $nextAssignee) {
+                $task->update(['task_assignee_code' => $nextAssignee->user_code]);
+                $project->members()->syncWithoutDetaching([$nextAssignee->user_code]);
+                if (($nextAssignee->user_notification_preferences['assignment'] ?? true) !== false) {
+                    ActivityService::notify(
+                        $nextAssignee->user_code,
+                        'Nhiệm vụ được bàn giao',
+                        'Bạn đã được bàn giao nhiệm vụ: '.$task->task_title,
+                        'info'
+                    );
+                }
             }
         }
     }
@@ -34,7 +45,7 @@ class AutomationService
     public static function sendDeadlineReminders(): int
     {
         $count = 0;
-        Task::with(['project.automations', 'assignee.user'])
+        Task::with(['project.automations', 'assignee'])
             ->where('task_status', '!=', 'done')
             ->whereNotNull('task_due_date')
             ->whereDate('task_due_date', '<=', now()->addDay()->toDateString())
@@ -43,7 +54,7 @@ class AutomationService
                     if (! $task->project?->automations->contains(fn ($automation) => $automation->automation_rule === 'deadline_reminder' && $automation->automation_enabled)) {
                         continue;
                     }
-                    $user = $task->assignee?->user;
+                    $user = $task->assignee;
                     if (! $user || (($user->user_notification_preferences['deadline'] ?? true) === false)) {
                         continue;
                     }

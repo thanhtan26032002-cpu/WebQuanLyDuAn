@@ -31,6 +31,12 @@ const remainingLabel = (item) => {
   return `Còn ${days} ngày để khôi phục`
 }
 
+const restoreDisabledLabel = (item) => {
+  if (!item.canRestore) return 'Đã quá 30 ngày'
+  if (!item.canRestoreByUser) return 'Bạn chỉ có quyền xem mục này'
+  return ''
+}
+
 const restore = async (type, id) => {
   restoringId.value = `${type}-${id}`
   if (type === 'project') await restoreProject(id)
@@ -70,7 +76,7 @@ const restore = async (type, id) => {
           </div>
           <div class="md:text-right">
             <p :class="['text-xs font-semibold mb-2', project.canRestore ? 'text-emerald-600' : 'text-rose-600']">{{ remainingLabel(project) }}</p>
-            <button @click="restore('project', project.id)" :disabled="!project.canRestore || restoringId === `project-${project.id}`" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold bg-violet-600 text-white hover:bg-violet-700 disabled:bg-slate-200 disabled:text-slate-500 disabled:cursor-not-allowed">
+            <button @click="restore('project', project.id)" :title="restoreDisabledLabel(project)" :disabled="!project.canRestore || !project.canRestoreByUser || restoringId === `project-${project.id}`" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold bg-violet-600 text-white hover:bg-violet-700 disabled:bg-slate-200 disabled:text-slate-500 disabled:cursor-not-allowed">
               <RotateCcw class="w-4 h-4" /> {{ restoringId === `project-${project.id}` ? 'Đang khôi phục...' : 'Khôi phục' }}
             </button>
           </div>
@@ -88,7 +94,7 @@ const restore = async (type, id) => {
           </div>
           <div class="md:text-right">
             <p :class="['text-xs font-semibold mb-2', task.canRestore ? 'text-emerald-600' : 'text-rose-600']">{{ remainingLabel(task) }}</p>
-            <button @click="restore('task', task.id)" :disabled="!task.canRestore || restoringId === `task-${task.id}`" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold bg-violet-600 text-white hover:bg-violet-700 disabled:bg-slate-200 disabled:text-slate-500 disabled:cursor-not-allowed">
+            <button @click="restore('task', task.id)" :title="restoreDisabledLabel(task)" :disabled="!task.canRestore || !task.canRestoreByUser || restoringId === `task-${task.id}`" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold bg-violet-600 text-white hover:bg-violet-700 disabled:bg-slate-200 disabled:text-slate-500 disabled:cursor-not-allowed">
               <RotateCcw class="w-4 h-4" /> {{ restoringId === `task-${task.id}` ? 'Đang khôi phục...' : 'Khôi phục' }}
             </button>
           </div>

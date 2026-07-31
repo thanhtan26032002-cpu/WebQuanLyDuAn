@@ -18,7 +18,7 @@ class UserController extends Controller
             'user_code', 'user_name', 'user_email', 'user_avatar', 'user_role',
             'user_color', 'user_job_title', 'user_department', 'user_profile_completed_at'
         );
-        if (! AccessService::canManagePeople($request->user())) {
+        if (! AccessService::canViewPrivateProfiles($request->user())) {
             $query->whereKey($request->user()->user_code);
         }
 
@@ -55,6 +55,15 @@ class UserController extends Controller
         ]);
         if (array_key_exists('role', $data) && ! AccessService::isAdmin($request->user())) {
             unset($data['role']);
+        }
+        if (
+            isset($data['role'])
+            && $request->user()->user_code === $user->user_code
+            && $data['role'] !== $user->user_role
+        ) {
+            return response()->json([
+                'errors' => ['role' => ['Quản trị viên không thể tự thay đổi vai trò của chính mình.']],
+            ], 422);
         }
 
         if ($request->hasFile('avatar')) {

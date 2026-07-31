@@ -25,9 +25,29 @@ class AccessService
         return self::role($user) === 'admin';
     }
 
-    public static function canManagePeople(User $user): bool
+    public static function canManageOrganization(User $user): bool
+    {
+        return self::isAdmin($user);
+    }
+
+    public static function canCreateProjects(User $user): bool
     {
         return in_array(self::role($user), ['admin', 'project_manager'], true);
+    }
+
+    public static function canViewPrivateProfiles(User $user): bool
+    {
+        return self::canCreateProjects($user);
+    }
+
+    public static function canViewReports(User $user): bool
+    {
+        return self::canCreateProjects($user);
+    }
+
+    public static function canManagePeople(User $user): bool
+    {
+        return self::canCreateProjects($user);
     }
 
     public static function userCode(User $user): string
@@ -57,7 +77,7 @@ class AccessService
 
     public static function canManageProject(User $user, Project $project): bool
     {
-        if (self::isAdmin($user) || $project->project_created_by === $user->user_code) {
+        if (self::isAdmin($user)) {
             return true;
         }
 
@@ -67,8 +87,25 @@ class AccessService
 
         $userCode = self::userCode($user);
 
-        return $project->project_manager_code === $userCode
-            || $project->members()->where('users.user_code', $userCode)->exists();
+        return $project->project_created_by === $userCode
+            || $project->project_manager_code === $userCode;
+    }
+
+    public static function scopeManagedProjects(Builder $query, User $user): Builder
+    {
+        if (self::isAdmin($user)) {
+            return $query;
+        }
+
+        $userCode = self::userCode($user);
+
+        return $query->where(function (Builder $managed) use ($userCode) {
+            $managed->where('project_created_by', $userCode)
+                ->orWhere(function (Builder $assigned) use ($userCode) {
+                    $assigned->where('project_manager_code', $userCode)
+                        ->whereHas('manager', fn (Builder $manager) => $manager->where('user_role', 'project_manager'));
+                });
+        });
     }
 
     public static function canViewTask(User $user, Task $task): bool
@@ -78,6 +115,10 @@ class AccessService
         }
 
         if ($task->task_assignee_code === self::userCode($user)) {
+            return true;
+        }
+
+        if (! $task->task_project_code && $task->task_created_by === self::userCode($user)) {
             return true;
         }
 
@@ -100,7 +141,7 @@ class AccessService
             return $task->project && self::canManageProject($user, $task->project);
         }
 
-        return self::canManagePeople($user);
+        return $task->task_created_by === self::userCode($user);
     }
 
     public static function canContributeToTask(User $user, Task $task): bool

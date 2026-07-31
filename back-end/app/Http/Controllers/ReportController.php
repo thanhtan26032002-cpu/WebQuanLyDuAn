@@ -91,7 +91,7 @@ class ReportController extends Controller
 
     public function index(Request $request)
     {
-        AccessService::authorize(AccessService::canManagePeople($request->user()), 'Chỉ quản lý mới được xem báo cáo tổng hợp.');
+        AccessService::authorize(AccessService::canViewReports($request->user()), 'Chỉ quản trị viên hoặc quản lý dự án mới được xem báo cáo tổng hợp.');
         $tasks = $this->visibleTasks($request)->with(['project', 'assignee', 'workLogs'])->get();
         $today = now()->toDateString();
 
@@ -170,13 +170,15 @@ class ReportController extends Controller
             return Task::query();
         }
 
-        $projectCodes = AccessService::scopeProjects(Project::query(), $request->user())->pluck('project_code');
+        $projectCodes = AccessService::scopeManagedProjects(Project::query(), $request->user())->pluck('project_code');
         $memberCode = AccessService::userCode($request->user());
 
         return Task::where(function (Builder $query) use ($projectCodes, $memberCode) {
             $query->whereIn('task_project_code', $projectCodes);
             if ($memberCode) {
-                $query->orWhere('task_assignee_code', $memberCode);
+                $query->orWhere(function (Builder $created) use ($memberCode) {
+                    $created->whereNull('task_project_code')->where('task_created_by', $memberCode);
+                });
             }
         });
     }

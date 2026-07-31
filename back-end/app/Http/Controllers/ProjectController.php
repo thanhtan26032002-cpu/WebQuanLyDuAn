@@ -6,8 +6,10 @@ use App\Models\Project;
 use App\Models\Task;
 use App\Services\AccessService;
 use App\Services\ActivityService;
+use App\Services\ProjectProgressService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\Rule;
 
 class ProjectController extends Controller
 {
@@ -38,7 +40,10 @@ class ProjectController extends Controller
             ->with(['customer', 'manager'])
             ->orderBy('project_deleted_at', 'desc')
             ->get()
-            ->map(fn (Project $project) => $this->trashItem($project));
+            ->map(fn (Project $project) => $this->trashItem(
+                $project,
+                AccessService::canManageProject($request->user(), $project)
+            ));
 
         return response()->json($projects);
     }
@@ -68,20 +73,24 @@ class ProjectController extends Controller
     // Tạo dự án mới
     public function store(Request $request)
     {
-        AccessService::authorize(AccessService::canManagePeople($request->user()), 'Chỉ quản lý mới được tạo dự án.');
+        AccessService::authorize(AccessService::canCreateProjects($request->user()), 'Chỉ quản trị viên hoặc quản lý dự án mới được tạo dự án.');
         $this->normalizeOptionalDates($request);
 
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
             'customer_code' => 'nullable|string|exists:customers,customer_code',
-            'manager_code' => 'nullable|string|exists:users,user_code',
+            'manager_code' => [
+                'nullable',
+                'string',
+                Rule::exists('users', 'user_code')->where(fn ($query) => $query->whereIn('user_role', ['admin', 'project_manager'])),
+            ],
             'color' => 'sometimes|string|in:indigo,emerald,amber,rose,sky,violet,orange,purple,green,pink,blue',
             'status' => 'nullable|string|in:planning,active,on_hold,completed',
             'health' => 'nullable|string|in:on_track,at_risk,off_track',
             'update_cadence' => 'nullable|string|in:weekly,biweekly,monthly,never',
             'start_date' => 'nullable|date',
-            'due_date' => 'nullable|date|after_or_equal:today',
+            'due_date' => 'nullable|date|after_or_equal:today|after_or_equal:start_date',
             'progress' => 'nullable|integer|min:0|max:100',
             'member_ids' => 'sometimes|array',
             'member_ids.*' => 'string|distinct|exists:users,user_code',
@@ -89,8 +98,20 @@ class ProjectController extends Controller
         ]);
         $validated = $this->discardFieldsMissingFromLegacySchema($validated);
 
-        $memberIds = $validated['member_ids'] ?? [];
+        $memberIds = collect($validated['member_ids'] ?? [])
+            ->when($validated['manager_code'] ?? null, fn ($members, $managerCode) => $members->push($managerCode))
+            ->unique()
+            ->values()
+            ->all();
         $template = $validated['template'] ?? 'blank';
+        if (($validated['status'] ?? null) === 'completed' && $template !== 'blank') {
+            return response()->json([
+                'message' => 'Không thể tạo dự án đã hoàn thành từ mẫu còn chứa nhiệm vụ chưa thực hiện.',
+            ], 422);
+        }
+        if (($validated['status'] ?? null) === 'completed') {
+            $validated['progress'] = 100;
+        }
         unset($validated['member_ids'], $validated['template']);
 
         $dbData = Project::mapToDbAttributes($validated);
@@ -99,6 +120,10 @@ class ProjectController extends Controller
         $project = Project::create($dbData);
         $project->members()->sync($memberIds);
         $this->createTemplateTasks($project, $template);
+        if ($template !== 'blank') {
+            ProjectProgressService::sync($project->project_code);
+            $project->refresh();
+        }
 
         ActivityService::log(
             $dbData['project_created_by'],
@@ -148,6 +173,7 @@ class ProjectController extends Controller
                 'task_priority' => 'medium',
                 'task_progress' => 0,
                 'task_estimated_hours' => $estimate,
+                'task_created_by' => $project->project_created_by,
             ]);
         }
     }
@@ -163,18 +189,41 @@ class ProjectController extends Controller
             'name' => 'nullable|string|max:255',
             'description' => 'nullable|string',
             'customer_code' => 'nullable|string|exists:customers,customer_code',
-            'manager_code' => 'nullable|string|exists:users,user_code',
+            'manager_code' => [
+                'nullable',
+                'string',
+                Rule::exists('users', 'user_code')->where(fn ($query) => $query->whereIn('user_role', ['admin', 'project_manager'])),
+            ],
             'color' => 'sometimes|string|in:indigo,emerald,amber,rose,sky,violet,orange,purple,green,pink,blue',
             'status' => 'nullable|string|in:planning,active,on_hold,completed',
             'health' => 'nullable|string|in:on_track,at_risk,off_track',
             'update_cadence' => 'nullable|string|in:weekly,biweekly,monthly,never',
             'start_date' => 'nullable|date',
-            'due_date' => 'nullable|date',
+            'due_date' => 'nullable|date|after_or_equal:start_date',
             'progress' => 'nullable|integer|min:0|max:100',
         ]);
         $validated = $this->discardFieldsMissingFromLegacySchema($validated);
 
+        if (
+            ($validated['status'] ?? null) === 'completed'
+            && $project->tasks()->where('task_status', '!=', 'done')->exists()
+        ) {
+            return response()->json([
+                'message' => 'Không thể hoàn thành dự án khi vẫn còn nhiệm vụ chưa hoàn thành.',
+            ], 409);
+        }
+        if (($validated['status'] ?? null) === 'completed') {
+            $validated['progress'] = 100;
+        }
+
         $project->update(Project::mapToDbAttributes($validated));
+        if (isset($validated['status']) && $validated['status'] !== 'completed') {
+            ProjectProgressService::sync($project->project_code);
+            $project->refresh();
+        }
+        if (! empty($validated['manager_code'])) {
+            $project->members()->syncWithoutDetaching([$validated['manager_code']]);
+        }
         $project->load('customer', 'manager', 'members', 'attachments');
 
         $userCode = $request->user()->user_code;
@@ -219,9 +268,7 @@ class ProjectController extends Controller
     public function restore(Request $request, $code)
     {
         $project = Project::onlyTrashed()->findOrFail($code);
-        AccessService::authorize(
-            AccessService::isAdmin($request->user()) || $project->project_created_by === $request->user()->user_code
-        );
+        AccessService::authorize(AccessService::canManageProject($request->user(), $project));
         $restoreUntil = $project->project_deleted_at->copy()->addDays(30);
 
         if (now()->greaterThan($restoreUntil)) {
@@ -257,7 +304,12 @@ class ProjectController extends Controller
             'member_ids.*' => 'string|distinct|exists:users,user_code',
         ]);
 
-        $project->members()->sync($validated['member_ids']);
+        $memberIds = collect($validated['member_ids'])
+            ->when($project->project_manager_code, fn ($members, $managerCode) => $members->push($managerCode))
+            ->unique()
+            ->values()
+            ->all();
+        $project->members()->sync($memberIds);
         $project->load('members');
 
         return response()->json([
@@ -284,13 +336,14 @@ class ProjectController extends Controller
         return $validated;
     }
 
-    private function trashItem(Project $project): array
+    private function trashItem(Project $project, bool $canRestoreByUser): array
     {
         $restoreUntil = $project->project_deleted_at->copy()->addDays(30);
 
         return array_merge($project->toArray(), [
             'restore_until' => $restoreUntil->toISOString(),
             'can_restore' => now()->lessThanOrEqualTo($restoreUntil),
+            'can_restore_by_user' => $canRestoreByUser,
         ]);
     }
 }

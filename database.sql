@@ -404,6 +404,7 @@ CREATE TABLE `tasks` (
   `task_blocked_override` tinyint(1) NOT NULL DEFAULT 0,
   `task_estimated_hours` decimal(8,2) DEFAULT NULL,
   `task_assignee_code` varchar(50) DEFAULT NULL,
+  `task_created_by` varchar(50) DEFAULT NULL,
   `task_tags` varchar(500) DEFAULT NULL,
   `task_recurrence` varchar(30) DEFAULT NULL,
   `task_recurrence_until` date DEFAULT NULL,
@@ -416,8 +417,10 @@ CREATE TABLE `tasks` (
   KEY `task_project_code` (`task_project_code`),
   KEY `tasks_task_milestone_code_index` (`task_milestone_code`),
   KEY `tasks_task_assignee_code_foreign` (`task_assignee_code`),
+  KEY `tasks_task_created_by_index` (`task_created_by`),
   CONSTRAINT `tasks_ibfk_1` FOREIGN KEY (`task_project_code`) REFERENCES `projects` (`project_code`) ON DELETE CASCADE,
-  CONSTRAINT `tasks_task_assignee_code_foreign` FOREIGN KEY (`task_assignee_code`) REFERENCES `users` (`user_code`) ON DELETE SET NULL
+  CONSTRAINT `tasks_task_assignee_code_foreign` FOREIGN KEY (`task_assignee_code`) REFERENCES `users` (`user_code`) ON DELETE SET NULL,
+  CONSTRAINT `tasks_task_created_by_foreign` FOREIGN KEY (`task_created_by`) REFERENCES `users` (`user_code`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `users`;

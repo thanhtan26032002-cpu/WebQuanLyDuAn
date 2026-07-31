@@ -54,6 +54,9 @@ const getLocalDateKey = (dateValue = new Date()) => {
 
 const todayKey = getLocalDateKey();
 const currentUserCode = computed(() => currentUser.value?.code || "");
+const canManageWorkspace = computed(() =>
+  ["admin", "project_manager", "manager"].includes(currentUser.value?.role),
+);
 const currentUserName = computed(
   () => currentUser.value?.name?.trim() || "bạn",
 );
@@ -258,7 +261,7 @@ const showRecentActivities = ref(false);
           </strong>.
         </p>
       </div>
-      <div class="flex items-center gap-3 shrink-0">
+      <div v-if="canManageWorkspace" class="flex items-center gap-3 shrink-0">
         <button
           @click="importProjectModalOpen = true"
           class="bg-white border border-slate-200 text-slate-700 px-5 py-2.5 rounded-xl font-medium hover:bg-slate-50 transition-all flex items-center gap-2"
@@ -361,6 +364,7 @@ const showRecentActivities = ref(false);
               </div>
 
               <button
+                v-if="canManageWorkspace"
                 @click="taskModalOpen = true"
                 class="w-full mt-2 py-2 flex items-center justify-center gap-2 text-slate-500 hover:text-slate-800 hover:bg-slate-200/50 rounded-xl transition-colors font-medium text-sm"
               >

@@ -11,7 +11,8 @@ import { apiFetch, parseApiError } from '../services/api'
 const statusFilter = ref('all')
 const priorityFilter = ref('all')
 const viewMode = ref('kanban')
-const { tasks, globalSearch, taskModalOpen, priorityMap, taskStatusMap, findMember, findProject, formatDate, getTaskDeadlineState, toggleTaskComplete, activeTaskId, moveTask, notify } = useProjectWorkspace()
+const { tasks, globalSearch, taskModalOpen, priorityMap, taskStatusMap, findMember, findProject, formatDate, getTaskDeadlineState, toggleTaskComplete, activeTaskId, moveTask, notify, currentUser } = useProjectWorkspace()
+const canCreateTasks = computed(() => ['admin', 'project_manager', 'manager'].includes(currentUser.value?.role))
 const savedViews = ref([])
 const selectedSavedView = ref('')
 const newViewName = ref('')
@@ -79,12 +80,28 @@ const openTask = (task) => {
   activeTaskId.value = task.id
 }
 
+const canContributeTask = (task) => {
+  const userCode = currentUser.value?.code
+  if (!userCode || !task) return false
+  if (currentUser.value?.role === 'admin') return true
+  if (task.assigneeId === userCode) return true
+
+  const project = findProject(task.projectId)
+  if (!project) return task.created_by === userCode
+  if (!['project_manager', 'manager'].includes(currentUser.value?.role)) return false
+  return project.created_by === userCode || project.managerId === userCode
+}
+
+const canDragTask = (event) => canContributeTask(event.draggedContext?.element)
+
 const moveTaskStatus = (task, newStatus) => {
+  if (!canContributeTask(task)) return
   moveTask(task.id, newStatus)
 }
 
 const onTaskChange = (event, newStatus) => {
   if (event.added) {
+    if (!canContributeTask(event.added.element)) return
     moveTask(event.added.element.id, newStatus)
   }
 }
@@ -109,6 +126,7 @@ const getTasksByStatus = (statusId) => {
         <p class="text-slate-500 text-sm">{{ tasks.length }} nhiệm vụ</p>
       </div>
       <button 
+        v-if="canCreateTasks"
         @click="taskModalOpen = true"
         class="bg-gradient-to-r from-violet-500 to-indigo-600 text-white px-5 py-2.5 rounded-xl font-medium hover:shadow-premium transition-all shadow-md shadow-violet-500/25 shrink-0 flex items-center gap-2"
       >
@@ -200,8 +218,11 @@ const getTasksByStatus = (statusId) => {
                 <div class="flex items-start gap-3">
                   <button 
                     @click.stop="toggleTaskComplete(task)"
+                    :disabled="!canContributeTask(task)"
+                    :title="canContributeTask(task) ? 'Đổi trạng thái nhiệm vụ' : 'Bạn chỉ có quyền xem nhiệm vụ này'"
                     :class="['mt-0.5 w-5 h-5 rounded flex items-center justify-center border transition-colors shrink-0', 
-                      task.status === 'done' ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-300 hover:border-violet-400 text-transparent']"
+                      task.status === 'done' ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-300 hover:border-violet-400 text-transparent',
+                      !canContributeTask(task) ? 'cursor-not-allowed opacity-50' : '']"
                   >
                     <Check class="w-3.5 h-3.5" />
                   </button>
@@ -284,17 +305,18 @@ const getTasksByStatus = (statusId) => {
             ghost-class="opacity-40"
             chosen-class="ring-2"
             drag-class="rotate-1"
+            :move="canDragTask"
             class="flex-1 space-y-3 min-h-[140px]"
             @change="onTaskChange($event, col.id)"
           >
             <template #item="{ element: task }">
-              <div class="relative group cursor-grab active:cursor-grabbing">
+              <div :class="['relative group', canContributeTask(task) ? 'cursor-grab active:cursor-grabbing' : 'cursor-default']">
                 <div @click="openTask(task)" class="hover:ring-2 hover:ring-violet-400 hover:ring-offset-2 hover:ring-offset-slate-50 rounded-xl transition-all">
                   <TaskCard :task="task" :show-status="false" />
                 </div>
 
                 <!-- Quick Move Actions -->
-                <div class="absolute -right-3 -bottom-3 opacity-0 group-hover:opacity-100 transition-opacity bg-white border border-slate-200 shadow-lg rounded-xl p-1 flex gap-1 z-10">
+                <div v-if="canContributeTask(task)" class="absolute -right-3 -bottom-3 opacity-0 group-hover:opacity-100 transition-opacity bg-white border border-slate-200 shadow-lg rounded-xl p-1 flex gap-1 z-10">
                   <button
                     v-if="col.id !== 'todo'"
                     @click.stop="moveTaskStatus(task, 'todo')"

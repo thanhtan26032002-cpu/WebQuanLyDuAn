@@ -10,7 +10,7 @@ const routes = [
   { path: '/tasks', name: 'tasks', component: () => import('../views/TasksView.vue'), meta: { title: 'Nhiệm vụ' } },
   { path: '/team', name: 'team', component: () => import('../views/TeamView.vue'), meta: { title: 'Nhóm' } },
   { path: '/calendar', name: 'calendar', component: () => import('../views/CalendarView.vue'), meta: { title: 'Lịch' } },
-  { path: '/reports', name: 'reports', component: () => import('../views/ReportsView.vue'), meta: { title: 'Báo cáo' } },
+  { path: '/reports', name: 'reports', component: () => import('../views/ReportsView.vue'), meta: { title: 'Báo cáo', roles: ['admin', 'project_manager', 'manager'] } },
   { path: '/trash', name: 'trash', component: () => import('../views/TrashView.vue'), meta: { title: 'Thùng rác' } },
   { path: '/settings', name: 'settings', component: () => import('../views/SettingsView.vue'), meta: { title: 'Cài đặt' } },
   { path: '/:pathMatch(.*)*', name: 'not-found', component: () => import('../views/NotFoundView.vue'), meta: { title: 'Không tìm thấy' } },
@@ -30,6 +30,7 @@ router.beforeEach((to) => {
   const requiresProfileCompletion = !user?.profile_completed_at
   if (requiresProfileCompletion && to.name !== 'complete-profile') return { name: 'complete-profile' }
   if (!requiresProfileCompletion && ['login', 'complete-profile'].includes(to.name)) return { name: 'dashboard' }
+  if (to.meta.roles && !to.meta.roles.includes(user?.role)) return { name: 'dashboard' }
   return true
 })
 

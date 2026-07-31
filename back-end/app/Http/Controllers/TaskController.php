@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Services\AccessService;
 use App\Services\ActivityService;
 use App\Services\AutomationService;
+use App\Services\ProjectProgressService;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -71,7 +72,10 @@ class TaskController extends Controller
             ])
             ->orderBy('task_deleted_at', 'desc')
             ->get()
-            ->map(fn (Task $task) => $this->trashItem($task));
+            ->map(fn (Task $task) => $this->trashItem(
+                $task,
+                AccessService::canManageTask($request->user(), $task)
+            ));
 
         return response()->json($tasks);
     }
@@ -109,14 +113,25 @@ class TaskController extends Controller
         if ($validated['project_code'] ?? null) {
             $project = Project::findOrFail($validated['project_code']);
             AccessService::authorize(AccessService::canManageProject($request->user(), $project), 'Bạn không có quyền tạo nhiệm vụ trong dự án này.');
+            if ($project->project_status === 'completed') {
+                return response()->json(['message' => 'Hãy mở lại dự án trước khi tạo nhiệm vụ mới.'], 409);
+            }
             if (($validated['milestone_code'] ?? null) && ! $project->milestones()->whereKey($validated['milestone_code'])->exists()) {
                 return response()->json(['message' => 'Cột mốc không thuộc dự án đã chọn.'], 422);
             }
         } else {
-            AccessService::authorize(AccessService::canManagePeople($request->user()), 'Chỉ quản lý mới được tạo nhiệm vụ độc lập.');
+            AccessService::authorize(AccessService::canCreateProjects($request->user()), 'Chỉ quản trị viên hoặc quản lý dự án mới được tạo nhiệm vụ độc lập.');
         }
 
-        $task = Task::create(Task::mapToDbAttributes($validated));
+        $taskData = Task::mapToDbAttributes($validated);
+        $taskData['task_created_by'] = $request->user()->user_code;
+        $task = Task::create($taskData);
+        $task->unsetRelation('project');
+        $task->load('project');
+        if ($task->task_project_code && $task->task_assignee_code) {
+            $task->project?->members()->syncWithoutDetaching([$task->task_assignee_code]);
+        }
+        ProjectProgressService::sync($task->task_project_code);
         TaskWatcher::firstOrCreate(['watcher_task_code' => $task->task_code, 'watcher_user_code' => $request->user()->user_code]);
         $task->load($this->taskRelations());
 
@@ -130,7 +145,8 @@ class TaskController extends Controller
         );
 
         if ($task->task_assignee_code) {
-            if (User::whereKey($task->task_assignee_code)->exists()) {
+            $assignedUser = User::find($task->task_assignee_code);
+            if ($assignedUser && (($assignedUser->user_notification_preferences['assignment'] ?? true) !== false)) {
                 ActivityService::notify(
                     $task->task_assignee_code,
                     'Nhiệm vụ mới',
@@ -184,12 +200,19 @@ class TaskController extends Controller
         $validated = $validator->validated();
 
         $previousStatus = $task->task_status;
+        $previousAssigneeCode = $task->task_assignee_code;
+        $previousProjectCode = $task->task_project_code;
 
         if (array_key_exists('project_code', $validated) && $validated['project_code'] !== $task->task_project_code) {
-            AccessService::authorize(AccessService::canManagePeople($request->user()));
             if ($validated['project_code']) {
                 $targetProject = Project::findOrFail($validated['project_code']);
                 AccessService::authorize(AccessService::canManageProject($request->user(), $targetProject));
+                $targetStatus = $validated['status'] ?? $task->task_status;
+                if ($targetProject->project_status === 'completed' && $targetStatus !== 'done') {
+                    return response()->json(['message' => 'Không thể chuyển nhiệm vụ chưa hoàn thành vào dự án đã đóng.'], 409);
+                }
+            } else {
+                $validated['created_by'] = $request->user()->user_code;
             }
         }
 
@@ -201,22 +224,51 @@ class TaskController extends Controller
         }
 
         if (array_key_exists('blocked_override', $validated) && $validated['blocked_override']) {
-            AccessService::authorize(AccessService::canManagePeople($request->user()), 'Chỉ quản lý mới được bỏ qua trạng thái bị chặn.');
+            AccessService::authorize(AccessService::canManageTask($request->user(), $task), 'Chỉ người quản lý nhiệm vụ mới được bỏ qua trạng thái bị chặn.');
         }
         if (isset($validated['status']) && in_array($validated['status'], ['in_progress', 'done'], true) && $task->is_blocked) {
-            $canOverride = ($validated['blocked_override'] ?? false) && AccessService::canManagePeople($request->user());
+            $canOverride = ($validated['blocked_override'] ?? false) && AccessService::canManageTask($request->user(), $task);
             if (! $canOverride) {
                 return response()->json(['message' => 'Nhiệm vụ đang bị chặn bởi công việc chưa hoàn thành.'], 409);
             }
         }
+        if (($validated['status'] ?? null) === 'done' && $task->checklists()->where('checklist_is_completed', false)->exists()) {
+            return response()->json(['message' => 'Hãy hoàn thành toàn bộ công việc con trước khi đóng nhiệm vụ.'], 409);
+        }
+        if (($validated['status'] ?? null) !== null && $validated['status'] !== 'done' && $task->project?->project_status === 'completed') {
+            return response()->json(['message' => 'Hãy mở lại dự án trước khi mở lại nhiệm vụ.'], 409);
+        }
         $task->update(Task::mapToDbAttributes($validated));
+        $task->unsetRelation('project');
+        $task->load('project');
         if (array_key_exists('status', $validated)) {
             $task->task_completed_at = $validated['status'] === 'done' ? ($task->task_completed_at ?: now()) : null;
+            if ($validated['status'] === 'done') {
+                $task->task_progress = 100;
+            }
             $task->save();
             if ($previousStatus !== 'done' && $validated['status'] === 'done') {
                 $this->createRecurringTaskIfNeeded($task);
             }
             AutomationService::taskStatusChanged($task->loadMissing(['project.automations', 'project.manager']), $previousStatus);
+        }
+        if ($task->task_project_code && $task->task_assignee_code) {
+            $task->project?->members()->syncWithoutDetaching([$task->task_assignee_code]);
+        }
+        if ($task->task_assignee_code && $task->task_assignee_code !== $previousAssigneeCode) {
+            $assignedUser = User::find($task->task_assignee_code);
+            if ($assignedUser && (($assignedUser->user_notification_preferences['assignment'] ?? true) !== false)) {
+                ActivityService::notify(
+                    $assignedUser->user_code,
+                    'Nhiệm vụ mới được phân công',
+                    'Bạn đã được phân công nhiệm vụ: '.$task->task_title,
+                    'info'
+                );
+            }
+        }
+        ProjectProgressService::sync($previousProjectCode);
+        if ($task->task_project_code !== $previousProjectCode) {
+            ProjectProgressService::sync($task->task_project_code);
         }
         $task->load($this->taskRelations());
 
@@ -249,21 +301,31 @@ class TaskController extends Controller
             'Bạn không phải người thực hiện hoặc người quản lý nhiệm vụ này.'
         );
         $previousStatus = $task->task_status;
+        if ($validated['status'] !== 'done' && $task->project?->project_status === 'completed') {
+            return response()->json(['message' => 'Hãy mở lại dự án trước khi mở lại nhiệm vụ.'], 409);
+        }
 
         if ($task->is_blocked && in_array($validated['status'], ['in_progress', 'done'], true)) {
-            $canOverride = ($validated['override_blocked'] ?? false) && AccessService::canManagePeople($request->user());
+            $canOverride = ($validated['override_blocked'] ?? false) && AccessService::canManageTask($request->user(), $task);
             if (! $canOverride) {
                 return response()->json(['message' => 'Nhiệm vụ đang bị chặn bởi công việc chưa hoàn thành.'], 409);
             }
             $task->task_blocked_override = true;
         }
+        if ($validated['status'] === 'done' && $task->checklists()->where('checklist_is_completed', false)->exists()) {
+            return response()->json(['message' => 'Hãy hoàn thành toàn bộ công việc con trước khi đóng nhiệm vụ.'], 409);
+        }
 
         $task->task_status = $validated['status'];
         $task->task_completed_at = $validated['status'] === 'done' ? now() : null;
+        if ($validated['status'] === 'done') {
+            $task->task_progress = 100;
+        }
         $task->save();
         if ($previousStatus !== 'done' && $validated['status'] === 'done') {
             $this->createRecurringTaskIfNeeded($task);
         }
+        ProjectProgressService::sync($task->task_project_code);
         AutomationService::taskStatusChanged($task->loadMissing(['project.automations', 'project.manager']), $previousStatus);
 
         $userCode = $request->user()->user_code;
@@ -285,14 +347,12 @@ class TaskController extends Controller
     public function destroy(Request $request, $code)
     {
         $task = Task::with('project')->findOrFail($code);
-        AccessService::authorize(
-            AccessService::isAdmin($request->user())
-            || ($task->project && AccessService::canManageProject($request->user(), $task->project))
-        );
+        AccessService::authorize(AccessService::canManageTask($request->user(), $task));
         $taskTitle = $task->task_title;
         $taskCode = $task->task_code;
 
         $task->delete();
+        ProjectProgressService::sync($task->task_project_code);
 
         $userCode = $request->user()->user_code;
         ActivityService::log(
@@ -311,7 +371,12 @@ class TaskController extends Controller
     public function restore(Request $request, $code)
     {
         $task = Task::onlyTrashed()->findOrFail($code);
-        AccessService::authorize(AccessService::isAdmin($request->user()));
+        $project = $task->task_project_code ? Project::withTrashed()->find($task->task_project_code) : null;
+        AccessService::authorize(
+            AccessService::isAdmin($request->user())
+            || ($project && AccessService::canManageProject($request->user(), $project))
+            || (! $task->task_project_code && $task->task_created_by === $request->user()->user_code)
+        );
         $restoreUntil = $task->task_deleted_at->copy()->addDays(30);
 
         if (now()->greaterThan($restoreUntil)) {
@@ -321,15 +386,20 @@ class TaskController extends Controller
         }
 
         if ($task->task_project_code) {
-            $project = Project::withTrashed()->find($task->task_project_code);
             if ($project?->trashed()) {
                 return response()->json([
                     'message' => 'Hãy khôi phục dự án chứa nhiệm vụ này trước.',
                 ], 409);
             }
+            if ($project?->project_status === 'completed' && $task->task_status !== 'done') {
+                return response()->json([
+                    'message' => 'Hãy mở lại dự án trước khi khôi phục nhiệm vụ chưa hoàn thành.',
+                ], 409);
+            }
         }
 
         $task->restore();
+        ProjectProgressService::sync($task->task_project_code);
 
         ActivityService::log(
             $request->user()->user_code,
@@ -432,7 +502,10 @@ class TaskController extends Controller
         return $query->where(function (Builder $visible) use ($projectCodes, $memberCode) {
             $visible->whereIn('task_project_code', $projectCodes);
             if ($memberCode) {
-                $visible->orWhere('task_assignee_code', $memberCode);
+                $visible->orWhere('task_assignee_code', $memberCode)
+                    ->orWhere(function (Builder $created) use ($memberCode) {
+                        $created->whereNull('task_project_code')->where('task_created_by', $memberCode);
+                    });
             }
         });
     }
@@ -475,16 +548,18 @@ class TaskController extends Controller
     private function notifyTaskWatchers(Task $task, string $actorCode, string $title, string $message): void
     {
         $task->watchers()->where('users.user_code', '!=', $actorCode)->get()
+            ->filter(fn (User $user) => ($user->user_notification_preferences['comments'] ?? true) !== false)
             ->each(fn (User $user) => ActivityService::notify($user->user_code, $title, $message, 'info'));
     }
 
-    private function trashItem(Task $task): array
+    private function trashItem(Task $task, bool $canRestoreByUser): array
     {
         $restoreUntil = $task->task_deleted_at->copy()->addDays(30);
 
         return array_merge($task->toArray(), [
             'restore_until' => $restoreUntil->toISOString(),
             'can_restore' => now()->lessThanOrEqualTo($restoreUntil),
+            'can_restore_by_user' => $canRestoreByUser,
         ]);
     }
 }

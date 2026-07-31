@@ -36,6 +36,7 @@ class Task extends Model
     protected $fillable = [
         'task_project_code', 'task_title', 'task_description', 'task_status',
         'task_priority', 'task_start_date', 'task_due_date', 'task_assignee_code',
+        'task_created_by',
         'task_progress', 'task_estimated_hours', 'task_type', 'task_tags',
         'task_milestone_code', 'task_blocked_reason', 'task_blocked_override',
         'task_recurrence', 'task_recurrence_until', 'task_completed_at',
@@ -60,6 +61,7 @@ class Task extends Model
             'task_start_date' => 'start_date',
             'task_due_date' => 'due_date',
             'task_assignee_code' => 'assignee_code',
+            'task_created_by' => 'created_by',
             'task_tags' => 'tags',
             'task_progress' => 'progress',
             'task_blocked_reason' => 'blocked_reason',

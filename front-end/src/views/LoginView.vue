@@ -42,7 +42,7 @@ async function submit() {
         <input v-model="form.email" required type="email" autocomplete="email" class="mt-1.5 w-full rounded-xl border p-3 focus:border-violet-400 focus:outline-none focus:ring-4 focus:ring-violet-100" />
       </label>
       <label class="mt-4 block text-sm font-semibold">Mật khẩu
-        <input v-model="form.password" required minlength="6" type="password" autocomplete="current-password" class="mt-1.5 w-full rounded-xl border p-3 focus:border-violet-400 focus:outline-none focus:ring-4 focus:ring-violet-100" />
+        <input v-model="form.password" required :minlength="isRegistering ? 8 : 1" type="password" :autocomplete="isRegistering ? 'new-password' : 'current-password'" class="mt-1.5 w-full rounded-xl border p-3 focus:border-violet-400 focus:outline-none focus:ring-4 focus:ring-violet-100" />
       </label>
       <button :disabled="loading" class="mt-6 w-full rounded-xl bg-violet-600 p-3 font-semibold text-white disabled:opacity-60">
         {{ loading ? 'Đang xử lý...' : (isRegistering ? 'Tạo tài khoản' : 'Đăng nhập') }}

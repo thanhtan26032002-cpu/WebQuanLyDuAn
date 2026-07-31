@@ -32,7 +32,7 @@ class FileController extends Controller
             ], 422);
         }
         $canUpload = $target instanceof Project
-            ? AccessService::canViewProject($request->user(), $target)
+            ? AccessService::canManageProject($request->user(), $target)
             : ($validated['target_type'] === 'TaskComment'
                 ? AccessService::canViewTask($request->user(), $target)
                 : AccessService::canContributeToTask($request->user(), $target));
@@ -79,11 +79,15 @@ class FileController extends Controller
         $target = $attachment->attachment_target_type === 'Project'
             ? Project::find($attachment->attachment_target_code)
             : Task::with('project')->find($attachment->attachment_target_code);
+        $canViewTarget = $target instanceof Project
+            ? AccessService::canViewProject($request->user(), $target)
+            : ($target instanceof Task && AccessService::canViewTask($request->user(), $target));
+        $canManageTarget = ($target instanceof Project && AccessService::canManageProject($request->user(), $target))
+            || ($target instanceof Task && AccessService::canManageTask($request->user(), $target));
         AccessService::authorize(
-            $attachment->attachment_uploaded_by === $request->user()->user_code
-            || AccessService::isAdmin($request->user())
-            || ($target instanceof Project && AccessService::canManageProject($request->user(), $target))
-            || ($target instanceof Task && AccessService::canManageTask($request->user(), $target))
+            AccessService::isAdmin($request->user())
+            || $canManageTarget
+            || ($canViewTarget && $attachment->attachment_uploaded_by === $request->user()->user_code)
         );
         $relativePath = ltrim(str_replace('/storage/', '', $attachment->attachment_file_path), '/');
 

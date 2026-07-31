@@ -7,8 +7,7 @@ const { activeMemberId, memberDetailModalOpen, members, groups, updateMember, cu
 
 const member = computed(() => members.value.find(m => m.id === activeMemberId.value))
 const canEditMember = computed(() => {
-  const role = currentUser.value?.role
-  return currentUser.value?.code === member.value?.id || ['admin', 'project_manager', 'manager'].includes(role)
+  return currentUser.value?.code === member.value?.id || currentUser.value?.role === 'admin'
 })
 const isEditing = ref(false)
 const editedMember = ref({})
