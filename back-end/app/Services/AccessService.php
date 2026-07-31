@@ -90,18 +90,23 @@ class AccessService
         return false;
     }
 
-    public static function canEditTask(User $user, Task $task): bool
+    public static function canManageTask(User $user, Task $task): bool
     {
         if (self::isAdmin($user)) {
             return true;
         }
 
-        if ($task->task_project_code && $task->project && self::canManageProject($user, $task->project)) {
-            return true;
+        if ($task->task_project_code) {
+            return $task->project && self::canManageProject($user, $task->project);
         }
 
-        return self::role($user) === 'member'
-            && $task->task_assignee_code === $user->user_code;
+        return self::canManagePeople($user);
+    }
+
+    public static function canContributeToTask(User $user, Task $task): bool
+    {
+        return self::canManageTask($user, $task)
+            || $task->task_assignee_code === self::userCode($user);
     }
 
     public static function authorize(bool $allowed, string $message = 'Bạn không có quyền thực hiện thao tác này.'): void

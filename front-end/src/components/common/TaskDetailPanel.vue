@@ -22,6 +22,18 @@ const task = computed(() => tasks.value.find(t => t.id === activeTaskId.value))
 const project = computed(() => findProject(task.value?.projectId))
 const assignee = computed(() => findMember(task.value?.assigneeId))
 const taskComments = computed(() => comments.value.filter(c => c.taskId === activeTaskId.value).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)))
+const currentUserCode = computed(() => currentUser.value?.code || null)
+const currentUserRole = computed(() => currentUser.value?.role || 'member')
+const isTaskAssignee = computed(() => task.value?.assigneeId === currentUserCode.value)
+const canManageTask = computed(() => {
+  if (!task.value || !currentUserCode.value) return false
+  if (currentUserRole.value === 'admin') return true
+  if (!task.value.projectId) return currentUserRole.value === 'project_manager'
+  if (project.value?.created_by === currentUserCode.value) return true
+  return currentUserRole.value === 'project_manager'
+    && (project.value?.managerId === currentUserCode.value || project.value?.memberIds?.includes(currentUserCode.value))
+})
+const canContributeToTask = computed(() => canManageTask.value || isTaskAssignee.value)
 
 const deadlineInfo = computed(() => {
   const state = getTaskDeadlineState(task.value?.dueDate, task.value?.status)
@@ -63,7 +75,7 @@ const watching = ref(false)
 const availableDependencies = computed(() => tasks.value.filter(item => item.id !== task.value?.id && item.projectId === task.value?.projectId))
 
 const startEditing = () => {
-  if (!task.value) return
+  if (!task.value || !canManageTask.value) return
   editedTask.value = JSON.parse(JSON.stringify(task.value))
   editedTask.value.tagsInput = Array.isArray(task.value?.tags) ? task.value.tags.join(', ') : (task.value?.tags || '')
   isEditing.value = true
@@ -90,6 +102,7 @@ const closePanel = () => {
 }
 
 const saveDependencies = async () => {
+  if (!canManageTask.value) return
   await syncTaskDependencies(task.value.id, selectedDependencyIds.value)
 }
 
@@ -98,7 +111,7 @@ const toggleWatching = async () => {
 }
 
 const handleDelete = async () => {
-  if (!task.value) return
+  if (!task.value || !canManageTask.value) return
   const deleted = await deleteTask(task.value.id)
   if (deleted) isConfirmingDelete.value = false
 }
@@ -193,9 +206,11 @@ const addChecklist = async () => {
   if (result.success) newChecklistText.value = ''
 }
 const toggleChecklist = async (item) => {
+  if (!canContributeToTask.value) return
   await updateTaskChecklist(task.value.id, item.id, { completed: !item.completed })
 }
 const removeChecklist = async (id) => {
+  if (!canContributeToTask.value) return
   await deleteTaskChecklist(task.value.id, id)
 }
 
@@ -208,6 +223,10 @@ const newWorkLogFiles = ref([])
 const newWorkLogChecklists = ref([])
 
 const openWorkLogForm = () => {
+  if (!canContributeToTask.value) {
+    notify('Bạn không có quyền báo cáo tiến độ cho nhiệm vụ này')
+    return
+  }
   if (!task.value?.assigneeId) {
     notify('Vui lòng phân công người phụ trách trước khi báo cáo tiến độ')
     return
@@ -216,7 +235,7 @@ const openWorkLogForm = () => {
 }
 
 const addWorkLog = async () => {
-  if (!newWorkLogTime.value) return
+  if (!newWorkLogTime.value || !canContributeToTask.value) return
   const result = await addTaskWorkLog(task.value.id, {
     time: newWorkLogTime.value,
     durationMinutes: newWorkLogDuration.value ? Math.round(Number(newWorkLogDuration.value) * 60) : null,
@@ -262,7 +281,7 @@ const removeWorkLogFile = (idx) => {
 // Task Attachment Upload logic
 const taskFileInput = ref(null)
 const openTaskFileUpload = () => {
-  if (taskFileInput.value) {
+  if (canContributeToTask.value && taskFileInput.value) {
     taskFileInput.value.click()
   }
 }
@@ -332,7 +351,7 @@ const formatDateTime = (isoStr) => {
             <Bell class="w-5 h-5" />
           </button>
           <button
-            v-if="!isEditing && !isConfirmingDelete"
+            v-if="canManageTask && !isEditing && !isConfirmingDelete"
             @click="isConfirmingDelete = true"
             class="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors"
             title="Xóa nhiệm vụ"
@@ -345,7 +364,7 @@ const formatDateTime = (isoStr) => {
             <button @click="handleDelete" class="px-2.5 py-1.5 text-xs font-medium text-white bg-rose-600 hover:bg-rose-700 rounded-lg">Xác nhận</button>
           </template>
           <button 
-            v-if="!isEditing && !isConfirmingDelete"
+            v-if="canManageTask && !isEditing && !isConfirmingDelete"
             @click="startEditing"
             class="p-2 text-slate-400 hover:text-violet-600 hover:bg-violet-50 rounded-xl transition-colors"
           >
@@ -450,6 +469,7 @@ const formatDateTime = (isoStr) => {
               <div v-for="item in task.checklists || []" :key="item.id" class="flex items-start gap-3 group">
                 <button 
                   @click="toggleChecklist(item)"
+                  :disabled="!canContributeToTask"
                   :class="['mt-0.5 shrink-0 w-5 h-5 rounded flex items-center justify-center border transition-colors', item.completed ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-300 hover:border-violet-400 text-transparent']"
                 >
                   <Check class="w-3.5 h-3.5" />
@@ -457,14 +477,14 @@ const formatDateTime = (isoStr) => {
                 <span :class="['text-sm flex-1 pt-0.5 transition-colors', item.completed ? 'text-slate-400 line-through' : 'text-slate-700']">
                   {{ item.text }}
                 </span>
-                <button @click="removeChecklist(item.id)" class="opacity-0 group-hover:opacity-100 p-1 text-slate-300 hover:text-rose-500 transition-all">
+                <button v-if="canContributeToTask" @click="removeChecklist(item.id)" class="opacity-0 group-hover:opacity-100 p-1 text-slate-300 hover:text-rose-500 transition-all">
                   <X class="w-4 h-4" />
                 </button>
               </div>
             </div>
             
             <!-- Add new -->
-            <div class="flex items-center gap-2 mt-2">
+            <div v-if="canContributeToTask" class="flex items-center gap-2 mt-2">
               <input 
                 v-model="newChecklistText" 
                 @keyup.enter="addChecklist"
@@ -490,8 +510,8 @@ const formatDateTime = (isoStr) => {
             </h3>
             <button 
               @click="openWorkLogForm"
-              :disabled="!task.assigneeId"
-              :title="task.assigneeId ? 'Thêm báo cáo tiến độ' : 'Cần phân công người phụ trách trước'"
+              :disabled="!task.assigneeId || !canContributeToTask"
+              :title="!task.assigneeId ? 'Cần phân công người phụ trách trước' : canContributeToTask ? 'Thêm báo cáo tiến độ' : 'Bạn không có quyền báo cáo tiến độ'"
               class="text-xs font-medium text-violet-600 hover:text-violet-700 bg-violet-50 hover:bg-violet-100 px-2 py-1 rounded flex items-center gap-1 transition-colors disabled:text-slate-400 disabled:bg-slate-100 disabled:cursor-not-allowed"
             >
               <Plus class="w-3.5 h-3.5" /> Báo cáo tiến độ
@@ -683,12 +703,16 @@ const formatDateTime = (isoStr) => {
           <div class="space-y-4">
             <div>
               <label class="mb-1.5 block text-xs font-semibold text-slate-600">Nhiệm vụ phải hoàn thành trước</label>
-              <select v-model="selectedDependencyIds" multiple class="min-h-24 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:border-violet-400 focus:outline-none">
+              <select v-if="canManageTask" v-model="selectedDependencyIds" multiple class="min-h-24 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:border-violet-400 focus:outline-none">
                 <option v-for="item in availableDependencies" :key="item.id" :value="item.id">{{ item.title }} — {{ taskStatusMap[item.status]?.label }}</option>
               </select>
-              <div class="mt-2 flex items-center justify-between gap-3">
+              <div v-if="canManageTask" class="mt-2 flex items-center justify-between gap-3">
                 <p class="text-[11px] text-slate-400">Giữ Ctrl/Cmd để chọn nhiều nhiệm vụ.</p>
                 <button @click="saveDependencies" class="rounded-lg bg-violet-50 px-3 py-1.5 text-xs font-semibold text-violet-700 hover:bg-violet-100">Lưu phụ thuộc</button>
+              </div>
+              <div v-else class="space-y-1.5 rounded-lg bg-slate-50 p-3">
+                <p v-for="item in task.dependencies || []" :key="item.code || item.id" class="text-sm text-slate-600">• {{ item.title }}</p>
+                <p v-if="!task.dependencies?.length" class="text-sm text-slate-400">Không có nhiệm vụ phụ thuộc.</p>
               </div>
             </div>
             <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -748,7 +772,7 @@ const formatDateTime = (isoStr) => {
               <button @click="isDownloadModalOpen = true" :disabled="!task.files?.length" class="text-xs font-medium text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded transition-colors disabled:opacity-50">
                 Tải xuống tất cả
               </button>
-              <button @click="openTaskFileUpload" :disabled="isTaskFileUploading" class="text-xs font-medium text-violet-600 hover:text-violet-700 bg-violet-50 hover:bg-violet-100 px-2 py-1 rounded transition-colors disabled:opacity-50">
+              <button v-if="canContributeToTask" @click="openTaskFileUpload" :disabled="isTaskFileUploading" class="text-xs font-medium text-violet-600 hover:text-violet-700 bg-violet-50 hover:bg-violet-100 px-2 py-1 rounded transition-colors disabled:opacity-50">
                 {{ isTaskFileUploading ? 'Đang tải...' : '+ Tải lên' }}
               </button>
             </div>

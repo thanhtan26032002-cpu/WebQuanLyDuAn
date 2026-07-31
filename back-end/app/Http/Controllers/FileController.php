@@ -31,11 +31,12 @@ class FileController extends Controller
                 'message' => 'Dự án hoặc nhiệm vụ đính kèm không tồn tại.',
             ], 422);
         }
-        AccessService::authorize(
-            $target instanceof Project
-                ? AccessService::canViewProject($request->user(), $target)
-                : AccessService::canViewTask($request->user(), $target)
-        );
+        $canUpload = $target instanceof Project
+            ? AccessService::canViewProject($request->user(), $target)
+            : ($validated['target_type'] === 'TaskComment'
+                ? AccessService::canViewTask($request->user(), $target)
+                : AccessService::canContributeToTask($request->user(), $target));
+        AccessService::authorize($canUpload, 'Bạn không có quyền tải tệp trực tiếp lên nhiệm vụ này.');
 
         if ($request->hasFile('file')) {
             $file = $request->file('file');
@@ -82,7 +83,7 @@ class FileController extends Controller
             $attachment->attachment_uploaded_by === $request->user()->user_code
             || AccessService::isAdmin($request->user())
             || ($target instanceof Project && AccessService::canManageProject($request->user(), $target))
-            || ($target instanceof Task && AccessService::canEditTask($request->user(), $target))
+            || ($target instanceof Task && AccessService::canManageTask($request->user(), $target))
         );
         $relativePath = ltrim(str_replace('/storage/', '', $attachment->attachment_file_path), '/');
 

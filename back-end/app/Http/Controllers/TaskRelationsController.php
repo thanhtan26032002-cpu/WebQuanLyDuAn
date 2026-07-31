@@ -14,7 +14,10 @@ class TaskRelationsController extends Controller
     public function syncDependencies(Request $request, string $taskCode)
     {
         $task = Task::with('project')->findOrFail($taskCode);
-        AccessService::authorize(AccessService::canEditTask($request->user(), $task));
+        AccessService::authorize(
+            AccessService::canManageTask($request->user(), $task),
+            'Chỉ người quản lý nhiệm vụ mới được thay đổi quan hệ phụ thuộc.'
+        );
 
         $validated = $request->validate([
             'dependency_ids' => 'present|array|max:30',

@@ -150,7 +150,10 @@ class TaskController extends Controller
     public function update(Request $request, $code)
     {
         $task = Task::with('project')->findOrFail($code);
-        AccessService::authorize(AccessService::canEditTask($request->user(), $task));
+        AccessService::authorize(
+            AccessService::canManageTask($request->user(), $task),
+            'Chỉ quản trị viên hoặc người quản lý dự án mới được sửa thông tin giao việc.'
+        );
 
         $input = $this->normalizeOptionalFields($request->all());
 
@@ -241,7 +244,10 @@ class TaskController extends Controller
         ]);
 
         $task = Task::with(['project', 'dependencies'])->findOrFail($code);
-        AccessService::authorize(AccessService::canEditTask($request->user(), $task));
+        AccessService::authorize(
+            AccessService::canContributeToTask($request->user(), $task),
+            'Bạn không phải người thực hiện hoặc người quản lý nhiệm vụ này.'
+        );
         $previousStatus = $task->task_status;
 
         if ($task->is_blocked && in_array($validated['status'], ['in_progress', 'done'], true)) {

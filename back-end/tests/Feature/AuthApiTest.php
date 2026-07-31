@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Models\Task;
+use App\Models\TaskDependency;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Schema;
@@ -195,6 +197,19 @@ class AuthApiTest extends TestCase
             'password' => 'secure-password',
         ])->assertCreated()->json();
 
+        $outsider = $this->postJson('/api/register', [
+            'name' => 'Outsider',
+            'email' => 'my-work-outsider@example.com',
+            'password' => 'secure-password',
+        ])->assertCreated()->json();
+
+        $manager = $this->postJson('/api/register', [
+            'name' => 'Project Manager',
+            'email' => 'my-work-manager@example.com',
+            'password' => 'secure-password',
+        ])->assertCreated()->json();
+        User::whereKey($manager['user']['code'])->update(['user_role' => 'project_manager']);
+
         $project = $this->withToken($admin['token'])->postJson('/api/projects', [
             'name' => 'Dự án chỉ quản trị viên quản lý',
         ])->assertCreated()->json('project');
@@ -212,19 +227,145 @@ class AuthApiTest extends TestCase
             'due_date' => now()->toDateString(),
         ])->assertCreated();
 
+        $managerTask = $this->withToken($admin['token'])->postJson('/api/tasks', [
+            'title' => 'Việc được giao cho quản lý',
+            'project_code' => $project['code'],
+            'assignee_code' => $manager['user']['code'],
+            'due_date' => now()->toDateString(),
+        ])->assertCreated()->json('task');
+
         $this->withToken($admin['token'])->getJson('/api/my-work')
             ->assertOk()
-            ->assertJsonCount(1, 'today')
-            ->assertJsonPath('today.0.title', 'Việc của quản trị viên');
+            ->assertJsonPath('summary.total_assigned', 1)
+            ->assertJsonCount(1, 'sections.today')
+            ->assertJsonPath('sections.today.0.title', 'Việc của quản trị viên');
 
         $this->withToken($employee['token'])->getJson('/api/my-work')
             ->assertOk()
-            ->assertJsonCount(1, 'today')
-            ->assertJsonPath('today.0.title', 'Việc của nhân viên');
+            ->assertJsonPath('summary.total_assigned', 1)
+            ->assertJsonCount(1, 'sections.today')
+            ->assertJsonPath('sections.today.0.title', 'Việc của nhân viên');
+
+        $this->withToken($manager['token'])->getJson('/api/my-work')
+            ->assertOk()
+            ->assertJsonPath('summary.total_assigned', 1)
+            ->assertJsonPath('sections.today.0.title', 'Việc được giao cho quản lý');
+
+        $this->withToken($manager['token'])->patchJson("/api/tasks/{$managerTask['code']}/status", [
+            'status' => 'in_progress',
+        ])->assertOk();
+
+        $this->withToken($manager['token'])->putJson("/api/tasks/{$managerTask['code']}", [
+            'title' => 'Không được sửa dự án ngoài phạm vi quản lý',
+        ])->assertForbidden();
 
         $this->withToken($employee['token'])->getJson('/api/tasks')
             ->assertOk()
             ->assertJsonCount(1)
             ->assertJsonPath('0.title', 'Việc của nhân viên');
+
+        $employeeTaskCode = $this->withToken($employee['token'])->getJson('/api/tasks')->json('0.code');
+        $this->withToken($employee['token'])->patchJson("/api/tasks/{$employeeTaskCode}/status", [
+            'status' => 'in_progress',
+        ])->assertOk();
+
+        $this->withToken($employee['token'])->postJson("/api/tasks/{$employeeTaskCode}/checklists", [
+            'text' => 'Phần việc cá nhân',
+        ])->assertCreated();
+
+        $this->withToken($employee['token'])->putJson("/api/tasks/{$employeeTaskCode}", [
+            'title' => 'Nhân viên không được tự đổi yêu cầu',
+            'assignee_code' => $admin['user']['code'],
+        ])->assertForbidden();
+
+        $this->withToken($outsider['token'])->patchJson("/api/tasks/{$employeeTaskCode}/status", [
+            'status' => 'done',
+        ])->assertForbidden();
+
+        $this->withToken($outsider['token'])->getJson('/api/my-work')
+            ->assertOk()
+            ->assertJsonPath('summary.total_assigned', 0)
+            ->assertJsonPath('summary.active', 0);
+
+        $this->assertDatabaseHas('tasks', [
+            'task_code' => $employeeTaskCode,
+            'task_title' => 'Việc của nhân viên',
+            'task_assignee_code' => $employee['user']['code'],
+            'task_status' => 'in_progress',
+        ]);
+    }
+
+    public function test_my_work_groups_every_assigned_task_once_and_never_includes_team_backlog(): void
+    {
+        $employee = $this->postJson('/api/register', [
+            'name' => 'Nhân viên phân nhóm',
+            'email' => 'grouped-work@example.com',
+            'password' => 'secure-password',
+        ])->assertCreated()->json();
+
+        $other = User::create([
+            'user_name' => 'Người khác',
+            'user_email' => 'other-work@example.com',
+            'user_password' => 'secure-password',
+            'user_role' => 'member',
+        ]);
+
+        $createTask = fn (string $title, ?string $dueDate, string $status = 'todo') => Task::create([
+            'task_title' => $title,
+            'task_assignee_code' => $employee['user']['code'],
+            'task_due_date' => $dueDate,
+            'task_status' => $status,
+            'task_priority' => 'medium',
+            'task_completed_at' => $status === 'done' ? now() : null,
+        ]);
+
+        $overdue = $createTask('Việc quá hạn', now()->subDay()->toDateString());
+        $today = $createTask('Việc hôm nay đang bị chặn', now()->toDateString());
+        $upcoming = $createTask('Việc ba ngày tới', now()->addDays(3)->toDateString());
+        $later = $createTask('Việc dài hạn', now()->addDays(10)->toDateString());
+        $noDeadline = $createTask('Việc chưa có hạn', null);
+        $completed = $createTask('Việc đã xong', now()->subDays(2)->toDateString(), 'done');
+
+        $blocker = Task::create([
+            'task_title' => 'Việc của người khác đang chặn',
+            'task_assignee_code' => $other->user_code,
+            'task_status' => 'todo',
+        ]);
+        TaskDependency::create([
+            'dependency_task_code' => $today->task_code,
+            'dependency_depends_on_code' => $blocker->task_code,
+        ]);
+        Task::create([
+            'task_title' => 'Việc chưa phân công của nhóm',
+            'task_status' => 'todo',
+        ]);
+
+        $response = $this->withToken($employee['token'])->getJson('/api/my-work')
+            ->assertOk()
+            ->assertJsonPath('owner.code', $employee['user']['code'])
+            ->assertJsonPath('summary.total_assigned', 6)
+            ->assertJsonPath('summary.active', 5)
+            ->assertJsonPath('summary.blocked', 1)
+            ->assertJsonPath('summary.completed', 1)
+            ->assertJsonCount(1, 'sections.overdue')
+            ->assertJsonCount(1, 'sections.today')
+            ->assertJsonCount(1, 'sections.upcoming')
+            ->assertJsonCount(1, 'sections.later')
+            ->assertJsonCount(1, 'sections.no_deadline')
+            ->assertJsonCount(1, 'sections.recently_completed');
+
+        $activeCodes = collect(['overdue', 'today', 'upcoming', 'later', 'no_deadline'])
+            ->flatMap(fn (string $section) => collect($response->json("sections.{$section}"))->pluck('code'));
+
+        $this->assertCount(5, $activeCodes);
+        $this->assertCount(5, $activeCodes->unique());
+        $this->assertEqualsCanonicalizing([
+            $overdue->task_code,
+            $today->task_code,
+            $upcoming->task_code,
+            $later->task_code,
+            $noDeadline->task_code,
+        ], $activeCodes->all());
+        $this->assertSame($completed->task_code, $response->json('sections.recently_completed.0.code'));
     }
 }

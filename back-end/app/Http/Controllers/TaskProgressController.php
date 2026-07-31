@@ -15,7 +15,7 @@ class TaskProgressController extends Controller
     public function storeChecklist(Request $request, string $taskCode)
     {
         $task = Task::with('project')->findOrFail($taskCode);
-        AccessService::authorize(AccessService::canEditTask($request->user(), $task));
+        AccessService::authorize(AccessService::canContributeToTask($request->user(), $task));
         $validated = $request->validate([
             'text' => 'required|string|max:255',
         ]);
@@ -35,7 +35,7 @@ class TaskProgressController extends Controller
     public function updateChecklist(Request $request, string $taskCode, string $checklistCode)
     {
         $task = Task::with('project')->findOrFail($taskCode);
-        AccessService::authorize(AccessService::canEditTask($request->user(), $task));
+        AccessService::authorize(AccessService::canContributeToTask($request->user(), $task));
         $checklist = $task->checklists()->whereKey($checklistCode)->firstOrFail();
         $validated = $request->validate([
             'text' => 'sometimes|required|string|max:255',
@@ -60,7 +60,7 @@ class TaskProgressController extends Controller
     public function destroyChecklist(Request $request, string $taskCode, string $checklistCode)
     {
         $task = Task::with('project')->findOrFail($taskCode);
-        AccessService::authorize(AccessService::canEditTask($request->user(), $task));
+        AccessService::authorize(AccessService::canContributeToTask($request->user(), $task));
         $checklist = $task->checklists()->whereKey($checklistCode)->firstOrFail();
         $checklist->delete();
 
@@ -73,7 +73,7 @@ class TaskProgressController extends Controller
     public function storeWorkLog(Request $request, string $taskCode)
     {
         $task = Task::with('project')->findOrFail($taskCode);
-        AccessService::authorize(AccessService::canEditTask($request->user(), $task));
+        AccessService::authorize(AccessService::canContributeToTask($request->user(), $task));
 
         if (! $task->task_assignee_code) {
             return response()->json([

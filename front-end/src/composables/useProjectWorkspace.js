@@ -798,7 +798,8 @@ export function useProjectWorkspace() {
 
   async function moveTask(taskId, status) {
     const task = tasks.value.find((item) => item.id === taskId)
-    if (!task || task.status === status) return
+    if (!task) return false
+    if (task.status === status) return true
     const oldStatus = task.status
     task.status = status // Cập nhật giao diện ngay lập tức
     try {
@@ -810,13 +811,16 @@ export function useProjectWorkspace() {
       if (res.ok) {
         //refreshActivitiesAndNotifications()
         notify('Đã cập nhật trạng thái nhiệm vụ')
+        return true
       } else {
         task.status = oldStatus // Hoàn tác nếu API lỗi
         notify('Lỗi: Không thể cập nhật trạng thái')
+        return false
       }
     } catch (e) {
       task.status = oldStatus
       notify('Lỗi kết nối')
+      return false
     }
   }
 

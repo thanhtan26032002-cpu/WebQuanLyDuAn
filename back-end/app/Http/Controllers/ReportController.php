@@ -14,25 +14,78 @@ class ReportController extends Controller
     public function myWork(Request $request)
     {
         $memberCode = AccessService::userCode($request->user());
-        $query = $this->visibleTasks($request)->with(['project', 'assignee', 'dependencies']);
-        if ($memberCode) {
-            $query->where('task_assignee_code', $memberCode);
-        } else {
-            $query->whereRaw('1 = 0');
-        }
-
-        $tasks = $query->get();
         $today = now()->toDateString();
-        $upcoming = now()->addDays(7)->toDateString();
+        $upcomingUntil = now()->addDays(7)->toDateString();
+        $assignedQuery = Task::query()->where('task_assignee_code', $memberCode);
+        $activeTasks = (clone $assignedQuery)
+            ->where('task_status', '!=', 'done')
+            ->with(['project', 'assignee', 'dependencies'])
+            ->get();
+        $recentlyCompleted = (clone $assignedQuery)
+            ->where('task_status', 'done')
+            ->with(['project', 'assignee', 'dependencies'])
+            ->orderByDesc('task_completed_at')
+            ->orderByDesc('task_updated_at')
+            ->limit(20)
+            ->get();
+
+        $sortTasks = fn ($items) => $items->sortBy(function (Task $task) {
+            $priority = ['high' => 0, 'medium' => 1, 'low' => 2][$task->task_priority] ?? 3;
+            $status = $task->task_status === 'in_progress' ? 0 : 1;
+
+            return sprintf(
+                '%d|%s|%d|%s',
+                $priority,
+                $task->task_due_date ?: '9999-12-31',
+                $status,
+                $task->task_created_at
+            );
+        })->values();
+
+        $overdue = $sortTasks($activeTasks->filter(
+            fn (Task $task) => $task->task_due_date && $task->task_due_date < $today
+        ));
+        $dueToday = $sortTasks($activeTasks->filter(
+            fn (Task $task) => $task->task_due_date === $today
+        ));
+        $upcoming = $sortTasks($activeTasks->filter(
+            fn (Task $task) => $task->task_due_date > $today && $task->task_due_date <= $upcomingUntil
+        ));
+        $later = $sortTasks($activeTasks->filter(
+            fn (Task $task) => $task->task_due_date > $upcomingUntil
+        ));
+        $withoutDeadline = $sortTasks($activeTasks->filter(
+            fn (Task $task) => ! $task->task_due_date
+        ));
 
         return response()->json([
-            'overdue' => $tasks->filter(fn (Task $task) => $task->task_status !== 'done' && $task->task_due_date && $task->task_due_date < $today)->values(),
-            'today' => $tasks->filter(fn (Task $task) => $task->task_status !== 'done' && $task->task_due_date === $today)->values(),
-            'upcoming' => $tasks->filter(fn (Task $task) => $task->task_status !== 'done' && $task->task_due_date > $today && $task->task_due_date <= $upcoming)->values(),
-            'blocked' => $tasks->filter(fn (Task $task) => $task->is_blocked)->values(),
-            'unassigned' => AccessService::canManagePeople($request->user())
-                ? $this->visibleTasks($request)->whereNull('task_assignee_code')->with('project')->get()
-                : [],
+            'owner' => [
+                'code' => $request->user()->user_code,
+                'name' => $request->user()->user_name,
+            ],
+            'summary' => [
+                'total_assigned' => (clone $assignedQuery)->count(),
+                'active' => $activeTasks->count(),
+                'in_progress' => $activeTasks->where('task_status', 'in_progress')->count(),
+                'overdue' => $overdue->count(),
+                'due_today' => $dueToday->count(),
+                'upcoming' => $upcoming->count(),
+                'blocked' => $activeTasks->filter(fn (Task $task) => $task->is_blocked)->count(),
+                'completed' => (clone $assignedQuery)->where('task_status', 'done')->count(),
+            ],
+            'sections' => [
+                'overdue' => $overdue,
+                'today' => $dueToday,
+                'upcoming' => $upcoming,
+                'later' => $later,
+                'no_deadline' => $withoutDeadline,
+                'recently_completed' => $recentlyCompleted,
+            ],
+            'meta' => [
+                'upcoming_days' => 7,
+                'recently_completed_limit' => 20,
+                'generated_at' => now()->toIso8601String(),
+            ],
         ]);
     }
 
