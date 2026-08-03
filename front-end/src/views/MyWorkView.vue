@@ -63,7 +63,9 @@ const emptyData = () => ({
 const loading = ref(true);
 const error = ref("");
 const data = ref(emptyData());
+const workspaceView = ref("tasks");
 const activeTab = ref("active");
+const projectFilter = ref("all");
 const searchQuery = ref("");
 const changingTaskId = ref(null);
 
@@ -104,6 +106,12 @@ const summaryCards = computed(() => [
     icon: CircleCheckBig,
     iconClass: "bg-emerald-100 text-emerald-700",
   },
+]);
+const projectSummaryCards = computed(() => [
+  { id: "all", label: "Tổng dự án", value: data.value.projects?.summary?.total || 0, helper: "Bạn tham gia hoặc phụ trách", icon: FolderKanban, iconClass: "bg-indigo-100 text-indigo-700" },
+  { id: "managed", label: "Đang phụ trách", value: data.value.projects?.summary?.managed || 0, helper: "Bạn chịu trách nhiệm chính", icon: Users, iconClass: "bg-violet-100 text-violet-700" },
+  { id: "active", label: "Chưa hoàn thành", value: data.value.projects?.summary?.active || 0, helper: "Còn đang được triển khai", icon: Clock, iconClass: "bg-emerald-100 text-emerald-700" },
+  { id: "overdue", label: "Đã quá hạn", value: data.value.projects?.summary?.overdue || 0, helper: "Cần ưu tiên xử lý", icon: AlertTriangle, iconClass: "bg-rose-100 text-rose-700" },
 ]);
 
 const activeSectionDefinitions = computed(() => [
@@ -174,6 +182,7 @@ const visibleSections = computed(() =>
 const completedTasks = computed(() =>
   data.value.sections.recently_completed.filter(matchesSearch),
 );
+const overdueTasks = computed(() => data.value.sections.overdue.filter(matchesSearch));
 const participationRoleLabels = {
   manager: "Phụ trách",
   creator: "Khởi tạo",
@@ -181,6 +190,9 @@ const participationRoleLabels = {
 };
 const visibleProjects = computed(() =>
   (data.value.projects?.items || []).filter((project) => {
+    if (projectFilter.value === "managed" && project.participation_role !== "manager") return false;
+    if (projectFilter.value === "active" && project.status === "completed") return false;
+    if (projectFilter.value === "overdue" && project.deadline_state !== "overdue") return false;
     if (!normalizedSearch.value) return true;
     return [project.name, project.code, project.manager?.name]
       .filter(Boolean)
@@ -189,8 +201,8 @@ const visibleProjects = computed(() =>
 );
 
 const visibleTaskCount = computed(() =>
-  activeTab.value === "projects"
-    ? visibleProjects.value.length
+  activeTab.value === "overdue"
+    ? overdueTasks.value.length
     : activeTab.value === "completed"
     ? completedTasks.value.length
     : visibleSections.value.reduce((total, section) => total + section.items.length, 0),
@@ -256,7 +268,18 @@ function openProject(project) {
 function selectSummary(card) {
   if (card.id === "completed") activeTab.value = "completed";
   if (card.id === "active") activeTab.value = "active";
-  if (card.id === "overdue" || card.id === "due") activeTab.value = "active";
+  if (card.id === "overdue") activeTab.value = "overdue";
+  if (card.id === "due") activeTab.value = "active";
+}
+
+function switchWorkspace(view) {
+  workspaceView.value = view;
+  searchQuery.value = "";
+  if (view === "tasks" && !["active", "completed", "overdue"].includes(activeTab.value)) activeTab.value = "active";
+}
+
+function selectProjectSummary(card) {
+  projectFilter.value = card.id;
 }
 
 onMounted(load);
@@ -291,6 +314,25 @@ onMounted(load);
       </div>
     </header>
 
+    <div class="flex justify-center">
+      <div class="inline-flex rounded-2xl border border-slate-200 bg-white p-1.5 shadow-sm">
+        <button
+          type="button"
+          :class="['flex min-w-36 items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold transition', workspaceView === 'tasks' ? 'bg-gradient-to-r from-violet-500 to-indigo-600 text-white shadow-md shadow-violet-200' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800']"
+          @click="switchWorkspace('tasks')"
+        >
+          <ListTodo class="h-4 w-4" /> Nhiệm vụ
+        </button>
+        <button
+          type="button"
+          :class="['flex min-w-36 items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold transition', workspaceView === 'projects' ? 'bg-gradient-to-r from-violet-500 to-indigo-600 text-white shadow-md shadow-violet-200' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800']"
+          @click="switchWorkspace('projects')"
+        >
+          <FolderKanban class="h-4 w-4" /> Dự án
+        </button>
+      </div>
+    </div>
+
     <div
       v-if="error"
       role="alert"
@@ -300,7 +342,7 @@ onMounted(load);
       <button class="font-bold underline" @click="load">Thử lại</button>
     </div>
 
-    <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <div v-if="workspaceView === 'tasks'" class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <button
         v-for="card in summaryCards"
         :key="card.id"
@@ -320,7 +362,25 @@ onMounted(load);
       </button>
     </div>
 
-    <section class="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
+    <div v-else class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <button
+        v-for="card in projectSummaryCards"
+        :key="card.id"
+        type="button"
+        :class="['rounded-2xl border bg-white p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md', projectFilter === card.id ? 'border-indigo-200 ring-2 ring-indigo-50' : 'border-slate-100 hover:border-indigo-100']"
+        @click="selectProjectSummary(card)"
+      >
+        <div class="flex items-start justify-between gap-4">
+          <span :class="['flex h-11 w-11 items-center justify-center rounded-xl', card.iconClass]"><component :is="card.icon" class="h-5 w-5" /></span>
+          <span v-if="loading" class="h-8 w-12 animate-pulse rounded-lg bg-slate-100"></span>
+          <strong v-else class="text-3xl font-bold text-slate-900">{{ card.value }}</strong>
+        </div>
+        <p class="mt-4 text-sm font-bold text-slate-800">{{ card.label }}</p>
+        <p class="mt-1 text-xs text-slate-400">{{ card.helper }}</p>
+      </button>
+    </div>
+
+    <section v-if="workspaceView === 'tasks'" class="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
       <div class="flex flex-col gap-4 border-b border-slate-100 p-4 sm:flex-row sm:items-center sm:justify-between">
         <div class="flex flex-wrap rounded-xl bg-slate-100 p-1">
           <button
@@ -353,13 +413,13 @@ onMounted(load);
             type="button"
             :class="[
               'rounded-lg px-4 py-2 text-sm font-semibold transition',
-              activeTab === 'projects' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-800',
+              activeTab === 'overdue' ? 'bg-white text-rose-700 shadow-sm' : 'text-slate-500 hover:text-slate-800',
             ]"
-            @click="activeTab = 'projects'"
+            @click="activeTab = 'overdue'"
           >
-            Dự án của tôi
-            <span class="ml-1.5 rounded-full bg-indigo-50 px-2 py-0.5 text-[11px] text-indigo-700">
-              {{ data.projects?.summary?.total || 0 }}
+            Quá hạn
+            <span class="ml-1.5 rounded-full bg-rose-50 px-2 py-0.5 text-[11px] text-rose-700">
+              {{ data.summary.overdue }}
             </span>
           </button>
         </div>
@@ -499,54 +559,61 @@ onMounted(load);
       </div>
 
       <div v-else class="p-5 sm:p-6">
-        <div class="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <div class="rounded-xl bg-indigo-50 p-4">
-            <p class="text-xs font-semibold text-indigo-600">Tổng dự án</p>
-            <p class="mt-1 text-2xl font-bold text-indigo-900">{{ data.projects?.summary?.total || 0 }}</p>
+        <div class="mb-4 flex items-center justify-between gap-4">
+          <div>
+            <h2 class="flex items-center gap-2 font-bold text-slate-900"><AlertTriangle class="h-5 w-5 text-rose-600" /> Nhiệm vụ quá hạn</h2>
+            <p class="mt-1 text-xs text-slate-400">Tập trung xử lý các cam kết đã vượt quá hạn chót.</p>
           </div>
-          <div class="rounded-xl bg-violet-50 p-4">
-            <p class="text-xs font-semibold text-violet-600">Đang phụ trách</p>
-            <p class="mt-1 text-2xl font-bold text-violet-900">{{ data.projects?.summary?.managed || 0 }}</p>
-          </div>
-          <div class="rounded-xl bg-emerald-50 p-4">
-            <p class="text-xs font-semibold text-emerald-600">Chưa hoàn thành</p>
-            <p class="mt-1 text-2xl font-bold text-emerald-900">{{ data.projects?.summary?.active || 0 }}</p>
-          </div>
-          <div class="rounded-xl bg-rose-50 p-4">
-            <p class="text-xs font-semibold text-rose-600">Đã quá hạn</p>
-            <p class="mt-1 text-2xl font-bold text-rose-900">{{ data.projects?.summary?.overdue || 0 }}</p>
-          </div>
+          <span class="rounded-full bg-rose-50 px-2.5 py-1 text-xs font-bold text-rose-700">{{ overdueTasks.length }}</span>
         </div>
+        <div v-if="overdueTasks.length" class="space-y-2.5">
+          <article v-for="task in overdueTasks" :key="task.code" class="group flex flex-col gap-3 rounded-2xl border border-rose-100 bg-rose-50/40 p-4 transition hover:bg-white hover:shadow-sm sm:flex-row sm:items-center">
+            <button type="button" class="min-w-0 flex-1 text-left" @click="openTask(task)">
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="text-[11px] font-bold uppercase tracking-wide text-slate-400">{{ task.code }}</span>
+                <span class="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-bold text-rose-700">Quá hạn {{ task.overdue_days }} ngày</span>
+              </div>
+              <p class="mt-1.5 truncate text-sm font-bold text-slate-800 group-hover:text-rose-700">{{ task.title }}</p>
+              <p class="mt-1 text-xs text-slate-500">{{ task.project?.name || "Nhiệm vụ độc lập" }} · Hạn {{ formatDate(task.due_date) }} · {{ task.progress || 0 }}%</p>
+            </button>
+            <button type="button" :disabled="!statusAction(task).status || changingTaskId === task.code" class="flex min-w-28 items-center justify-center gap-1.5 rounded-xl border border-rose-200 bg-white px-3 py-2 text-xs font-bold text-rose-700 transition hover:bg-rose-50 disabled:opacity-50" @click="changeStatus(task, statusAction(task).status)">
+              <RefreshCw v-if="changingTaskId === task.code" class="h-3.5 w-3.5 animate-spin" />
+              <component :is="statusAction(task).icon" v-else class="h-3.5 w-3.5" /> {{ statusAction(task).label }}
+            </button>
+          </article>
+        </div>
+        <div v-else class="py-14 text-center">
+          <CheckCircle2 class="mx-auto h-10 w-10 text-emerald-400" />
+          <p class="mt-3 font-bold text-slate-700">{{ searchQuery ? "Không tìm thấy nhiệm vụ quá hạn phù hợp" : "Bạn không có nhiệm vụ quá hạn" }}</p>
+          <p class="mt-1 text-sm text-slate-400">Tiến độ cá nhân hiện đang đúng cam kết.</p>
+        </div>
+      </div>
+    </section>
 
+    <section v-else class="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
+      <div class="flex flex-col gap-4 border-b border-slate-100 p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 class="font-bold text-slate-900">Dự án của tôi</h2>
+          <p class="mt-1 text-xs text-slate-400">Đang lọc: {{ projectSummaryCards.find(card => card.id === projectFilter)?.label }}</p>
+        </div>
+        <label class="relative block w-full sm:max-w-sm">
+          <Search class="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <input v-model="searchQuery" type="search" placeholder="Tìm dự án theo tên, mã hoặc quản lý..." class="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-4 text-sm outline-none transition focus:border-indigo-300 focus:bg-white focus:ring-4 focus:ring-indigo-50" />
+        </label>
+      </div>
+      <div v-if="loading" class="grid gap-4 p-5 lg:grid-cols-2"><div v-for="index in 4" :key="index" class="h-72 animate-pulse rounded-2xl bg-slate-100"></div></div>
+      <div v-else class="p-5 sm:p-6">
         <div v-if="visibleProjects.length" class="grid gap-4 lg:grid-cols-2">
-          <article
-            v-for="project in visibleProjects"
-            :key="project.code"
-            class="group rounded-2xl border border-slate-100 bg-slate-50/60 p-5 transition hover:border-indigo-100 hover:bg-white hover:shadow-sm"
-          >
+          <article v-for="project in visibleProjects" :key="project.code" class="group rounded-2xl border border-slate-100 bg-slate-50/60 p-5 transition hover:border-indigo-100 hover:bg-white hover:shadow-sm">
             <button type="button" class="w-full text-left" @click="openProject(project)">
               <div class="flex items-start justify-between gap-4">
-                <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-indigo-100 text-indigo-700">
-                  <FolderKanban class="h-5 w-5" />
-                </span>
-                <span class="rounded-full bg-white px-2.5 py-1 text-[11px] font-bold text-indigo-700 ring-1 ring-indigo-100">
-                  {{ participationRoleLabels[project.participation_role] || "Tham gia" }}
-                </span>
+                <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-indigo-100 text-indigo-700"><FolderKanban class="h-5 w-5" /></span>
+                <span class="rounded-full bg-white px-2.5 py-1 text-[11px] font-bold text-indigo-700 ring-1 ring-indigo-100">{{ participationRoleLabels[project.participation_role] || "Tham gia" }}</span>
               </div>
               <p class="mt-4 text-[11px] font-bold uppercase tracking-wide text-slate-400">{{ project.code }}</p>
               <h2 class="mt-1 truncate font-bold text-slate-900 group-hover:text-indigo-700">{{ project.name }}</h2>
               <p class="mt-1 line-clamp-2 min-h-10 text-sm text-slate-500">{{ project.description || "Chưa có mô tả dự án." }}</p>
-
-              <div class="mt-4">
-                <div class="mb-1.5 flex items-center justify-between text-xs">
-                  <span class="font-medium text-slate-500">Tiến độ</span>
-                  <strong class="text-slate-800">{{ project.progress || 0 }}%</strong>
-                </div>
-                <div class="h-2 overflow-hidden rounded-full bg-slate-200">
-                  <div class="h-full rounded-full bg-gradient-to-r from-violet-500 to-indigo-600" :style="{ width: `${project.progress || 0}%` }"></div>
-                </div>
-              </div>
-
+              <div class="mt-4"><div class="mb-1.5 flex items-center justify-between text-xs"><span class="font-medium text-slate-500">Tiến độ</span><strong class="text-slate-800">{{ project.progress || 0 }}%</strong></div><div class="h-2 overflow-hidden rounded-full bg-slate-200"><div class="h-full rounded-full bg-gradient-to-r from-violet-500 to-indigo-600" :style="{ width: `${project.progress || 0}%` }"></div></div></div>
               <div class="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-slate-500">
                 <span class="flex items-center gap-1.5"><Users class="h-3.5 w-3.5" /> {{ project.member_count }} thành viên</span>
                 <span class="flex items-center gap-1.5"><ListTodo class="h-3.5 w-3.5" /> {{ project.open_task_count }} nhiệm vụ đang mở</span>
@@ -560,12 +627,7 @@ onMounted(load);
             </button>
           </article>
         </div>
-
-        <div v-else class="py-14 text-center">
-          <FolderKanban class="mx-auto h-10 w-10 text-slate-300" />
-          <p class="mt-3 font-bold text-slate-700">{{ searchQuery ? "Không tìm thấy dự án phù hợp" : "Bạn chưa tham gia dự án nào" }}</p>
-          <p class="mt-1 text-sm text-slate-400">Dự án sẽ xuất hiện khi bạn được thêm vào hoặc giao phụ trách.</p>
-        </div>
+        <div v-else class="py-14 text-center"><FolderKanban class="mx-auto h-10 w-10 text-slate-300" /><p class="mt-3 font-bold text-slate-700">{{ searchQuery ? "Không tìm thấy dự án phù hợp" : "Không có dự án trong bộ lọc này" }}</p><p class="mt-1 text-sm text-slate-400">Hãy chọn một bộ lọc khác hoặc xóa từ khóa tìm kiếm.</p></div>
       </div>
     </section>
   </div>
