@@ -54,7 +54,7 @@ const emptyData = () => ({
     recently_completed: [],
   },
   projects: {
-    summary: { total: 0, managed: 0, participating: 0, active: 0, overdue: 0 },
+    summary: { total: 0, managed: 0, participating: 0, active: 0, completed: 0, overdue: 0, on_hold: 0 },
     items: [],
   },
   meta: null,
@@ -109,9 +109,9 @@ const summaryCards = computed(() => [
 ]);
 const projectSummaryCards = computed(() => [
   { id: "all", label: "Tổng dự án", value: data.value.projects?.summary?.total || 0, helper: "Bạn tham gia hoặc phụ trách", icon: FolderKanban, iconClass: "bg-indigo-100 text-indigo-700" },
-  { id: "managed", label: "Đang phụ trách", value: data.value.projects?.summary?.managed || 0, helper: "Bạn chịu trách nhiệm chính", icon: Users, iconClass: "bg-violet-100 text-violet-700" },
-  { id: "active", label: "Chưa hoàn thành", value: data.value.projects?.summary?.active || 0, helper: "Còn đang được triển khai", icon: Clock, iconClass: "bg-emerald-100 text-emerald-700" },
+  { id: "completed", label: "Đã hoàn thành", value: data.value.projects?.summary?.completed || 0, helper: "Dự án đã đóng đúng quy trình", icon: CircleCheckBig, iconClass: "bg-emerald-100 text-emerald-700" },
   { id: "overdue", label: "Đã quá hạn", value: data.value.projects?.summary?.overdue || 0, helper: "Cần ưu tiên xử lý", icon: AlertTriangle, iconClass: "bg-rose-100 text-rose-700" },
+  { id: "on_hold", label: "Tạm dừng", value: data.value.projects?.summary?.on_hold || 0, helper: "Đang chờ điều kiện tiếp tục", icon: Ban, iconClass: "bg-amber-100 text-amber-700" },
 ]);
 
 const activeSectionDefinitions = computed(() => [
@@ -190,9 +190,9 @@ const participationRoleLabels = {
 };
 const visibleProjects = computed(() =>
   (data.value.projects?.items || []).filter((project) => {
-    if (projectFilter.value === "managed" && project.participation_role !== "manager") return false;
-    if (projectFilter.value === "active" && project.status === "completed") return false;
+    if (projectFilter.value === "completed" && project.status !== "completed") return false;
     if (projectFilter.value === "overdue" && project.deadline_state !== "overdue") return false;
+    if (projectFilter.value === "on_hold" && project.status !== "on_hold") return false;
     if (!normalizedSearch.value) return true;
     return [project.name, project.code, project.manager?.name]
       .filter(Boolean)

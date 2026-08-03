@@ -250,6 +250,8 @@ class AuthApiTest extends TestCase
             ->assertOk()
             ->assertJsonPath('summary.total_assigned', 1)
             ->assertJsonPath('projects.summary.total', 1)
+            ->assertJsonPath('projects.summary.completed', 0)
+            ->assertJsonPath('projects.summary.on_hold', 0)
             ->assertJsonPath('projects.items.0.participation_role', 'creator')
             ->assertJsonCount(1, 'sections.today')
             ->assertJsonPath('sections.today.0.title', 'Việc của quản trị viên');
