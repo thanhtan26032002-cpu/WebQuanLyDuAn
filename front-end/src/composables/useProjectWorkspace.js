@@ -463,8 +463,7 @@ function translateValidationMessage(msg, field = '') {
     type: 'Loại nhiệm vụ',
     status: 'Trạng thái',
     priority: 'Mức độ ưu tiên',
-    code: 'Mã',
-    color: 'Màu sắc'
+    code: 'Mã'
   }
   const fieldName = fieldNames[field] || 'Trường này'
 
@@ -628,7 +627,6 @@ export function useProjectWorkspace() {
           description: payload.description || '',
           customer_code: payload.customerId || null,
           manager_code: payload.managerId || null,
-          color: payload.color || 'indigo',
           status: payload.status || 'planning',
           start_date: payload.startDate || new Date().toISOString().split('T')[0],
           due_date: payload.dueDate || null,
@@ -677,7 +675,6 @@ export function useProjectWorkspace() {
       if (updates.description !== undefined) payload.description = updates.description
       if (updates.customerId !== undefined) payload.customer_code = updates.customerId || null
       if (updates.managerId !== undefined) payload.manager_code = updates.managerId || null
-      if (updates.color !== undefined) payload.color = updates.color
       if (updates.status !== undefined) payload.status = updates.status
       if (updates.progress !== undefined) payload.progress = Number(updates.progress)
       if (updates.startDate !== undefined || updates.start_date !== undefined) {

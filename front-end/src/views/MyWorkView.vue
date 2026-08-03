@@ -1,6 +1,5 @@
 <script setup>
 import { computed, onMounted, ref } from "vue";
-import { useRouter } from "vue-router";
 import {
   AlertTriangle,
   Ban,
@@ -18,10 +17,10 @@ import {
   Search,
   TrendingUp,
   Users,
-  ArrowRight,
 } from "@lucide/vue";
 import { apiFetch, parseApiError } from "../services/api";
 import { useProjectWorkspace } from "../composables/useProjectWorkspace";
+import ProjectCard from "../components/common/ProjectCard.vue";
 
 const {
   activeTaskId,
@@ -31,7 +30,6 @@ const {
   priorityMap,
   taskStatusMap,
 } = useProjectWorkspace();
-const router = useRouter();
 
 const emptyData = () => ({
   owner: null,
@@ -199,6 +197,19 @@ const visibleProjects = computed(() =>
       .some((value) => String(value).toLocaleLowerCase("vi").includes(normalizedSearch.value));
   }),
 );
+const visibleProjectCards = computed(() => visibleProjects.value.map((project) => ({
+  ...project,
+  id: project.code,
+  dueDate: project.due_date,
+  deadlineState: project.deadline_state,
+  overdueDays: Number(project.overdue_days || 0),
+  lateDays: Number(project.late_days || 0),
+  managerId: project.manager?.code || null,
+  memberIds: [],
+  memberCount: project.member_count || 0,
+  taskCount: project.task_count || 0,
+  contextLabel: `${participationRoleLabels[project.participation_role] || "Tham gia"} · ${project.assigned_task_count || 0} việc của bạn`,
+})));
 
 const visibleTaskCount = computed(() =>
   activeTab.value === "overdue"
@@ -259,10 +270,6 @@ async function changeStatus(task, status) {
 
 function openTask(task) {
   activeTaskId.value = task.code;
-}
-
-function openProject(project) {
-  router.push({ name: "project-detail", params: { id: project.code } });
 }
 
 function selectSummary(card) {
@@ -603,29 +610,8 @@ onMounted(load);
       </div>
       <div v-if="loading" class="grid gap-4 p-5 lg:grid-cols-2"><div v-for="index in 4" :key="index" class="h-72 animate-pulse rounded-2xl bg-slate-100"></div></div>
       <div v-else class="p-5 sm:p-6">
-        <div v-if="visibleProjects.length" class="grid gap-4 lg:grid-cols-2">
-          <article v-for="project in visibleProjects" :key="project.code" class="group rounded-2xl border border-slate-100 bg-slate-50/60 p-5 transition hover:border-indigo-100 hover:bg-white hover:shadow-sm">
-            <button type="button" class="w-full text-left" @click="openProject(project)">
-              <div class="flex items-start justify-between gap-4">
-                <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-indigo-100 text-indigo-700"><FolderKanban class="h-5 w-5" /></span>
-                <span class="rounded-full bg-white px-2.5 py-1 text-[11px] font-bold text-indigo-700 ring-1 ring-indigo-100">{{ participationRoleLabels[project.participation_role] || "Tham gia" }}</span>
-              </div>
-              <p class="mt-4 text-[11px] font-bold uppercase tracking-wide text-slate-400">{{ project.code }}</p>
-              <h2 class="mt-1 truncate font-bold text-slate-900 group-hover:text-indigo-700">{{ project.name }}</h2>
-              <p class="mt-1 line-clamp-2 min-h-10 text-sm text-slate-500">{{ project.description || "Chưa có mô tả dự án." }}</p>
-              <div class="mt-4"><div class="mb-1.5 flex items-center justify-between text-xs"><span class="font-medium text-slate-500">Tiến độ</span><strong class="text-slate-800">{{ project.progress || 0 }}%</strong></div><div class="h-2 overflow-hidden rounded-full bg-slate-200"><div class="h-full rounded-full bg-gradient-to-r from-violet-500 to-indigo-600" :style="{ width: `${project.progress || 0}%` }"></div></div></div>
-              <div class="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-slate-500">
-                <span class="flex items-center gap-1.5"><Users class="h-3.5 w-3.5" /> {{ project.member_count }} thành viên</span>
-                <span class="flex items-center gap-1.5"><ListTodo class="h-3.5 w-3.5" /> {{ project.open_task_count }} nhiệm vụ đang mở</span>
-                <span class="flex items-center gap-1.5"><CalendarClock class="h-3.5 w-3.5" /> {{ project.due_date ? `Hạn ${formatDate(project.due_date)}` : "Chưa có hạn" }}</span>
-              </div>
-              <div class="mt-4 flex items-center justify-between border-t border-slate-100 pt-3">
-                <span v-if="project.deadline_state === 'overdue'" class="text-xs font-bold text-rose-600">Quá hạn {{ project.overdue_days }} ngày</span>
-                <span v-else class="text-xs font-medium text-slate-400">Bạn có {{ project.assigned_task_count }} nhiệm vụ trong dự án</span>
-                <span class="flex items-center gap-1 text-xs font-bold text-indigo-600">Xem dự án <ArrowRight class="h-3.5 w-3.5" /></span>
-              </div>
-            </button>
-          </article>
+        <div v-if="visibleProjectCards.length" class="grid gap-4 lg:grid-cols-2">
+          <ProjectCard v-for="project in visibleProjectCards" :key="project.id" :project="project" read-only />
         </div>
         <div v-else class="py-14 text-center"><FolderKanban class="mx-auto h-10 w-10 text-slate-300" /><p class="mt-3 font-bold text-slate-700">{{ searchQuery ? "Không tìm thấy dự án phù hợp" : "Không có dự án trong bộ lọc này" }}</p><p class="mt-1 text-sm text-slate-400">Hãy chọn một bộ lọc khác hoặc xóa từ khóa tìm kiếm.</p></div>
       </div>

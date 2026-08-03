@@ -92,7 +92,6 @@ class ProjectController extends Controller
                 'string',
                 Rule::exists('users', 'user_code')->where(fn ($query) => $query->whereIn('user_role', ['admin', 'project_manager'])),
             ],
-            'color' => 'sometimes|string|in:indigo,emerald,amber,rose,sky,violet,orange,purple,green,pink,blue',
             'status' => 'nullable|string|in:planning,active,on_hold,completed',
             'health' => 'nullable|string|in:on_track,at_risk,off_track',
             'update_cadence' => 'nullable|string|in:weekly,biweekly,monthly,never',
@@ -123,6 +122,9 @@ class ProjectController extends Controller
 
         $dbData = Project::mapToDbAttributes($validated);
         $dbData['project_created_by'] = $request->user()->user_code;
+        if (Schema::hasColumn('projects', 'project_color')) {
+            $dbData['project_color'] = 'indigo';
+        }
         if (($validated['status'] ?? null) === 'completed') {
             $dbData['project_completed_at'] = now();
         }
@@ -206,7 +208,6 @@ class ProjectController extends Controller
                 'string',
                 Rule::exists('users', 'user_code')->where(fn ($query) => $query->whereIn('user_role', ['admin', 'project_manager'])),
             ],
-            'color' => 'sometimes|string|in:indigo,emerald,amber,rose,sky,violet,orange,purple,green,pink,blue',
             'status' => 'nullable|string|in:planning,active,on_hold,completed',
             'health' => 'nullable|string|in:on_track,at_risk,off_track',
             'update_cadence' => 'nullable|string|in:weekly,biweekly,monthly,never',
@@ -483,7 +484,6 @@ class ProjectController extends Controller
             'description' => 'Mô tả',
             'customer_code' => 'Khách hàng',
             'manager_code' => 'Quản lý dự án',
-            'color' => 'Màu nhận diện',
             'status' => 'Trạng thái',
             'health' => 'Sức khỏe dự án',
             'update_cadence' => 'Chu kỳ cập nhật',

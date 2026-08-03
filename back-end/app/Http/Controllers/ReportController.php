@@ -36,7 +36,10 @@ class ReportController extends Controller
                     ->orWhere('project_manager_code', $memberCode)
                     ->orWhereHas('members', fn (Builder $members) => $members->where('users.user_code', $memberCode));
             })
-            ->with('manager:user_code,user_name,user_avatar,user_color,user_job_title')
+            ->with([
+                'manager:user_code,user_name,user_avatar,user_color,user_job_title',
+                'customer',
+            ])
             ->withCount([
                 'members',
                 'tasks',
@@ -67,6 +70,7 @@ class ReportController extends Controller
                 'overdue_days' => $project->overdue_days,
                 'participation_role' => $participationRole,
                 'manager' => $project->manager,
+                'customer' => $project->customer,
                 'member_count' => $project->members_count,
                 'task_count' => $project->tasks_count,
                 'open_task_count' => $project->open_tasks_count,

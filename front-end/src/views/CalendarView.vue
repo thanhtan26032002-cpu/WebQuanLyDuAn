@@ -15,7 +15,19 @@ const calendarTitle = computed(() => {
 })
 
 const events = computed(() => [
-  ...projects.value.map((project) => ({ id: project.id, date: project.dueDate, text: project.name, type: 'project', color: project.color })),
+  ...projects.value.map((project) => ({
+    id: project.id,
+    date: project.dueDate,
+    text: project.name,
+    type: 'project',
+    color: project.deadlineState === 'overdue' || project.health === 'off_track'
+      ? 'rose'
+      : project.status === 'on_hold' || project.health === 'at_risk'
+        ? 'amber'
+        : project.status === 'completed'
+          ? 'emerald'
+          : 'indigo',
+  })),
   ...tasks.value.map((task) => ({ id: task.id, date: task.dueDate, text: task.title, type: 'task', priority: task.priority })),
 ])
 

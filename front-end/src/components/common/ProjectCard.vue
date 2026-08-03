@@ -1,7 +1,18 @@
 <script setup>
 import { computed } from "vue";
 import { useRouter } from "vue-router";
-import { CalendarDays, ArrowRight, MoreHorizontal, Building2 } from "@lucide/vue";
+import {
+  AlertTriangle,
+  Building2,
+  CalendarDays,
+  CheckCircle2,
+  CirclePause,
+  ClipboardList,
+  MoreHorizontal,
+  ShieldCheck,
+  UserRound,
+  Users,
+} from "@lucide/vue";
 import { useProjectWorkspace } from "../../composables/useProjectWorkspace";
 
 const props = defineProps({
@@ -25,181 +36,163 @@ const handleEdit = () => {
   editingProjectId.value = props.project.id;
   projectSettingsModalOpen.value = true;
 };
-
 const openProject = () => {
   if (props.clickable) router.push(`/projects/${props.project.id}`);
 };
 
 const deadlineState = computed(() =>
-  props.project.deadlineState || getTaskDeadlineState(props.project.dueDate, props.project.status)
+  props.project.deadlineState || getTaskDeadlineState(props.project.dueDate, props.project.status),
+);
+const memberIds = computed(() => Array.isArray(props.project.memberIds) ? props.project.memberIds : []);
+const memberCount = computed(() => props.project.memberCount ?? memberIds.value.length);
+const taskCount = computed(() => props.project.tasks_count ?? props.project.taskCount ?? null);
+const managerName = computed(() =>
+  props.project.manager?.name || findMember(props.project.managerId)?.name || "Chưa phân công",
 );
 
-const deadlineClass = computed(() => {
-  if (deadlineState.value === "overdue") {
-    return "text-red-600 bg-red-50 border-red-200 font-semibold px-2 py-0.5 rounded-lg border";
-  }
-  if (deadlineState.value === "due") {
-    return "text-amber-700 bg-amber-50 border-amber-200 font-semibold px-2 py-0.5 rounded-lg border";
-  }
-  if (deadlineState.value === "completed_late") {
-    return "text-amber-700 bg-amber-50 border-amber-200 font-semibold px-2 py-0.5 rounded-lg border";
-  }
-  return "text-slate-400 bg-transparent border-transparent";
-});
-
-const gradientMap = {
-  purple: "from-violet-500 to-indigo-600",
-  violet: "from-violet-500 to-indigo-600",
-  indigo: "from-indigo-500 to-violet-600",
-  emerald: "from-emerald-500 to-teal-600",
-  amber: "from-amber-500 to-orange-600",
-  rose: "from-rose-500 to-pink-600",
-  sky: "from-sky-500 to-blue-600",
-  green: "from-green-500 to-emerald-600",
-  orange: "from-orange-500 to-amber-600",
-  pink: "from-pink-500 to-rose-600",
-  blue: "from-blue-500 to-indigo-600",
-};
-
-const progressBgMap = {
-  purple: "bg-violet-500",
-  violet: "bg-violet-500",
-  indigo: "bg-indigo-500",
-  emerald: "bg-emerald-500",
-  amber: "bg-amber-500",
-  rose: "bg-rose-500",
-  sky: "bg-sky-500",
-  green: "bg-green-500",
-  orange: "bg-orange-500",
-  pink: "bg-pink-500",
-  blue: "bg-blue-500",
-};
-
-const getGradient = (color) => gradientMap[color] || gradientMap.indigo;
-const getProgressBg = (color) => progressBgMap[color] || progressBgMap.indigo;
-
-const statusBadge = computed(() => {
-  const map = {
-    active: "bg-emerald-50 text-emerald-700 border border-emerald-100",
-    planning: "bg-slate-100 text-slate-600 border border-slate-200",
-    on_hold: "bg-amber-50 text-amber-700 border border-amber-100",
-    completed: "bg-violet-50 text-violet-700 border border-violet-100",
+const visualState = computed(() => {
+  if (deadlineState.value === "completed_late") return {
+    label: `Hoàn thành trễ ${props.project.lateDays || 0} ngày`,
+    detail: "Đã hoàn thành nhưng vượt cam kết ban đầu.",
+    icon: AlertTriangle,
+    accent: "bg-amber-500",
+    badge: "border-amber-200 bg-amber-50 text-amber-700",
+    panel: "border-amber-100 bg-amber-50/70 text-amber-800",
+    progress: "bg-amber-500",
+    issue: true,
   };
-  return map[props.project.status] || map.planning;
+  if (props.project.status === "completed") return {
+    label: "Đã hoàn thành",
+    detail: "Dự án đã được đóng đúng quy trình.",
+    icon: CheckCircle2,
+    accent: "bg-emerald-500",
+    badge: "border-emerald-200 bg-emerald-50 text-emerald-700",
+    panel: "border-emerald-100 bg-emerald-50/70 text-emerald-800",
+    progress: "bg-emerald-500",
+    issue: false,
+  };
+  if (deadlineState.value === "overdue" || props.project.health === "off_track") return {
+    label: deadlineState.value === "overdue" ? `Quá hạn ${props.project.overdueDays || 0} ngày` : "Chậm tiến độ",
+    detail: props.project.delayReason || "Cần cập nhật nguyên nhân và kế hoạch khắc phục.",
+    icon: AlertTriangle,
+    accent: "bg-rose-500",
+    badge: "border-rose-200 bg-rose-50 text-rose-700",
+    panel: "border-rose-100 bg-rose-50/70 text-rose-800",
+    progress: "bg-rose-500",
+    issue: true,
+  };
+  if (props.project.status === "on_hold") return {
+    label: "Đang tạm dừng",
+    detail: "Dự án đang chờ điều kiện để tiếp tục triển khai.",
+    icon: CirclePause,
+    accent: "bg-amber-500",
+    badge: "border-amber-200 bg-amber-50 text-amber-700",
+    panel: "border-amber-100 bg-amber-50/70 text-amber-800",
+    progress: "bg-amber-500",
+    issue: true,
+  };
+  if (props.project.health === "at_risk" || deadlineState.value === "due") return {
+    label: deadlineState.value === "due" ? "Đến hạn hôm nay" : "Có rủi ro",
+    detail: "Cần theo dõi sát để tránh ảnh hưởng cam kết.",
+    icon: AlertTriangle,
+    accent: "bg-amber-500",
+    badge: "border-amber-200 bg-amber-50 text-amber-700",
+    panel: "border-amber-100 bg-amber-50/70 text-amber-800",
+    progress: "bg-amber-500",
+    issue: true,
+  };
+  if (props.project.status === "planning") return {
+    label: "Đang lập kế hoạch",
+    detail: "Dự án chưa bắt đầu triển khai.",
+    icon: ClipboardList,
+    accent: "bg-slate-400",
+    badge: "border-slate-200 bg-slate-50 text-slate-600",
+    panel: "border-slate-100 bg-slate-50 text-slate-600",
+    progress: "bg-slate-500",
+    issue: false,
+  };
+  return {
+    label: "Đang ổn định",
+    detail: "Tiến độ hiện tại chưa ghi nhận vấn đề.",
+    icon: ShieldCheck,
+    accent: "bg-emerald-500",
+    badge: "border-emerald-200 bg-emerald-50 text-emerald-700",
+    panel: "border-emerald-100 bg-emerald-50/70 text-emerald-800",
+    progress: "bg-emerald-500",
+    issue: false,
+  };
 });
 </script>
 
 <template>
   <article
-    :class="['bg-white rounded-2xl border border-slate-100 shadow-sm transition-all duration-300 overflow-hidden group flex flex-col', clickable ? 'cursor-pointer hover:shadow-md hover:-translate-y-0.5' : 'cursor-default']"
+    :class="[
+      'relative flex flex-col overflow-hidden rounded-2xl border bg-white shadow-sm transition-all duration-300',
+      visualState.issue ? visualState.panel.split(' ')[0] : 'border-slate-200',
+      clickable ? 'cursor-pointer hover:-translate-y-0.5 hover:shadow-lg' : 'cursor-default',
+    ]"
     @click="openProject"
   >
-    <!-- Gradient Header -->
-    <header
-      :class="[
-        'px-5 py-5 bg-gradient-to-br relative overflow-hidden',
-        getGradient(project.color),
-      ]"
-    >
-      <!-- Decorative -->
-      <div
-        class="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -translate-y-8 translate-x-8 blur-xl"
-      ></div>
+    <div :class="['h-1.5 w-full', visualState.accent]"></div>
 
-      <div class="relative flex justify-between items-start">
-        <div class="flex-1 min-w-0 pr-3">
-          <h3
-            class="font-bold text-white text-base leading-tight mb-2 line-clamp-2"
-          >
-            {{ project.name }}
-          </h3>
-          <span
-            :class="[
-              'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-white/20 text-white backdrop-blur-sm',
-            ]"
-          >
-            {{ projectStatusMap[project.status]?.label }}
-          </span>
+    <div class="flex flex-1 flex-col p-5">
+      <header class="flex items-start justify-between gap-3">
+        <div class="min-w-0 flex-1">
+          <div class="mb-2 flex flex-wrap items-center gap-2">
+            <span :class="['inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold', visualState.badge]">
+              <component :is="visualState.icon" class="h-3.5 w-3.5" />
+              {{ visualState.label }}
+            </span>
+            <span class="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-600">
+              {{ projectStatusMap[project.status]?.label || project.status }}
+            </span>
+          </div>
+          <h3 class="line-clamp-2 text-base font-bold leading-snug text-slate-900">{{ project.name }}</h3>
+          <p class="mt-1 text-[11px] font-bold uppercase tracking-wide text-slate-400">{{ project.id }}</p>
         </div>
-        <button
-          v-if="!readOnly"
-          class="text-white/70 hover:text-white hover:bg-white/20 p-1.5 rounded-lg transition-colors shrink-0"
-          @click.stop="handleEdit"
-          title="Chỉnh sửa dự án"
-        >
-          <MoreHorizontal class="w-4 h-4" />
+        <button v-if="!readOnly" class="shrink-0 rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700" @click.stop="handleEdit" title="Chỉnh sửa dự án">
+          <MoreHorizontal class="h-4 w-4" />
         </button>
-      </div>
-    </header>
+      </header>
 
-    <!-- Body -->
-    <div class="p-5 flex flex-col flex-1">
-      <div class="mb-3 flex items-center gap-2 text-xs font-semibold text-slate-500">
-        <Building2 class="h-3.5 w-3.5 text-violet-500" />
-        <span class="truncate">{{ project.customer?.name || 'Chưa gắn khách hàng' }}</span>
+      <div :class="['mt-4 flex items-start gap-2 rounded-xl border px-3 py-2.5 text-xs leading-relaxed', visualState.panel]">
+        <component :is="visualState.icon" class="mt-0.5 h-4 w-4 shrink-0" />
+        <span class="line-clamp-2">{{ visualState.detail }}</span>
       </div>
-      <p class="text-sm text-slate-500 mb-4 line-clamp-2 flex-1">
-        {{ project.description }}
-      </p>
 
-      <!-- Progress -->
-      <div class="mb-4">
-        <div class="flex justify-between items-center mb-1.5">
-          <span class="text-xs font-medium text-slate-500">Tiến độ</span>
-          <span class="text-sm font-bold text-slate-900"
-            >{{ project.progress }}%</span
-          >
+      <p class="mt-4 line-clamp-2 min-h-10 text-sm leading-relaxed text-slate-500">{{ project.description || "Chưa có mô tả dự án." }}</p>
+
+      <div class="mt-4 grid grid-cols-2 gap-2 text-xs">
+        <div class="min-w-0 rounded-xl bg-slate-50 px-3 py-2.5">
+          <span class="flex items-center gap-1.5 text-slate-400"><UserRound class="h-3.5 w-3.5" /> Phụ trách</span>
+          <p class="mt-1 truncate font-bold text-slate-700">{{ managerName }}</p>
         </div>
-        <div class="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
-          <div
-            :class="[
-              'h-full rounded-full transition-all duration-700',
-              getProgressBg(project.color),
-            ]"
-            :style="{ width: `${project.progress}%` }"
-          ></div>
+        <div class="min-w-0 rounded-xl bg-slate-50 px-3 py-2.5">
+          <span class="flex items-center gap-1.5 text-slate-400"><Building2 class="h-3.5 w-3.5" /> Khách hàng</span>
+          <p class="mt-1 truncate font-bold text-slate-700">{{ project.customer?.name || "Chưa cập nhật" }}</p>
         </div>
       </div>
 
-      <!-- Footer -->
-      <footer class="flex items-center justify-between">
-        <!-- Member avatars -->
-        <div class="flex -space-x-1.5">
-          <div
-            v-for="memberId in project.memberIds.slice(0, 4)"
-            :key="memberId"
-            :class="[
-              'w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-bold text-white ring-2 ring-white shrink-0',
-              `bg-${findMember(memberId).color}-500`,
-            ]"
-            :title="findMember(memberId).name"
-          >
-            {{ findMember(memberId).initials }}
-          </div>
-          <div
-            v-if="project.memberIds.length > 4"
-            class="w-6 h-6 rounded-full bg-slate-100 text-slate-500 ring-2 ring-white flex items-center justify-center text-[9px] font-bold"
-          >
-            +{{ project.memberIds.length - 4 }}
-          </div>
+      <div class="mt-4">
+        <div class="mb-1.5 flex items-center justify-between text-xs">
+          <span class="font-semibold text-slate-500">Tiến độ tổng thể</span>
+          <strong class="text-slate-900">{{ project.progress || 0 }}%</strong>
         </div>
+        <div class="h-2 overflow-hidden rounded-full bg-slate-100">
+          <div :class="['h-full rounded-full transition-all duration-700', visualState.progress]" :style="{ width: `${project.progress || 0}%` }"></div>
+        </div>
+      </div>
 
-        <!-- Due date / Arrow -->
-        <div
-          :class="[
-            'flex items-center gap-1 text-xs transition-colors',
-            deadlineClass,
-          ]"
-        >
-          <CalendarDays class="w-3.5 h-3.5" />
-          {{
-            deadlineState === "overdue"
-              ? `Quá hạn ${project.overdueDays} ngày`
-              : deadlineState === "completed_late"
-                ? `Trễ ${project.lateDays} ngày`
-                : formatDate(project.dueDate)
-          }}
+      <footer class="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3 text-xs text-slate-500">
+        <div class="flex items-center gap-3">
+          <span class="flex items-center gap-1.5" :title="`${memberCount} thành viên`"><Users class="h-3.5 w-3.5" /> {{ memberCount }}</span>
+          <span v-if="taskCount !== null" class="flex items-center gap-1.5" :title="`${taskCount} nhiệm vụ`"><ClipboardList class="h-3.5 w-3.5" /> {{ taskCount }}</span>
+          <span v-if="project.contextLabel" class="font-semibold text-indigo-600">{{ project.contextLabel }}</span>
         </div>
+        <span :class="['flex items-center gap-1.5 font-semibold', deadlineState === 'overdue' ? 'text-rose-600' : deadlineState === 'due' ? 'text-amber-700' : 'text-slate-500']">
+          <CalendarDays class="h-3.5 w-3.5" />
+          {{ deadlineState === "overdue" ? `Quá hạn ${project.overdueDays || 0} ngày` : deadlineState === "completed_late" ? `Trễ ${project.lateDays || 0} ngày` : project.dueDate ? formatDate(project.dueDate) : "Chưa đặt hạn" }}
+        </span>
       </footer>
     </div>
   </article>

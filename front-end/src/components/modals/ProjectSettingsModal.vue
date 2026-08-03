@@ -10,7 +10,6 @@ const { projects, members, customers, projectSettingsModalOpen, editingProjectId
 const form = reactive({
   name: '',
   description: '',
-  color: 'indigo',
   status: 'planning',
   customerId: '',
   managerId: '',
@@ -50,7 +49,6 @@ watch(projectSettingsModalOpen, (isOpen) => {
   if (isOpen && project.value) {
     form.name = project.value.name
     form.description = project.value.description || ''
-    form.color = project.value.color
     form.status = project.value.status
     form.customerId = project.value.customerId || ''
     form.managerId = project.value.managerId || ''
@@ -87,16 +85,6 @@ async function createCustomer() {
     showErrors(result?.errors || { _general: 'Không thể tạo khách hàng.' })
   }
 }
-
-const colors = [
-  { id: 'indigo', bg: 'bg-indigo-500', ring: 'ring-indigo-500' },
-  { id: 'emerald', bg: 'bg-emerald-500', ring: 'ring-emerald-500' },
-  { id: 'amber', bg: 'bg-amber-500', ring: 'ring-amber-500' },
-  { id: 'rose', bg: 'bg-rose-500', ring: 'ring-rose-500' },
-  { id: 'sky', bg: 'bg-sky-500', ring: 'ring-sky-500' },
-  { id: 'violet', bg: 'bg-violet-500', ring: 'ring-violet-500' },
-  { id: 'orange', bg: 'bg-orange-500', ring: 'ring-orange-500' }
-]
 
 async function submit() {
   errors.value = {}
@@ -206,28 +194,6 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
               <div class="space-y-2">
                 <label class="block text-sm font-semibold text-slate-700">Ngày bắt đầu</label>
                 <input v-model="form.startDate" type="date" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none focus:border-violet-300" />
-              </div>
-            </div>
-
-            <div class="space-y-3">
-              <label class="block text-sm font-semibold text-slate-700">Màu sắc</label>
-              <div class="flex flex-wrap gap-3">
-                <label 
-                  v-for="color in colors" 
-                  :key="color.id"
-                  class="relative cursor-pointer"
-                >
-                  <input v-model="form.color" type="radio" :value="color.id" class="sr-only" />
-                  <div 
-                    :class="[
-                      'w-8 h-8 rounded-full flex items-center justify-center transition-all',
-                      color.bg,
-                      form.color === color.id ? `ring-4 ring-offset-2 ${color.ring}` : 'hover:scale-110 shadow-sm'
-                    ]"
-                  >
-                    <Check v-if="form.color === color.id" class="w-4 h-4 text-white" />
-                  </div>
-                </label>
               </div>
             </div>
 

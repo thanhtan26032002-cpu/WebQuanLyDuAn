@@ -60,7 +60,7 @@ class CoreApiTest extends TestCase
         $projectResponse
             ->assertCreated()
             ->assertJsonPath('project.code', 'PJ0001')
-            ->assertJsonPath('project.color', 'rose')
+            ->assertJsonPath('project.color', 'indigo')
             ->assertJsonPath('project.members.0.code', $member->user_code)
             ->assertJsonPath('project.due_date', now()->toDateString());
 
@@ -91,7 +91,7 @@ class CoreApiTest extends TestCase
 
         $this->getJson('/api/projects/PJ0001')
             ->assertOk()
-            ->assertJsonPath('color', 'rose')
+            ->assertJsonPath('color', 'indigo')
             ->assertJsonCount(1, 'tasks');
 
         $this->putJson('/api/projects/PJ0001/members', [

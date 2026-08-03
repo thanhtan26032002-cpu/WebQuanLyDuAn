@@ -1,6 +1,6 @@
 <script setup>
 import { computed, nextTick, reactive, ref, onMounted, onUnmounted } from 'vue'
-import { X, FolderKanban, Plus, Check, Paperclip, UploadCloud, Building2 } from '@lucide/vue'
+import { X, FolderKanban, Plus, Paperclip, UploadCloud, Building2 } from '@lucide/vue'
 import { useProjectWorkspace } from '../../composables/useProjectWorkspace'
 
 const { members, customers, projectModalOpen, addProject, addCustomer, validateCustomerDraft, formatBytes } = useProjectWorkspace()
@@ -11,7 +11,6 @@ const form = reactive({
   name: '',
   template: 'blank',
   description: '',
-  color: 'indigo',
   status: 'planning',
   customerId: '',
   managerId: '',
@@ -43,16 +42,6 @@ async function createCustomer() {
     showErrors(result?.errors || { _general: 'Không thể tạo khách hàng.' })
   }
 }
-
-const colors = [
-  { id: 'indigo', bg: 'bg-indigo-500', ring: 'ring-indigo-500' },
-  { id: 'emerald', bg: 'bg-emerald-500', ring: 'ring-emerald-500' },
-  { id: 'amber', bg: 'bg-amber-500', ring: 'ring-amber-500' },
-  { id: 'rose', bg: 'bg-rose-500', ring: 'ring-rose-500' },
-  { id: 'sky', bg: 'bg-sky-500', ring: 'ring-sky-500' },
-  { id: 'violet', bg: 'bg-violet-500', ring: 'ring-violet-500' },
-  { id: 'orange', bg: 'bg-orange-500', ring: 'ring-orange-500' }
-]
 
 const errors = ref({})
 const modalBody = ref(null)
@@ -199,28 +188,6 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
             <label class="block text-sm font-semibold text-slate-700">Mô tả</label>
             <textarea v-model="form.description" rows="3" placeholder="Mô tả ngắn về dự án..." class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 focus:bg-white focus:border-violet-300 focus:ring-4 focus:ring-violet-500/10 transition-all outline-none resize-none"></textarea>
             <p v-if="errors.description" class="text-xs font-medium text-red-500">{{ errors.description }}</p>
-          </div>
-
-          <div class="space-y-3">
-            <label class="block text-sm font-semibold text-slate-700">Màu sắc</label>
-            <div class="flex flex-wrap gap-3">
-              <label 
-                v-for="color in colors" 
-                :key="color.id"
-                class="relative cursor-pointer"
-              >
-                <input v-model="form.color" type="radio" :value="color.id" class="sr-only" />
-                <div 
-                  :class="[
-                    'w-8 h-8 rounded-full flex items-center justify-center transition-all',
-                    color.bg,
-                    form.color === color.id ? `ring-4 ring-offset-2 ${color.ring}` : 'hover:scale-110 shadow-sm'
-                  ]"
-                >
-                  <Check v-if="form.color === color.id" class="w-4 h-4 text-white" />
-                </div>
-              </label>
-            </div>
           </div>
 
           <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">

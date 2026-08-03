@@ -240,19 +240,13 @@ const stats = computed(() => [
   { label: 'Hoàn thành', value: projectTasks.value.filter(t => t.status === 'done').length, icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-100' },
 ])
 
-const gradientMap = {
-  purple: 'from-violet-500 to-indigo-600',
-  violet: 'from-violet-500 to-indigo-600',
-  indigo: 'from-indigo-500 to-violet-600',
-  emerald: 'from-emerald-500 to-teal-600',
-  amber: 'from-amber-500 to-orange-600',
-  rose: 'from-rose-500 to-pink-600',
-  sky: 'from-sky-500 to-blue-600',
-  green: 'from-green-500 to-emerald-600',
-  orange: 'from-orange-500 to-amber-600',
-  pink: 'from-pink-500 to-rose-600',
-  blue: 'from-blue-500 to-indigo-600',
-}
+const projectHeroClass = computed(() => {
+  if (project.value?.deadlineState === 'overdue' || project.value?.health === 'off_track') return 'from-rose-600 to-red-700'
+  if (project.value?.status === 'on_hold' || project.value?.health === 'at_risk') return 'from-amber-500 to-orange-600'
+  if (project.value?.status === 'completed') return 'from-emerald-600 to-teal-700'
+  if (project.value?.status === 'planning') return 'from-slate-600 to-slate-700'
+  return 'from-indigo-600 to-violet-700'
+})
 
 const priorityClasses = {
   high: 'bg-rose-50 text-rose-600 border border-rose-100',
@@ -295,7 +289,7 @@ const projectStatusClasses = {
     </button>
 
     <!-- Project Hero -->
-    <div :class="['rounded-2xl bg-gradient-to-br text-white p-6 shadow-lg relative overflow-hidden', gradientMap[project.color] || gradientMap.indigo]">
+    <div :class="['rounded-2xl bg-gradient-to-br text-white p-6 shadow-lg relative overflow-hidden', projectHeroClass]">
       <!-- Decorative circles -->
       <div class="absolute -top-8 -right-8 w-40 h-40 bg-white/10 rounded-full blur-2xl"></div>
       <div class="absolute -bottom-10 -left-10 w-32 h-32 bg-black/10 rounded-full blur-2xl"></div>
