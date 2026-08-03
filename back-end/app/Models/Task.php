@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Traits\GeneratesCode;
 use App\Traits\MapsAttributes;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -28,10 +29,12 @@ class Task extends Model
         'task_deleted_at' => 'datetime',
         'task_completed_at' => 'datetime',
         'task_blocked_override' => 'boolean',
+        'task_start_date' => 'date:Y-m-d',
+        'task_due_date' => 'date:Y-m-d',
         'task_recurrence_until' => 'date:Y-m-d',
     ];
 
-    protected $appends = ['is_blocked', 'actual_minutes', 'remaining_hours'];
+    protected $appends = ['is_blocked', 'actual_minutes', 'remaining_hours', 'deadline_state', 'overdue_days', 'late_days'];
 
     protected $fillable = [
         'task_project_code', 'task_title', 'task_description', 'task_status',
@@ -40,6 +43,7 @@ class Task extends Model
         'task_progress', 'task_estimated_hours', 'task_type', 'task_tags',
         'task_milestone_code', 'task_blocked_reason', 'task_blocked_override',
         'task_recurrence', 'task_recurrence_until', 'task_completed_at',
+        'task_delay_reason', 'task_recovery_plan',
     ];
 
     public function getCodePrefix()
@@ -60,6 +64,8 @@ class Task extends Model
             'task_priority' => 'priority',
             'task_start_date' => 'start_date',
             'task_due_date' => 'due_date',
+            'task_delay_reason' => 'delay_reason',
+            'task_recovery_plan' => 'recovery_plan',
             'task_assignee_code' => 'assignee_code',
             'task_created_by' => 'created_by',
             'task_tags' => 'tags',
@@ -126,6 +132,47 @@ class Task extends Model
     public function watchers()
     {
         return $this->belongsToMany(User::class, 'task_watchers', 'watcher_task_code', 'watcher_user_code', 'task_code', 'user_code');
+    }
+
+    public function deadlineExtensions()
+    {
+        return $this->hasMany(DeadlineExtension::class, 'extension_target_code', 'task_code')
+            ->where('extension_target_type', 'Task')
+            ->orderByDesc('extension_created_at');
+    }
+
+    public function getOverdueDaysAttribute(): int
+    {
+        if (! $this->task_due_date) {
+            return 0;
+        }
+
+        $dueDate = Carbon::parse($this->task_due_date)->startOfDay();
+        $endDate = $this->task_status === 'done' && $this->task_completed_at
+            ? Carbon::parse($this->task_completed_at)->startOfDay()
+            : now()->startOfDay();
+
+        return $endDate->greaterThan($dueDate) ? (int) $dueDate->diffInDays($endDate) : 0;
+    }
+
+    public function getLateDaysAttribute(): int
+    {
+        return $this->task_status === 'done' ? $this->overdue_days : 0;
+    }
+
+    public function getDeadlineStateAttribute(): string
+    {
+        if (! $this->task_due_date) {
+            return 'none';
+        }
+        if ($this->task_status === 'done') {
+            return $this->late_days > 0 ? 'completed_late' : 'completed_on_time';
+        }
+        if ($this->overdue_days > 0) {
+            return 'overdue';
+        }
+
+        return Carbon::parse($this->task_due_date)->isToday() ? 'due' : 'normal';
     }
 
     public function getIsBlockedAttribute(): bool

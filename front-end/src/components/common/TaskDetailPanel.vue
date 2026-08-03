@@ -35,13 +35,18 @@ const canManageTask = computed(() => {
 })
 const canContributeToTask = computed(() => canManageTask.value || isTaskAssignee.value)
 const canModifyChecklist = computed(() => canContributeToTask.value && task.value?.status !== 'done')
+const isDeadlineExtension = computed(() => {
+  const currentDueDate = task.value?.dueDate?.split('T')[0]
+  const editedDueDate = editedTask.value?.dueDate?.split?.('T')?.[0] || editedTask.value?.dueDate
+  return Boolean(currentDueDate && editedDueDate && editedDueDate > currentDueDate)
+})
 
 const deadlineInfo = computed(() => {
   const state = getTaskDeadlineState(task.value?.dueDate, task.value?.status)
 
   if (state === 'overdue') {
     return {
-      label: 'Quá hạn',
+      label: `Quá hạn ${task.value?.overdueDays || 0} ngày`,
       textClass: 'text-rose-600',
       iconClass: 'bg-rose-50 text-rose-600 border-rose-200',
     }
@@ -55,7 +60,9 @@ const deadlineInfo = computed(() => {
   }
   if (task.value?.status === 'done') {
     return {
-      label: 'Đã hoàn thành',
+      label: task.value?.lateDays > 0
+        ? `Hoàn thành trễ ${task.value.lateDays} ngày`
+        : 'Đã hoàn thành đúng hạn',
       textClass: 'text-emerald-600',
       iconClass: 'bg-emerald-50 text-emerald-600 border-emerald-200',
     }
@@ -70,6 +77,7 @@ const deadlineInfo = computed(() => {
 const newComment = ref('')
 const isEditing = ref(false)
 const editedTask = ref({})
+const saveError = ref('')
 const isConfirmingDelete = ref(false)
 const selectedDependencyIds = ref([])
 const watching = ref(false)
@@ -79,6 +87,8 @@ const startEditing = () => {
   if (!task.value || !canManageTask.value) return
   editedTask.value = JSON.parse(JSON.stringify(task.value))
   editedTask.value.tagsInput = Array.isArray(task.value?.tags) ? task.value.tags.join(', ') : (task.value?.tags || '')
+  editedTask.value.extensionReason = ''
+  saveError.value = ''
   isEditing.value = true
 }
 
@@ -90,6 +100,7 @@ watch(activeTaskId, async (newVal) => {
     if (task.value) {
       editedTask.value = JSON.parse(JSON.stringify(task.value))
       editedTask.value.tagsInput = Array.isArray(task.value?.tags) ? task.value.tags.join(', ') : (task.value?.tags || '')
+      editedTask.value.extensionReason = ''
       selectedDependencyIds.value = (task.value.dependencies || []).map(item => item.code || item.id)
       watching.value = (task.value.watchers || []).some(item => item.code === currentUser.value?.code)
     }
@@ -117,12 +128,13 @@ const handleDelete = async () => {
   if (deleted) isConfirmingDelete.value = false
 }
 
-const handleSave = () => {
+const handleSave = async () => {
   const tagsArray = editedTask.value.tagsInput 
     ? editedTask.value.tagsInput.split(',').map(s => s.trim()).filter(Boolean) 
     : []
 
-  updateTask(task.value.id, {
+  saveError.value = ''
+  const result = await updateTask(task.value.id, {
     title: editedTask.value.title,
     description: editedTask.value.description,
     status: editedTask.value.status,
@@ -138,9 +150,16 @@ const handleSave = () => {
     blockedReason: editedTask.value.blockedReason || null,
     recurrence: editedTask.value.recurrence || null,
     recurrenceUntil: editedTask.value.recurrenceUntil || null,
+    delayReason: editedTask.value.delayReason || null,
+    recoveryPlan: editedTask.value.recoveryPlan || null,
+    extensionReason: editedTask.value.extensionReason || null,
     tags: tagsArray
   })
-  isEditing.value = false
+  if (result?.success) {
+    isEditing.value = false
+  } else {
+    saveError.value = Object.values(result?.errors || {}).find(Boolean) || 'Không thể lưu thay đổi.'
+  }
 }
 
 const fileInput = ref(null)
@@ -389,6 +408,9 @@ const formatDateTime = (isoStr) => {
 
       <!-- Content -->
       <div class="flex-1 overflow-y-auto px-6 py-6 custom-scrollbar">
+        <div v-if="saveError" role="alert" class="mb-5 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">
+          {{ saveError }}
+        </div>
         <div v-if="task.isBlocked" class="mb-5 flex items-start gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-rose-700">
           <Ban class="mt-0.5 h-5 w-5 shrink-0" />
           <div>
@@ -671,6 +693,57 @@ const formatDateTime = (isoStr) => {
             </div>
           </div>
         </div>
+
+        <section
+          v-if="isEditing && (task.deadlineState === 'overdue' || task.delayReason || task.recoveryPlan)"
+          class="mb-8 space-y-4 rounded-2xl border border-rose-200 bg-rose-50/70 p-4"
+        >
+          <div>
+            <h3 class="font-bold text-rose-900">Xử lý nhiệm vụ chậm tiến độ</h3>
+            <p class="mt-1 text-xs text-rose-700">Nêu rõ nguyên nhân và hành động khắc phục trước khi gia hạn nhiệm vụ quá hạn.</p>
+          </div>
+          <div>
+            <label class="mb-1.5 block text-xs font-bold text-slate-700">Lý do chậm *</label>
+            <textarea v-model="editedTask.delayReason" rows="3" class="w-full rounded-xl border border-rose-200 bg-white p-3 text-sm outline-none focus:border-rose-400" placeholder="Nguyên nhân khách quan hoặc trở ngại đang gặp..."></textarea>
+          </div>
+          <div>
+            <label class="mb-1.5 block text-xs font-bold text-slate-700">Kế hoạch khắc phục *</label>
+            <textarea v-model="editedTask.recoveryPlan" rows="3" class="w-full rounded-xl border border-rose-200 bg-white p-3 text-sm outline-none focus:border-rose-400" placeholder="Việc cần làm, người chịu trách nhiệm và thời gian dự kiến..."></textarea>
+          </div>
+        </section>
+
+        <section v-if="isEditing && isDeadlineExtension" class="mb-8 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+          <label class="mb-1.5 block text-xs font-bold text-amber-800">Lý do gia hạn *</label>
+          <textarea v-model="editedTask.extensionReason" rows="2" class="w-full rounded-xl border border-amber-200 bg-white p-3 text-sm outline-none focus:border-amber-400" placeholder="Vì sao cần đổi hạn chót?"></textarea>
+          <p class="mt-1 text-[11px] text-amber-700">Hạn cũ và hạn mới sẽ được lưu trong lịch sử.</p>
+        </section>
+
+        <section
+          v-if="!isEditing && (task.delayReason || task.recoveryPlan || task.deadlineExtensions?.length)"
+          class="mb-8 rounded-2xl border border-slate-100 bg-white p-5 shadow-sm"
+        >
+          <h3 class="text-sm font-bold text-slate-900">Theo dõi chậm tiến độ</h3>
+          <div v-if="task.delayReason || task.recoveryPlan" class="mt-3 grid gap-3 sm:grid-cols-2">
+            <div class="rounded-xl bg-rose-50 p-3">
+              <p class="text-[11px] font-bold uppercase text-rose-600">Lý do chậm</p>
+              <p class="mt-1 text-sm text-slate-700">{{ task.delayReason || 'Chưa cập nhật' }}</p>
+            </div>
+            <div class="rounded-xl bg-emerald-50 p-3">
+              <p class="text-[11px] font-bold uppercase text-emerald-700">Kế hoạch khắc phục</p>
+              <p class="mt-1 text-sm text-slate-700">{{ task.recoveryPlan || 'Chưa cập nhật' }}</p>
+            </div>
+          </div>
+          <div v-if="task.deadlineExtensions?.length" class="mt-4 border-t border-slate-100 pt-4">
+            <p class="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">Lịch sử gia hạn</p>
+            <div class="space-y-2">
+              <article v-for="item in task.deadlineExtensions" :key="item.id" class="rounded-xl border border-slate-100 bg-slate-50 p-3 text-xs">
+                <p class="font-bold text-slate-700">{{ formatDate(item.oldDueDate) }} → {{ formatDate(item.newDueDate) }}</p>
+                <p class="mt-1 text-slate-600">{{ item.reason }}</p>
+                <p class="mt-1 text-slate-400">{{ item.actor?.name || 'Người quản lý' }} · {{ formatDateTime(item.createdAt) }}</p>
+              </article>
+            </div>
+          </div>
+        </section>
 
         <div class="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div class="rounded-xl border border-slate-100 bg-white p-4 shadow-sm">

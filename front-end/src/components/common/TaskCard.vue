@@ -15,7 +15,7 @@ const project = computed(() => findProject(props.task.projectId));
 const assignee = computed(() => findMember(props.task.assigneeId));
 
 const deadlineState = computed(() =>
-  getTaskDeadlineState(props.task.dueDate, props.task.status),
+  props.task.deadlineState || getTaskDeadlineState(props.task.dueDate, props.task.status),
 );
 
 const deadlineClass = computed(() => {
@@ -23,6 +23,9 @@ const deadlineClass = computed(() => {
     return "text-rose-600 bg-rose-50 border-rose-200";
   }
   if (deadlineState.value === "due") {
+    return "text-amber-700 bg-amber-50 border-amber-200";
+  }
+  if (deadlineState.value === "completed_late") {
     return "text-amber-700 bg-amber-50 border-amber-200";
   }
   return "text-slate-400 bg-transparent border-transparent";
@@ -119,7 +122,13 @@ const statusBadgeMap = {
         ]"
       >
         <CalendarDays class="w-3.5 h-3.5" />
-        {{ formatDate(task.dueDate) }}
+        {{
+          deadlineState === "overdue"
+            ? `Quá hạn ${task.overdueDays} ngày`
+            : deadlineState === "completed_late"
+              ? `Trễ ${task.lateDays} ngày`
+              : formatDate(task.dueDate)
+        }}
       </div>
 
       <UserAvatar :member-id="task.assigneeId" size="sm" />

@@ -57,6 +57,18 @@ function mapAttachment(a) {
   }
 }
 
+function mapDeadlineExtension(item) {
+  return {
+    ...item,
+    id: item.code || item.id,
+    oldDueDate: item.old_due_date || item.oldDueDate,
+    newDueDate: item.new_due_date || item.newDueDate,
+    createdAt: item.created_at || item.createdAt,
+    createdBy: item.created_by || item.createdBy,
+    actor: item.actor || null,
+  }
+}
+
 // API trả về snake_case (due_date), Frontend dùng camelCase (dueDate)
 function mapProject(p) {
   return {
@@ -75,6 +87,13 @@ function mapProject(p) {
     canRestoreByUser: p.can_restore_by_user ?? p.canRestoreByUser ?? false,
     memberIds: p.members ? p.members.map(m => m.code) : (p.memberIds || []),
     progress: p.progress || 0,
+    deadlineState: p.deadline_state || p.deadlineState || 'none',
+    overdueDays: Number(p.overdue_days ?? p.overdueDays ?? 0),
+    lateDays: Number(p.late_days ?? p.lateDays ?? 0),
+    delayReason: p.delay_reason || p.delayReason || '',
+    recoveryPlan: p.recovery_plan || p.recoveryPlan || '',
+    completedAt: p.completed_at || p.completedAt || null,
+    deadlineExtensions: (p.deadline_extensions || p.deadlineExtensions || []).map(mapDeadlineExtension),
     health: p.health || 'on_track',
     updateCadence: p.update_cadence || p.updateCadence || 'weekly',
     updates: p.updates || [],
@@ -141,6 +160,12 @@ function mapTask(t) {
     canRestoreByUser: t.can_restore_by_user ?? t.canRestoreByUser ?? false,
     tags: parsedTags,
     progress: t.progress || 0,
+    deadlineState: t.deadline_state || t.deadlineState || 'none',
+    overdueDays: Number(t.overdue_days ?? t.overdueDays ?? 0),
+    lateDays: Number(t.late_days ?? t.lateDays ?? 0),
+    delayReason: t.delay_reason || t.delayReason || '',
+    recoveryPlan: t.recovery_plan || t.recoveryPlan || '',
+    deadlineExtensions: (t.deadline_extensions || t.deadlineExtensions || []).map(mapDeadlineExtension),
     files: t.attachments ? t.attachments.map(mapAttachment) : (t.files || []),
     checklists: (t.checklists || []).map(mapChecklist),
     workLogs: (t.work_logs || t.workLogs || []).map(mapWorkLog),
@@ -665,6 +690,9 @@ export function useProjectWorkspace() {
           ? (updates.due_date || null)
           : (updates.dueDate || null)
       }
+      if (updates.delayReason !== undefined) payload.delay_reason = updates.delayReason || null
+      if (updates.recoveryPlan !== undefined) payload.recovery_plan = updates.recoveryPlan || null
+      if (updates.extensionReason !== undefined) payload.extension_reason = updates.extensionReason || null
 
       const res = await fetch(`${API_URL}/projects/${projectId}`, {
         method: 'PUT',
@@ -866,6 +894,9 @@ export function useProjectWorkspace() {
       if (updates.blockedOverride !== undefined) payload.blocked_override = Boolean(updates.blockedOverride)
       if (updates.recurrence !== undefined) payload.recurrence = updates.recurrence || null
       if (updates.recurrenceUntil !== undefined) payload.recurrence_until = updates.recurrenceUntil || null
+      if (updates.delayReason !== undefined) payload.delay_reason = updates.delayReason || null
+      if (updates.recoveryPlan !== undefined) payload.recovery_plan = updates.recoveryPlan || null
+      if (updates.extensionReason !== undefined) payload.extension_reason = updates.extensionReason || null
 
       const res = await fetch(`${API_URL}/tasks/${taskId}`, {
         method: 'PUT',
@@ -878,9 +909,14 @@ export function useProjectWorkspace() {
         if (idx >= 0) Object.assign(tasks.value[idx], mapTask(data.task))
         //refreshActivitiesAndNotifications()
         notify('Đã cập nhật nhiệm vụ')
+        return { success: true, task: idx >= 0 ? tasks.value[idx] : mapTask(data.task) }
       }
+      const errors = await parseValidationErrors(res)
+      if (errors._general) notify(errors._general)
+      return { success: false, errors }
     } catch (e) {
       notify('Lỗi kết nối: Không thể cập nhật nhiệm vụ')
+      return { success: false, errors: { _general: 'Không thể kết nối tới máy chủ.' } }
     }
   }
 

@@ -25,7 +25,7 @@ const handleEdit = () => {
 };
 
 const deadlineState = computed(() =>
-  getTaskDeadlineState(props.project.dueDate, props.project.status)
+  props.project.deadlineState || getTaskDeadlineState(props.project.dueDate, props.project.status)
 );
 
 const deadlineClass = computed(() => {
@@ -33,6 +33,9 @@ const deadlineClass = computed(() => {
     return "text-red-600 bg-red-50 border-red-200 font-semibold px-2 py-0.5 rounded-lg border";
   }
   if (deadlineState.value === "due") {
+    return "text-amber-700 bg-amber-50 border-amber-200 font-semibold px-2 py-0.5 rounded-lg border";
+  }
+  if (deadlineState.value === "completed_late") {
     return "text-amber-700 bg-amber-50 border-amber-200 font-semibold px-2 py-0.5 rounded-lg border";
   }
   return "text-slate-400 bg-transparent border-transparent";
@@ -182,7 +185,13 @@ const statusBadge = computed(() => {
           ]"
         >
           <CalendarDays class="w-3.5 h-3.5" />
-          {{ formatDate(project.dueDate) }}
+          {{
+            deadlineState === "overdue"
+              ? `Quá hạn ${project.overdueDays} ngày`
+              : deadlineState === "completed_late"
+                ? `Trễ ${project.lateDays} ngày`
+                : formatDate(project.dueDate)
+          }}
         </div>
       </footer>
     </div>

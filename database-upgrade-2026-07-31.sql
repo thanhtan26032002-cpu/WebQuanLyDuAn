@@ -101,3 +101,91 @@ SET @activity_project_fk_sql = IF(
 PREPARE activity_project_fk_statement FROM @activity_project_fk_sql;
 EXECUTE activity_project_fk_statement;
 DEALLOCATE PREPARE activity_project_fk_statement;
+
+-- Quan tri qua han, ke hoach khac phuc va lich su gia han.
+SET @project_delay_reason_exists = (
+  SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'projects' AND COLUMN_NAME = 'project_delay_reason'
+);
+SET @project_delay_reason_sql = IF(
+  @project_delay_reason_exists = 0,
+  'ALTER TABLE `projects` ADD COLUMN `project_delay_reason` text NULL AFTER `project_due_date`',
+  'SELECT ''projects.project_delay_reason already exists'' AS message'
+);
+PREPARE project_delay_reason_statement FROM @project_delay_reason_sql;
+EXECUTE project_delay_reason_statement;
+DEALLOCATE PREPARE project_delay_reason_statement;
+
+SET @project_recovery_plan_exists = (
+  SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'projects' AND COLUMN_NAME = 'project_recovery_plan'
+);
+SET @project_recovery_plan_sql = IF(
+  @project_recovery_plan_exists = 0,
+  'ALTER TABLE `projects` ADD COLUMN `project_recovery_plan` text NULL AFTER `project_delay_reason`',
+  'SELECT ''projects.project_recovery_plan already exists'' AS message'
+);
+PREPARE project_recovery_plan_statement FROM @project_recovery_plan_sql;
+EXECUTE project_recovery_plan_statement;
+DEALLOCATE PREPARE project_recovery_plan_statement;
+
+SET @project_completed_at_exists = (
+  SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'projects' AND COLUMN_NAME = 'project_completed_at'
+);
+SET @project_completed_at_sql = IF(
+  @project_completed_at_exists = 0,
+  'ALTER TABLE `projects` ADD COLUMN `project_completed_at` timestamp NULL AFTER `project_recovery_plan`, ADD INDEX `projects_project_completed_at_index` (`project_completed_at`)',
+  'SELECT ''projects.project_completed_at already exists'' AS message'
+);
+PREPARE project_completed_at_statement FROM @project_completed_at_sql;
+EXECUTE project_completed_at_statement;
+DEALLOCATE PREPARE project_completed_at_statement;
+
+SET @task_delay_reason_exists = (
+  SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'tasks' AND COLUMN_NAME = 'task_delay_reason'
+);
+SET @task_delay_reason_sql = IF(
+  @task_delay_reason_exists = 0,
+  'ALTER TABLE `tasks` ADD COLUMN `task_delay_reason` text NULL AFTER `task_due_date`',
+  'SELECT ''tasks.task_delay_reason already exists'' AS message'
+);
+PREPARE task_delay_reason_statement FROM @task_delay_reason_sql;
+EXECUTE task_delay_reason_statement;
+DEALLOCATE PREPARE task_delay_reason_statement;
+
+SET @task_recovery_plan_exists = (
+  SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'tasks' AND COLUMN_NAME = 'task_recovery_plan'
+);
+SET @task_recovery_plan_sql = IF(
+  @task_recovery_plan_exists = 0,
+  'ALTER TABLE `tasks` ADD COLUMN `task_recovery_plan` text NULL AFTER `task_delay_reason`',
+  'SELECT ''tasks.task_recovery_plan already exists'' AS message'
+);
+PREPARE task_recovery_plan_statement FROM @task_recovery_plan_sql;
+EXECUTE task_recovery_plan_statement;
+DEALLOCATE PREPARE task_recovery_plan_statement;
+
+CREATE TABLE IF NOT EXISTS `deadline_extensions` (
+  `extension_code` varchar(50) NOT NULL,
+  `extension_target_type` varchar(20) NOT NULL,
+  `extension_target_code` varchar(50) NOT NULL,
+  `extension_old_due_date` date NOT NULL,
+  `extension_new_due_date` date NOT NULL,
+  `extension_reason` text NOT NULL,
+  `extension_created_by` varchar(50) NOT NULL,
+  `extension_created_at` timestamp NULL DEFAULT NULL,
+  `extension_updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`extension_code`),
+  KEY `deadline_extension_target_index` (`extension_target_type`,`extension_target_code`,`extension_created_at`),
+  KEY `deadline_extensions_extension_created_by_foreign` (`extension_created_by`),
+  CONSTRAINT `deadline_extensions_extension_created_by_foreign`
+    FOREIGN KEY (`extension_created_by`) REFERENCES `users` (`user_code`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+UPDATE `projects`
+SET `project_completed_at` = `project_updated_at`
+WHERE `project_status` = 'completed'
+  AND `project_completed_at` IS NULL;

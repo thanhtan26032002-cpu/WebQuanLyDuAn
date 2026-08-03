@@ -67,6 +67,12 @@ const canManageProject = computed(() => {
   return role === 'admin' || (role === 'project_manager' && [project.value?.managerId, project.value?.created_by].includes(userCode))
 })
 const projectTasks = computed(() => tasks.value.filter(t => t.projectId === projectId.value))
+const projectDeadlineLabel = computed(() => {
+  if (project.value?.deadlineState === 'overdue') return `Quá hạn ${project.value.overdueDays} ngày`
+  if (project.value?.deadlineState === 'completed_late') return `Hoàn thành trễ ${project.value.lateDays} ngày`
+  if (project.value?.deadlineState === 'due') return 'Đến hạn hôm nay'
+  return ''
+})
 
 const taskViewMode = ref('board') // 'list' or 'board'
 const columns = [
@@ -279,6 +285,9 @@ const projectStatusClasses = {
             <span :class="['px-2.5 py-1 rounded-full text-xs font-bold backdrop-blur-sm bg-white/20']">
               {{ projectStatusMap[project.status]?.label }}
             </span>
+            <span v-if="projectDeadlineLabel" class="rounded-full bg-rose-500 px-2.5 py-1 text-xs font-bold text-white shadow-sm">
+              {{ projectDeadlineLabel }}
+            </span>
           </div>
           <h1 class="text-2xl sm:text-3xl font-bold mb-2">{{ project.name }}</h1>
           <p class="text-white/80 text-sm max-w-lg">{{ project.description }}</p>
@@ -327,6 +336,41 @@ const projectStatusClasses = {
       <div class="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm"><p class="text-xs font-semibold text-slate-400">Ngày bắt đầu</p><p class="mt-1 text-sm font-bold text-slate-800">{{ formatDate(project.startDate) }}</p></div>
       <div class="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm"><p class="text-xs font-semibold text-slate-400">Hạn hoàn thành</p><p class="mt-1 text-sm font-bold text-slate-800">{{ formatDate(project.dueDate) }}</p></div>
     </div>
+
+    <section
+      v-if="project.deadlineState === 'overdue' || project.delayReason || project.recoveryPlan || project.deadlineExtensions?.length"
+      class="rounded-2xl border border-rose-100 bg-white p-5 shadow-sm"
+    >
+      <header class="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 class="flex items-center gap-2 font-bold text-slate-900"><ShieldAlert class="h-5 w-5 text-rose-500" /> Kiểm soát quá hạn</h2>
+          <p class="mt-1 text-sm text-slate-500">Nguyên nhân, phương án phục hồi và toàn bộ lần thay đổi hạn chót.</p>
+        </div>
+        <button v-if="canManageProject" class="rounded-xl bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700 hover:bg-rose-100" @click="handleEdit">
+          Cập nhật kế hoạch
+        </button>
+      </header>
+      <div class="mt-4 grid gap-4 md:grid-cols-2">
+        <div class="rounded-xl bg-rose-50 p-4">
+          <p class="text-xs font-bold uppercase tracking-wide text-rose-600">Lý do chậm</p>
+          <p class="mt-2 text-sm leading-6 text-slate-700">{{ project.delayReason || 'Chưa được quản lý dự án cập nhật.' }}</p>
+        </div>
+        <div class="rounded-xl bg-emerald-50 p-4">
+          <p class="text-xs font-bold uppercase tracking-wide text-emerald-700">Kế hoạch khắc phục</p>
+          <p class="mt-2 text-sm leading-6 text-slate-700">{{ project.recoveryPlan || 'Chưa được quản lý dự án cập nhật.' }}</p>
+        </div>
+      </div>
+      <div v-if="project.deadlineExtensions?.length" class="mt-5 border-t border-slate-100 pt-4">
+        <p class="mb-3 text-xs font-bold uppercase tracking-wide text-slate-500">Lịch sử gia hạn</p>
+        <div class="grid gap-3 lg:grid-cols-2">
+          <article v-for="item in project.deadlineExtensions" :key="item.id" class="rounded-xl border border-slate-100 bg-slate-50 p-4">
+            <p class="text-sm font-bold text-slate-800">{{ formatDate(item.oldDueDate) }} → {{ formatDate(item.newDueDate) }}</p>
+            <p class="mt-1 text-sm text-slate-600">{{ item.reason }}</p>
+            <p class="mt-2 text-xs text-slate-400">{{ item.actor?.name || 'Người quản lý' }} · {{ formatDate(item.createdAt) }}</p>
+          </article>
+        </div>
+      </div>
+    </section>
 
     <!-- Stats Row -->
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -478,35 +522,37 @@ const projectStatusClasses = {
           </button>
         </div>
         
-        <div v-if="showProjectActivities && projectActivities.length" class="relative">
-          <div class="absolute top-2 bottom-2 left-[19px] w-px bg-slate-200"></div>
-          <div class="space-y-6 relative">
-            <div v-for="activity in projectActivities" :key="activity.id" class="flex gap-4">
-              <!-- Avatar Node -->
-              <UserAvatar v-if="activity.userId" :member-id="activity.userId" size="md" :show-popover="false" class="relative z-10 ring-4 ring-white rounded-full" />
-              <div v-else class="relative z-10 w-10 h-10 rounded-full flex items-center justify-center shrink-0 border-4 border-white bg-slate-500 shadow-sm text-xs font-bold text-white">HT</div>
-              <!-- Content -->
-              <div class="pt-2">
-                <p class="text-sm text-slate-900">
-                  <span class="font-semibold">{{ activity.actor?.name || 'Người dùng hệ thống' }}</span>
-                  <span class="text-slate-500"> {{ activity.action }} </span>
-                  <span class="font-medium text-slate-800">{{ activity.target }}</span>
-                </p>
-                <div v-if="activity.detail" class="mt-1.5 p-2.5 bg-slate-50 border border-slate-100 rounded-lg text-sm text-slate-600 inline-block">
-                  {{ activity.detail }}
+        <div v-if="showProjectActivities && projectActivities.length" class="max-h-[500px] overflow-y-auto custom-scrollbar pr-4 -mr-4">
+          <div class="relative pb-2">
+            <div class="absolute top-2 bottom-2 left-[19px] w-px bg-slate-200"></div>
+            <div class="space-y-6 relative">
+              <div v-for="activity in projectActivities" :key="activity.id" class="flex gap-4">
+                <!-- Avatar Node -->
+                <UserAvatar v-if="activity.userId" :member-id="activity.userId" size="md" :show-popover="false" class="relative z-10 ring-4 ring-white rounded-full" />
+                <div v-else class="relative z-10 w-10 h-10 rounded-full flex items-center justify-center shrink-0 border-4 border-white bg-slate-500 shadow-sm text-xs font-bold text-white">HT</div>
+                <!-- Content -->
+                <div class="pt-2">
+                  <p class="text-sm text-slate-900">
+                    <span class="font-semibold">{{ activity.actor?.name || 'Người dùng hệ thống' }}</span>
+                    <span class="text-slate-500"> {{ activity.action }} </span>
+                    <span class="font-medium text-slate-800">{{ activity.target }}</span>
+                  </p>
+                  <div v-if="activity.detail" class="mt-1.5 p-2.5 bg-slate-50 border border-slate-100 rounded-lg text-sm text-slate-600 inline-block">
+                    {{ activity.detail }}
+                  </div>
+                  <p class="text-xs text-slate-400 mt-1.5 font-medium">{{ timeAgo(activity.createdAt) }}</p>
                 </div>
-                <p class="text-xs text-slate-400 mt-1.5 font-medium">{{ timeAgo(activity.createdAt) }}</p>
               </div>
             </div>
+            <button
+              v-if="activityMeta.currentPage < activityMeta.lastPage"
+              :disabled="activitiesLoading"
+              class="mt-6 w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 text-sm font-semibold text-slate-600 hover:border-violet-200 hover:text-violet-700 disabled:opacity-50"
+              @click="loadProjectActivityPage(activityMeta.currentPage + 1)"
+            >
+              {{ activitiesLoading ? 'Đang tải...' : `Xem thêm (${projectActivities.length}/${activityMeta.total})` }}
+            </button>
           </div>
-          <button
-            v-if="activityMeta.currentPage < activityMeta.lastPage"
-            :disabled="activitiesLoading"
-            class="mt-6 w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 text-sm font-semibold text-slate-600 hover:border-violet-200 hover:text-violet-700 disabled:opacity-50"
-            @click="loadProjectActivityPage(activityMeta.currentPage + 1)"
-          >
-            {{ activitiesLoading ? 'Đang tải...' : `Xem thêm (${projectActivities.length}/${activityMeta.total})` }}
-          </button>
         </div>
         <div v-else class="text-center py-8 text-slate-400 text-sm font-medium">
           Chưa có hoạt động nào (hoặc đang ẩn).

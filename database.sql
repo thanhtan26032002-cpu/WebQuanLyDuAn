@@ -252,6 +252,25 @@ CREATE TABLE `project_updates` (
   CONSTRAINT `project_updates_update_project_code_foreign` FOREIGN KEY (`update_project_code`) REFERENCES `projects` (`project_code`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `deadline_extensions`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `deadline_extensions` (
+  `extension_code` varchar(50) NOT NULL,
+  `extension_target_type` varchar(20) NOT NULL,
+  `extension_target_code` varchar(50) NOT NULL,
+  `extension_old_due_date` date NOT NULL,
+  `extension_new_due_date` date NOT NULL,
+  `extension_reason` text NOT NULL,
+  `extension_created_by` varchar(50) NOT NULL,
+  `extension_created_at` timestamp NULL DEFAULT NULL,
+  `extension_updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`extension_code`),
+  KEY `deadline_extension_target_index` (`extension_target_type`,`extension_target_code`,`extension_created_at`),
+  KEY `deadline_extensions_extension_created_by_foreign` (`extension_created_by`),
+  CONSTRAINT `deadline_extensions_extension_created_by_foreign` FOREIGN KEY (`extension_created_by`) REFERENCES `users` (`user_code`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `projects`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
@@ -266,6 +285,9 @@ CREATE TABLE `projects` (
   `project_update_cadence` varchar(30) NOT NULL DEFAULT 'weekly',
   `project_start_date` date DEFAULT NULL,
   `project_due_date` date DEFAULT NULL,
+  `project_delay_reason` text DEFAULT NULL,
+  `project_recovery_plan` text DEFAULT NULL,
+  `project_completed_at` timestamp NULL DEFAULT NULL,
   `project_progress` int(11) DEFAULT 0,
   `project_created_by` varchar(50) NOT NULL,
   `project_manager_code` varchar(50) DEFAULT NULL,
@@ -278,6 +300,7 @@ CREATE TABLE `projects` (
   KEY `project_customer_code` (`project_customer_code`),
   KEY `projects_project_health_index` (`project_health`),
   KEY `projects_project_manager_code_foreign` (`project_manager_code`),
+  KEY `projects_project_completed_at_index` (`project_completed_at`),
   CONSTRAINT `projects_ibfk_1` FOREIGN KEY (`project_created_by`) REFERENCES `users` (`user_code`) ON DELETE CASCADE,
   CONSTRAINT `projects_ibfk_2` FOREIGN KEY (`project_customer_code`) REFERENCES `customers` (`customer_code`) ON DELETE SET NULL,
   CONSTRAINT `projects_project_manager_code_foreign` FOREIGN KEY (`project_manager_code`) REFERENCES `users` (`user_code`) ON DELETE SET NULL
@@ -402,6 +425,8 @@ CREATE TABLE `tasks` (
   `task_priority` varchar(255) NOT NULL DEFAULT 'medium',
   `task_start_date` date DEFAULT NULL,
   `task_due_date` date DEFAULT NULL,
+  `task_delay_reason` text DEFAULT NULL,
+  `task_recovery_plan` text DEFAULT NULL,
   `task_progress` int(11) DEFAULT 0,
   `task_blocked_reason` text DEFAULT NULL,
   `task_blocked_override` tinyint(1) NOT NULL DEFAULT 0,
@@ -478,7 +503,11 @@ INSERT INTO `migrations` VALUES
 (18,'0001_01_01_000002_create_jobs_table',2),
 (19,'2026_07_30_000002_add_professional_project_management_features',3),
 (20,'2026_07_30_000003_merge_members_into_users',4),
-(21,'2026_07_30_000004_limit_system_roles_and_default_to_member',5);
+(21,'2026_07_30_000004_limit_system_roles_and_default_to_member',5),
+(22,'2026_07_31_000001_add_task_created_by_to_tasks_table',6),
+(23,'2026_07_31_000002_backfill_task_created_by',7),
+(24,'2026_07_31_000003_add_project_code_to_activities_table',8),
+(25,'2026_08_03_000001_add_deadline_governance',9);
 UNLOCK TABLES;
 
 -- Tài khoản thử nghiệm không được ghi cứng vào mã nguồn.

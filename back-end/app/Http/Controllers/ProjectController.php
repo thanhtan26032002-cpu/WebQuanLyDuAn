@@ -2,14 +2,18 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\DeadlineExtension;
 use App\Models\Project;
 use App\Models\Task;
 use App\Services\AccessService;
 use App\Services\ActivityService;
 use App\Services\ProjectProgressService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class ProjectController extends Controller
 {
@@ -25,6 +29,7 @@ class ProjectController extends Controller
                     $q->select('users.user_code', 'users.user_name', 'users.user_avatar', 'users.user_color', 'users.user_job_title', 'users.user_department');
                 },
                 'attachments',
+                'deadlineExtensions.actor:user_code,user_name,user_avatar',
             ])
             ->orderBy('project_created_at', 'desc')
             ->get();
@@ -64,6 +69,7 @@ class ProjectController extends Controller
             'updates.author:user_code,user_name,user_avatar',
             'milestones.tasks',
             'automations',
+            'deadlineExtensions.actor:user_code,user_name,user_avatar',
         ])->findOrFail($code);
         AccessService::authorize(AccessService::canViewProject($request->user(), $project));
 
@@ -116,6 +122,9 @@ class ProjectController extends Controller
 
         $dbData = Project::mapToDbAttributes($validated);
         $dbData['project_created_by'] = $request->user()->user_code;
+        if (($validated['status'] ?? null) === 'completed') {
+            $dbData['project_completed_at'] = now();
+        }
 
         $project = Project::create($dbData);
         $project->members()->sync($memberIds);
@@ -201,8 +210,39 @@ class ProjectController extends Controller
             'start_date' => 'nullable|date',
             'due_date' => 'nullable|date|after_or_equal:start_date',
             'progress' => 'nullable|integer|min:0|max:100',
+            'delay_reason' => 'nullable|string|max:5000',
+            'recovery_plan' => 'nullable|string|max:10000',
+            'extension_reason' => 'nullable|string|max:2000',
         ]);
         $validated = $this->discardFieldsMissingFromLegacySchema($validated);
+        $extensionReason = trim((string) ($validated['extension_reason'] ?? ''));
+        unset($validated['extension_reason']);
+        $oldDueDate = $project->project_due_date?->toDateString();
+        $newDueDate = array_key_exists('due_date', $validated) && $validated['due_date']
+            ? Carbon::parse($validated['due_date'])->toDateString()
+            : null;
+        $isExtension = $oldDueDate && $newDueDate && $newDueDate > $oldDueDate;
+
+        if ($isExtension && $extensionReason === '') {
+            throw ValidationException::withMessages([
+                'extension_reason' => ['Vui lòng nhập lý do gia hạn để lưu vào lịch sử.'],
+            ]);
+        }
+        if ($isExtension && $newDueDate < now()->toDateString()) {
+            throw ValidationException::withMessages([
+                'due_date' => ['Hạn chót sau gia hạn không được nằm trong quá khứ.'],
+            ]);
+        }
+        if ($isExtension && $project->deadline_state === 'overdue') {
+            $delayReason = trim((string) ($validated['delay_reason'] ?? $project->project_delay_reason));
+            $recoveryPlan = trim((string) ($validated['recovery_plan'] ?? $project->project_recovery_plan));
+            if ($delayReason === '' || $recoveryPlan === '') {
+                throw ValidationException::withMessages([
+                    'delay_reason' => ['Dự án quá hạn phải có lý do chậm.'],
+                    'recovery_plan' => ['Dự án quá hạn phải có kế hoạch khắc phục trước khi gia hạn.'],
+                ]);
+            }
+        }
 
         if (
             ($validated['status'] ?? null) === 'completed'
@@ -216,7 +256,26 @@ class ProjectController extends Controller
             $validated['progress'] = 100;
         }
 
-        $project->update(Project::mapToDbAttributes($validated));
+        DB::transaction(function () use ($project, $validated, $isExtension, $oldDueDate, $newDueDate, $extensionReason, $request) {
+            $projectData = Project::mapToDbAttributes($validated);
+            if (array_key_exists('status', $validated)) {
+                $projectData['project_completed_at'] = $validated['status'] === 'completed'
+                    ? ($project->project_completed_at ?: now())
+                    : null;
+            }
+            $project->update($projectData);
+
+            if ($isExtension) {
+                DeadlineExtension::create([
+                    'extension_target_type' => 'Project',
+                    'extension_target_code' => $project->project_code,
+                    'extension_old_due_date' => $oldDueDate,
+                    'extension_new_due_date' => $newDueDate,
+                    'extension_reason' => $extensionReason,
+                    'extension_created_by' => $request->user()->user_code,
+                ]);
+            }
+        });
         if (isset($validated['status']) && $validated['status'] !== 'completed') {
             ProjectProgressService::sync($project->project_code);
             $project->refresh();
@@ -224,7 +283,7 @@ class ProjectController extends Controller
         if (! empty($validated['manager_code'])) {
             $project->members()->syncWithoutDetaching([$validated['manager_code']]);
         }
-        $project->load('customer', 'manager', 'members', 'attachments');
+        $project->load('customer', 'manager', 'members', 'attachments', 'deadlineExtensions.actor');
 
         $userCode = $request->user()->user_code;
         ActivityService::log(
@@ -234,6 +293,15 @@ class ProjectController extends Controller
             $project->project_code,
             "Đã cập nhật thông tin dự án: {$project->project_name}"
         );
+        if ($isExtension) {
+            ActivityService::log(
+                $userCode,
+                'gia hạn dự án',
+                'Project',
+                $project->project_code,
+                "Đã đổi hạn từ {$oldDueDate} sang {$newDueDate}. Lý do: {$extensionReason}"
+            );
+        }
 
         return response()->json([
             'message' => 'Đã cập nhật dự án',

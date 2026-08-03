@@ -16,6 +16,9 @@ const form = reactive({
   managerId: '',
   startDate: '',
   dueDate: '',
+  delayReason: '',
+  recoveryPlan: '',
+  extensionReason: '',
   progress: 0,
 })
 
@@ -33,6 +36,15 @@ function showErrors(nextErrors) {
 }
 
 const project = computed(() => projects.value.find(p => p.id === editingProjectId.value))
+const isDeadlineExtension = computed(() => {
+  const currentDueDate = project.value?.dueDate?.split('T')[0]
+  return Boolean(currentDueDate && form.dueDate && form.dueDate > currentDueDate)
+})
+const showDelayGovernance = computed(() =>
+  project.value?.deadlineState === 'overdue'
+  || Boolean(form.delayReason)
+  || Boolean(form.recoveryPlan),
+)
 
 watch(projectSettingsModalOpen, (isOpen) => {
   if (isOpen && project.value) {
@@ -44,6 +56,9 @@ watch(projectSettingsModalOpen, (isOpen) => {
     form.managerId = project.value.managerId || ''
     form.startDate = project.value.startDate ? project.value.startDate.split('T')[0] : ''
     form.dueDate = project.value.dueDate ? project.value.dueDate.split('T')[0] : ''
+    form.delayReason = project.value.delayReason || ''
+    form.recoveryPlan = project.value.recoveryPlan || ''
+    form.extensionReason = ''
     form.progress = project.value.progress
     isDeleting.value = false
     showNewCustomer.value = false
@@ -230,6 +245,29 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
                 <label class="block text-sm font-semibold text-slate-700">Hạn chót</label>
                 <input v-model="form.dueDate" type="date" @input="errors.due_date = ''" :class="['w-full bg-slate-50 border rounded-xl px-4 py-2.5 text-slate-900 focus:bg-white focus:ring-4 transition-all outline-none cursor-pointer', errors.due_date ? 'border-red-300 focus:border-red-300 focus:ring-red-500/10' : 'border-slate-200 focus:border-violet-300 focus:ring-violet-500/10']" />
                 <p v-if="errors.due_date" class="text-xs font-medium text-red-500">{{ errors.due_date }}</p>
+              </div>
+            </div>
+
+            <div v-if="isDeadlineExtension" class="space-y-2 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+              <label class="block text-sm font-bold text-amber-900">Lý do gia hạn *</label>
+              <textarea v-model="form.extensionReason" rows="2" placeholder="Giải thích vì sao phải thay đổi hạn chót..." class="w-full rounded-xl border border-amber-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-amber-400"></textarea>
+              <p class="text-xs text-amber-700">Thay đổi này sẽ được lưu vĩnh viễn trong lịch sử gia hạn.</p>
+            </div>
+
+            <div v-if="showDelayGovernance" class="space-y-4 rounded-2xl border border-rose-200 bg-rose-50/70 p-4">
+              <div>
+                <p class="text-sm font-bold text-rose-900">
+                  Dự án {{ project?.overdueDays ? `đã quá hạn ${project.overdueDays} ngày` : 'có rủi ro chậm tiến độ' }}
+                </p>
+                <p class="mt-1 text-xs text-rose-700">Cập nhật nguyên nhân và kế hoạch đưa dự án trở lại đúng hướng.</p>
+              </div>
+              <div class="space-y-2">
+                <label class="block text-sm font-semibold text-slate-700">Lý do chậm *</label>
+                <textarea v-model="form.delayReason" rows="3" placeholder="Nguyên nhân khiến dự án không đạt hạn chót..." class="w-full rounded-xl border border-rose-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-rose-400"></textarea>
+              </div>
+              <div class="space-y-2">
+                <label class="block text-sm font-semibold text-slate-700">Kế hoạch khắc phục *</label>
+                <textarea v-model="form.recoveryPlan" rows="3" placeholder="Hành động, người chịu trách nhiệm và thời gian dự kiến..." class="w-full rounded-xl border border-rose-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-rose-400"></textarea>
               </div>
             </div>
 

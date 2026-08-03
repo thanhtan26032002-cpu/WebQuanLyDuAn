@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Traits\GeneratesCode;
 use App\Traits\MapsAttributes;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -26,13 +27,19 @@ class Project extends Model
 
     protected $casts = [
         'project_deleted_at' => 'datetime',
+        'project_start_date' => 'date:Y-m-d',
+        'project_due_date' => 'date:Y-m-d',
+        'project_completed_at' => 'datetime',
     ];
+
+    protected $appends = ['deadline_state', 'overdue_days', 'late_days'];
 
     protected $fillable = [
         'project_name', 'project_description', 'project_color', 'project_status',
         'project_start_date', 'project_due_date', 'project_created_by', 'project_progress',
         'project_customer_code', 'project_manager_code', 'project_health',
-        'project_update_cadence',
+        'project_update_cadence', 'project_delay_reason', 'project_recovery_plan',
+        'project_completed_at',
     ];
 
     public function getCodePrefix()
@@ -53,6 +60,9 @@ class Project extends Model
             'project_update_cadence' => 'update_cadence',
             'project_start_date' => 'start_date',
             'project_due_date' => 'due_date',
+            'project_delay_reason' => 'delay_reason',
+            'project_recovery_plan' => 'recovery_plan',
+            'project_completed_at' => 'completed_at',
             'project_progress' => 'progress',
             'project_created_by' => 'created_by',
             'project_manager_code' => 'manager_code',
@@ -105,5 +115,46 @@ class Project extends Model
     public function automations()
     {
         return $this->hasMany(ProjectAutomation::class, 'automation_project_code', 'project_code');
+    }
+
+    public function deadlineExtensions()
+    {
+        return $this->hasMany(DeadlineExtension::class, 'extension_target_code', 'project_code')
+            ->where('extension_target_type', 'Project')
+            ->orderByDesc('extension_created_at');
+    }
+
+    public function getOverdueDaysAttribute(): int
+    {
+        if (! $this->project_due_date) {
+            return 0;
+        }
+
+        $dueDate = Carbon::parse($this->project_due_date)->startOfDay();
+        $endDate = $this->project_status === 'completed' && $this->project_completed_at
+            ? Carbon::parse($this->project_completed_at)->startOfDay()
+            : now()->startOfDay();
+
+        return $endDate->greaterThan($dueDate) ? (int) $dueDate->diffInDays($endDate) : 0;
+    }
+
+    public function getLateDaysAttribute(): int
+    {
+        return $this->project_status === 'completed' ? $this->overdue_days : 0;
+    }
+
+    public function getDeadlineStateAttribute(): string
+    {
+        if (! $this->project_due_date) {
+            return 'none';
+        }
+        if ($this->project_status === 'completed') {
+            return $this->late_days > 0 ? 'completed_late' : 'completed_on_time';
+        }
+        if ($this->overdue_days > 0) {
+            return 'overdue';
+        }
+
+        return Carbon::parse($this->project_due_date)->isToday() ? 'due' : 'normal';
     }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\DeadlineExtension;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\TaskComment;
@@ -14,8 +15,10 @@ use App\Services\ProjectProgressService;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class TaskController extends Controller
 {
@@ -33,6 +36,7 @@ class TaskController extends Controller
             'blocking:task_code,task_title,task_status,task_project_code',
             'milestone',
             'watchers:user_code,user_name,user_avatar',
+            'deadlineExtensions.actor:user_code,user_name,user_avatar',
         ]);
 
         if ($request->filled('project_code')) {
@@ -191,6 +195,9 @@ class TaskController extends Controller
             'blocked_override' => 'nullable|boolean',
             'recurrence' => 'nullable|in:daily,weekly,monthly',
             'recurrence_until' => 'nullable|date',
+            'delay_reason' => 'nullable|string|max:5000',
+            'recovery_plan' => 'nullable|string|max:10000',
+            'extension_reason' => 'nullable|string|max:2000',
         ]);
 
         if ($validator->fails()) {
@@ -198,6 +205,40 @@ class TaskController extends Controller
         }
 
         $validated = $validator->validated();
+        $extensionReason = trim((string) ($validated['extension_reason'] ?? ''));
+        unset($validated['extension_reason']);
+        $oldDueDate = $task->task_due_date?->toDateString();
+        $newDueDate = array_key_exists('due_date', $validated) && $validated['due_date']
+            ? Carbon::parse($validated['due_date'])->toDateString()
+            : null;
+        $isExtension = $oldDueDate && $newDueDate && $newDueDate > $oldDueDate;
+
+        if ($isExtension) {
+            AccessService::authorize(
+                AccessService::canCreateProjects($request->user()),
+                'Chỉ quản trị viên hoặc quản lý dự án mới được gia hạn nhiệm vụ.'
+            );
+        }
+        if ($isExtension && $extensionReason === '') {
+            throw ValidationException::withMessages([
+                'extension_reason' => ['Vui lòng nhập lý do gia hạn để lưu vào lịch sử.'],
+            ]);
+        }
+        if ($isExtension && $newDueDate < now()->toDateString()) {
+            throw ValidationException::withMessages([
+                'due_date' => ['Hạn chót sau gia hạn không được nằm trong quá khứ.'],
+            ]);
+        }
+        if ($isExtension && $task->deadline_state === 'overdue') {
+            $delayReason = trim((string) ($validated['delay_reason'] ?? $task->task_delay_reason));
+            $recoveryPlan = trim((string) ($validated['recovery_plan'] ?? $task->task_recovery_plan));
+            if ($delayReason === '' || $recoveryPlan === '') {
+                throw ValidationException::withMessages([
+                    'delay_reason' => ['Nhiệm vụ quá hạn phải có lý do chậm.'],
+                    'recovery_plan' => ['Nhiệm vụ quá hạn phải có kế hoạch khắc phục trước khi gia hạn.'],
+                ]);
+            }
+        }
 
         $previousStatus = $task->task_status;
         $previousAssigneeCode = $task->task_assignee_code;
@@ -238,7 +279,19 @@ class TaskController extends Controller
         if (($validated['status'] ?? null) !== null && $validated['status'] !== 'done' && $task->project?->project_status === 'completed') {
             return response()->json(['message' => 'Hãy mở lại dự án trước khi mở lại nhiệm vụ.'], 409);
         }
-        $task->update(Task::mapToDbAttributes($validated));
+        DB::transaction(function () use ($task, $validated, $isExtension, $oldDueDate, $newDueDate, $extensionReason, $request) {
+            $task->update(Task::mapToDbAttributes($validated));
+            if ($isExtension) {
+                DeadlineExtension::create([
+                    'extension_target_type' => 'Task',
+                    'extension_target_code' => $task->task_code,
+                    'extension_old_due_date' => $oldDueDate,
+                    'extension_new_due_date' => $newDueDate,
+                    'extension_reason' => $extensionReason,
+                    'extension_created_by' => $request->user()->user_code,
+                ]);
+            }
+        });
         $task->unsetRelation('project');
         $task->load('project');
         if (array_key_exists('status', $validated)) {
@@ -280,6 +333,15 @@ class TaskController extends Controller
             $task->task_code,
             "Đã cập nhật nhiệm vụ: {$task->task_title}"
         );
+        if ($isExtension) {
+            ActivityService::log(
+                $userCode,
+                'gia hạn nhiệm vụ',
+                'Task',
+                $task->task_code,
+                "Đã đổi hạn từ {$oldDueDate} sang {$newDueDate}. Lý do: {$extensionReason}"
+            );
+        }
         if ($previousProjectCode && $previousProjectCode !== $task->task_project_code) {
             ActivityService::log(
                 $userCode,
@@ -526,6 +588,7 @@ class TaskController extends Controller
             'assignee:user_code,user_name,user_avatar,user_weekly_capacity_hours,user_color,user_job_title',
             'attachments', 'checklists', 'workLogs.reporter', 'dependencies', 'blocking',
             'milestone', 'watchers:user_code,user_name,user_avatar',
+            'deadlineExtensions.actor:user_code,user_name,user_avatar',
         ];
     }
 

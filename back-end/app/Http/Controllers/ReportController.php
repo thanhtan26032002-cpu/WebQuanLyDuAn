@@ -29,30 +29,31 @@ class ReportController extends Controller
             ->limit(20)
             ->get();
 
-        $sortTasks = fn ($items) => $items->sortBy(function (Task $task) {
+        $taskDueDate = fn (Task $task) => $task->task_due_date?->toDateString();
+        $sortTasks = fn ($items) => $items->sortBy(function (Task $task) use ($taskDueDate) {
             $priority = ['high' => 0, 'medium' => 1, 'low' => 2][$task->task_priority] ?? 3;
             $status = $task->task_status === 'in_progress' ? 0 : 1;
 
             return sprintf(
                 '%d|%s|%d|%s',
                 $priority,
-                $task->task_due_date ?: '9999-12-31',
+                $taskDueDate($task) ?: '9999-12-31',
                 $status,
                 $task->task_created_at
             );
         })->values();
 
         $overdue = $sortTasks($activeTasks->filter(
-            fn (Task $task) => $task->task_due_date && $task->task_due_date < $today
+            fn (Task $task) => $taskDueDate($task) && $taskDueDate($task) < $today
         ));
         $dueToday = $sortTasks($activeTasks->filter(
-            fn (Task $task) => $task->task_due_date === $today
+            fn (Task $task) => $taskDueDate($task) === $today
         ));
         $upcoming = $sortTasks($activeTasks->filter(
-            fn (Task $task) => $task->task_due_date > $today && $task->task_due_date <= $upcomingUntil
+            fn (Task $task) => $taskDueDate($task) > $today && $taskDueDate($task) <= $upcomingUntil
         ));
         $later = $sortTasks($activeTasks->filter(
-            fn (Task $task) => $task->task_due_date > $upcomingUntil
+            fn (Task $task) => $taskDueDate($task) > $upcomingUntil
         ));
         $withoutDeadline = $sortTasks($activeTasks->filter(
             fn (Task $task) => ! $task->task_due_date
@@ -93,6 +94,9 @@ class ReportController extends Controller
     {
         AccessService::authorize(AccessService::canViewReports($request->user()), 'Chỉ quản trị viên hoặc quản lý dự án mới được xem báo cáo tổng hợp.');
         $tasks = $this->visibleTasks($request)->with(['project', 'assignee', 'workLogs'])->get();
+        $projects = AccessService::scopeManagedProjects(Project::query(), $request->user())
+            ->with('manager')
+            ->get();
         $today = now()->toDateString();
 
         $completedByWeek = collect(range(7, 0))->map(function (int $weeksAgo) use ($tasks) {
@@ -108,7 +112,9 @@ class ReportController extends Controller
         })->values();
 
         $overdue = $tasks
-            ->filter(fn (Task $task) => $task->task_status !== 'done' && $task->task_due_date && $task->task_due_date < $today)
+            ->filter(fn (Task $task) => $task->task_status !== 'done'
+                && $task->task_due_date
+                && $task->task_due_date->toDateString() < $today)
             ->values();
 
         $workload = $tasks->where('task_status', '!=', 'done')
@@ -145,6 +151,25 @@ class ReportController extends Controller
                     : null;
             })->filter(fn ($hours) => $hours !== null);
 
+        $completedTasksWithDeadline = $tasks->filter(fn (Task $task) => $task->task_status === 'done'
+            && $task->task_due_date
+            && $task->task_completed_at);
+        $lateTasks = $completedTasksWithDeadline
+            ->filter(fn (Task $task) => $task->late_days > 0)
+            ->sortByDesc('late_days')
+            ->values();
+        $completedProjectsWithDeadline = $projects->filter(fn (Project $project) => $project->project_status === 'completed'
+            && $project->project_due_date
+            && $project->project_completed_at);
+        $lateProjects = $completedProjectsWithDeadline
+            ->filter(fn (Project $project) => $project->late_days > 0)
+            ->sortByDesc('late_days')
+            ->values();
+        $overdueProjects = $projects
+            ->filter(fn (Project $project) => $project->deadline_state === 'overdue')
+            ->sortByDesc('overdue_days')
+            ->values();
+
         return response()->json([
             'completed_by_week' => $completedByWeek,
             'overdue' => [
@@ -161,6 +186,30 @@ class ReportController extends Controller
             'workload' => $workload,
             'estimate_vs_actual' => $estimateVsActual,
             'average_cycle_hours' => $cycleDurations->isEmpty() ? 0 : round($cycleDurations->avg(), 1),
+            'overdue_projects' => [
+                'total' => $overdueProjects->count(),
+                'items' => $overdueProjects->take(20)->values(),
+            ],
+            'late_completion' => [
+                'tasks' => [
+                    'total' => $lateTasks->count(),
+                    'completed_with_deadline' => $completedTasksWithDeadline->count(),
+                    'rate' => $completedTasksWithDeadline->isEmpty()
+                        ? 0
+                        : round(($lateTasks->count() / $completedTasksWithDeadline->count()) * 100, 1),
+                    'average_late_days' => $lateTasks->isEmpty() ? 0 : round($lateTasks->avg('late_days'), 1),
+                    'items' => $lateTasks->take(20)->values(),
+                ],
+                'projects' => [
+                    'total' => $lateProjects->count(),
+                    'completed_with_deadline' => $completedProjectsWithDeadline->count(),
+                    'rate' => $completedProjectsWithDeadline->isEmpty()
+                        ? 0
+                        : round(($lateProjects->count() / $completedProjectsWithDeadline->count()) * 100, 1),
+                    'average_late_days' => $lateProjects->isEmpty() ? 0 : round($lateProjects->avg('late_days'), 1),
+                    'items' => $lateProjects->take(20)->values(),
+                ],
+            ],
         ]);
     }
 

@@ -36,10 +36,39 @@ onMounted(load)
     <div v-if="loading" class="grid gap-5 sm:grid-cols-3"><div v-for="i in 6" :key="i" class="h-36 animate-pulse rounded-2xl bg-white"></div></div>
 
     <template v-else-if="report">
-      <section class="grid gap-4 sm:grid-cols-3">
+      <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <article class="rounded-2xl border border-rose-100 bg-white p-5 shadow-sm"><AlertTriangle class="h-5 w-5 text-rose-500" /><p class="mt-4 text-3xl font-bold">{{ report.overdue.total }}</p><p class="text-sm text-slate-500">Nhiệm vụ quá hạn</p></article>
+        <article class="rounded-2xl border border-orange-100 bg-white p-5 shadow-sm"><AlertTriangle class="h-5 w-5 text-orange-500" /><p class="mt-4 text-3xl font-bold">{{ report.overdue_projects?.total || 0 }}</p><p class="text-sm text-slate-500">Dự án quá hạn</p></article>
+        <article class="rounded-2xl border border-amber-100 bg-white p-5 shadow-sm"><Clock3 class="h-5 w-5 text-amber-600" /><p class="mt-4 text-3xl font-bold">{{ report.late_completion?.tasks?.total || 0 }}</p><p class="text-sm text-slate-500">Nhiệm vụ hoàn thành trễ</p><p class="mt-1 text-xs text-slate-400">{{ report.late_completion?.tasks?.rate || 0 }}% việc có hạn đã hoàn thành</p></article>
+        <article class="rounded-2xl border border-fuchsia-100 bg-white p-5 shadow-sm"><Clock3 class="h-5 w-5 text-fuchsia-600" /><p class="mt-4 text-3xl font-bold">{{ report.late_completion?.projects?.total || 0 }}</p><p class="text-sm text-slate-500">Dự án hoàn thành trễ</p><p class="mt-1 text-xs text-slate-400">{{ report.late_completion?.projects?.rate || 0 }}% dự án có hạn đã hoàn thành</p></article>
         <article class="rounded-2xl border border-violet-100 bg-white p-5 shadow-sm"><Clock3 class="h-5 w-5 text-violet-500" /><p class="mt-4 text-3xl font-bold">{{ report.average_cycle_hours }}h</p><p class="text-sm text-slate-500">Chu kỳ hoàn thành trung bình</p></article>
         <article class="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm"><UsersRound class="h-5 w-5 text-blue-500" /><p class="mt-4 text-3xl font-bold">{{ report.workload.length }}</p><p class="text-sm text-slate-500">Thành viên có việc đang mở</p></article>
+      </section>
+
+      <section class="grid items-start gap-5 xl:grid-cols-2">
+        <article class="rounded-2xl border border-rose-100 bg-white p-5 shadow-sm">
+          <h2 class="font-bold text-slate-900">Dự án đang quá hạn</h2>
+          <p class="mt-1 text-xs text-slate-500">Sắp xếp theo số ngày quá hạn giảm dần.</p>
+          <div class="mt-4 space-y-2">
+            <div v-for="project in report.overdue_projects?.items || []" :key="project.code" class="flex items-center justify-between gap-4 rounded-xl bg-rose-50/70 p-3">
+              <div class="min-w-0"><p class="truncate text-sm font-semibold text-slate-800">{{ project.name }}</p><p class="text-xs text-slate-500">{{ project.manager?.name || 'Chưa phân công quản lý' }} · {{ project.progress || 0 }}%</p></div>
+              <span class="shrink-0 rounded-full bg-rose-100 px-2.5 py-1 text-xs font-bold text-rose-700">{{ project.overdue_days }} ngày</span>
+            </div>
+            <p v-if="!report.overdue_projects?.items?.length" class="py-8 text-center text-sm text-slate-400">Không có dự án quá hạn.</p>
+          </div>
+        </article>
+
+        <article class="rounded-2xl border border-amber-100 bg-white p-5 shadow-sm">
+          <h2 class="font-bold text-slate-900">Nhiệm vụ hoàn thành trễ</h2>
+          <p class="mt-1 text-xs text-slate-500">Trung bình trễ {{ report.late_completion?.tasks?.average_late_days || 0 }} ngày.</p>
+          <div class="mt-4 space-y-2">
+            <div v-for="task in report.late_completion?.tasks?.items || []" :key="task.code" class="flex items-center justify-between gap-4 rounded-xl bg-amber-50/70 p-3">
+              <div class="min-w-0"><p class="truncate text-sm font-semibold text-slate-800">{{ task.title }}</p><p class="truncate text-xs text-slate-500">{{ task.project?.name || 'Nhiệm vụ độc lập' }} · {{ task.assignee?.name || 'Chưa phân công' }}</p></div>
+              <span class="shrink-0 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-800">Trễ {{ task.late_days }} ngày</span>
+            </div>
+            <p v-if="!report.late_completion?.tasks?.items?.length" class="py-8 text-center text-sm text-slate-400">Chưa có nhiệm vụ hoàn thành trễ.</p>
+          </div>
+        </article>
       </section>
 
       <section class="grid items-start gap-5 xl:grid-cols-2">

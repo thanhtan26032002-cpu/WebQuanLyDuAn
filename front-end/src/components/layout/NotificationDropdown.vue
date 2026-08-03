@@ -1,6 +1,6 @@
 <script setup>
 import { computed, onMounted, onUnmounted } from 'vue'
-import { Bell, MessageSquare, AtSign, Settings, CheckCheck } from '@lucide/vue'
+import { Bell, MessageSquare, AtSign, Settings, CheckCheck, AlertTriangle } from '@lucide/vue'
 import { useProjectWorkspace } from '../../composables/useProjectWorkspace'
 
 const { 
@@ -25,6 +25,8 @@ const getIcon = (type) => {
   switch (type) {
     case 'comment': return MessageSquare
     case 'mention': return AtSign
+    case 'warning':
+    case 'danger': return AlertTriangle
     default: return Bell
   }
 }
@@ -33,6 +35,8 @@ const getColor = (type) => {
   switch (type) {
     case 'comment': return 'bg-blue-100 text-blue-600'
     case 'mention': return 'bg-violet-100 text-violet-600'
+    case 'warning': return 'bg-amber-100 text-amber-700'
+    case 'danger': return 'bg-rose-100 text-rose-700'
     default: return 'bg-emerald-100 text-emerald-600'
   }
 }
