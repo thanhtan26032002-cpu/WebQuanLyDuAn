@@ -7,6 +7,7 @@ import UserAvatar from "./UserAvatar.vue";
 const props = defineProps({
   task: { type: Object, required: true },
   showStatus: Boolean,
+  readOnly: Boolean,
 });
 
 const { priorityMap, taskStatusMap, findProject, findMember, formatDate, getTaskDeadlineState } =
@@ -52,7 +53,7 @@ const statusBadgeMap = {
 
 <template>
   <article
-    class="bg-white p-4 rounded-xl shadow-sm border border-slate-100 hover:shadow-md hover:border-violet-100 transition-all duration-200 cursor-grab active:cursor-grabbing group"
+    :class="['bg-white p-4 rounded-xl shadow-sm border border-slate-100 hover:shadow-md hover:border-violet-100 transition-all duration-200 group', readOnly ? 'cursor-pointer' : 'cursor-grab active:cursor-grabbing']"
   >
     <!-- Top row: priority + menu -->
     <div class="flex items-center justify-between mb-2.5">
@@ -82,6 +83,7 @@ const statusBadgeMap = {
         </span>
       </div>
       <button
+        v-if="!readOnly"
         class="text-slate-300 hover:text-slate-600 opacity-0 group-hover:opacity-100 transition-all"
       >
         <MoreHorizontal class="w-4 h-4" />
@@ -97,7 +99,7 @@ const statusBadgeMap = {
 
     <!-- Project name -->
     <p class="text-xs text-slate-400 mb-3 truncate">
-      {{ project?.name || "Không thuộc dự án" }}
+      {{ task.projectName || project?.name || "Không thuộc dự án" }}
     </p>
 
     <!-- Tags -->

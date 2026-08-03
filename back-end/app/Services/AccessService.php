@@ -35,6 +35,16 @@ class AccessService
         return in_array(self::role($user), ['admin', 'project_manager'], true);
     }
 
+    public static function canCreateTasks(User $user): bool
+    {
+        return in_array(self::role($user), ['admin', 'project_manager', 'member'], true);
+    }
+
+    public static function canCreateTaskInProject(User $user, Project $project): bool
+    {
+        return self::canCreateTasks($user) && self::canViewProject($user, $project);
+    }
+
     public static function canViewPrivateProfiles(User $user): bool
     {
         return self::canCreateProjects($user);

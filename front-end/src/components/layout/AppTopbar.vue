@@ -9,7 +9,7 @@ import UserAvatar from '../common/UserAvatar.vue'
 const route = useRoute()
 const { sidebarOpen, globalSearchModalOpen, openTaskModal, currentUser, logout } = useProjectWorkspace()
 const searchFocused = ref(false)
-const canManageWorkspace = computed(() => ['admin', 'project_manager', 'manager'].includes(currentUser.value?.role))
+const canCreateTasks = computed(() => Boolean(currentUser.value?.code))
 const systemRoleLabels = { admin: 'Quản trị viên', project_manager: 'Quản lý dự án', member: 'Nhân viên' }
 </script>
 
@@ -46,7 +46,7 @@ const systemRoleLabels = { admin: 'Quản trị viên', project_manager: 'Quản
       <!-- Quick add task -->
       <button 
         @click="openTaskModal(route.name === 'project-detail' ? route.params.id : '')"
-        v-if="canManageWorkspace"
+        v-if="canCreateTasks"
         class="hidden sm:flex items-center gap-1.5 text-xs font-semibold bg-violet-50 text-violet-700 border border-violet-100 px-3 py-2 rounded-lg hover:bg-violet-100 transition-colors"
       >
         <Plus class="w-3.5 h-3.5" /> Nhiệm vụ

@@ -66,6 +66,13 @@ const canManageProject = computed(() => {
   const userCode = currentUser.value?.code
   return role === 'admin' || (role === 'project_manager' && [project.value?.managerId, project.value?.created_by].includes(userCode))
 })
+const canCreateTaskInProject = computed(() => {
+  const userCode = currentUser.value?.code
+  return Boolean(userCode) && (
+    canManageProject.value ||
+    project.value?.memberIds?.includes(userCode)
+  )
+})
 const projectTasks = computed(() => tasks.value.filter(t => t.projectId === projectId.value))
 const projectDeadlineLabel = computed(() => {
   if (project.value?.deadlineState === 'overdue') return `Quá hạn ${project.value.overdueDays} ngày`
@@ -616,7 +623,7 @@ const projectStatusClasses = {
             </button>
           </div>
           <button
-            v-if="canManageProject"
+            v-if="canCreateTaskInProject"
             @click="openTaskModal(project?.id)"
             class="flex items-center gap-2 bg-gradient-to-r from-violet-500 to-indigo-600 text-white px-4 py-2 rounded-xl text-sm font-medium shadow-md shadow-violet-500/25 hover:shadow-lg transition-all shrink-0"
           >
@@ -629,7 +636,7 @@ const projectStatusClasses = {
       <div v-if="projectTasks.length === 0" class="py-16 flex flex-col items-center text-center flex-1 justify-center">
         <ListTodo class="w-12 h-12 text-slate-300 mb-3" />
         <p class="text-slate-500 font-medium">Chưa có nhiệm vụ nào trong dự án này.</p>
-        <button v-if="canManageProject" @click="openTaskModal(project?.id)" class="mt-4 text-sm text-violet-600 font-medium hover:text-violet-700">
+        <button v-if="canCreateTaskInProject" @click="openTaskModal(project?.id)" class="mt-4 text-sm text-violet-600 font-medium hover:text-violet-700">
           Tạo nhiệm vụ đầu tiên →
         </button>
       </div>
@@ -716,7 +723,7 @@ const projectStatusClasses = {
                 </draggable>
               </div>
               
-              <button v-if="canManageProject" @click="openTaskModal(project?.id)" class="w-full mt-2 py-2 flex items-center justify-center gap-2 text-slate-500 hover:text-slate-800 hover:bg-slate-200/50 rounded-xl transition-colors font-medium text-sm shrink-0">
+              <button v-if="canCreateTaskInProject" @click="openTaskModal(project?.id)" class="w-full mt-2 py-2 flex items-center justify-center gap-2 text-slate-500 hover:text-slate-800 hover:bg-slate-200/50 rounded-xl transition-colors font-medium text-sm shrink-0">
                 <Plus class="w-4 h-4" /> Thêm thẻ
               </button>
             </div>

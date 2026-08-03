@@ -3,7 +3,8 @@ import { computed, nextTick, reactive, ref, onMounted, onUnmounted, watch } from
 import { X, CheckSquare, Plus } from '@lucide/vue'
 import { useProjectWorkspace } from '../../composables/useProjectWorkspace'
 
-const { projects, tasks, members, taskModalOpen, addTask, newTaskProjectId, closeTaskModal } = useProjectWorkspace()
+const { projects, tasks, members, currentUser, taskModalOpen, addTask, newTaskProjectId, closeTaskModal } = useProjectWorkspace()
+const isEmployee = computed(() => currentUser.value?.role === 'member')
 const taskTypes = [
   ['task', 'Công việc chung'], ['analysis', 'Phân tích yêu cầu'], ['ui_ux', 'Thiết kế UI/UX'],
   ['frontend', 'Phát triển Frontend'], ['backend', 'Phát triển Backend'],
@@ -58,7 +59,10 @@ function closeTagDropdown() {
 }
 
 watch(taskModalOpen, isOpen => {
-  if (isOpen) form.projectId = newTaskProjectId.value || form.projectId || ''
+  if (isOpen) {
+    form.projectId = newTaskProjectId.value || form.projectId || ''
+    if (isEmployee.value) form.assigneeId = currentUser.value?.code || ''
+  }
 })
 
 function showErrors(nextErrors) {
@@ -195,7 +199,11 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
             
             <div class="space-y-2">
               <label class="block text-sm font-semibold text-slate-700">Người phụ trách</label>
-              <select v-model="form.assigneeId" :class="['w-full bg-slate-50 border rounded-xl px-4 py-2.5 text-slate-900 focus:bg-white focus:ring-4 transition-all outline-none appearance-none cursor-pointer', errors.assignee_code ? 'border-red-300 focus:border-red-300 focus:ring-red-500/10' : 'border-slate-200 focus:border-violet-300 focus:ring-violet-500/10']">
+              <div v-if="isEmployee" class="rounded-xl border border-violet-100 bg-violet-50 px-4 py-2.5 text-sm font-semibold text-violet-700">
+                {{ currentUser?.name || 'Chính tôi' }}
+                <p class="mt-0.5 text-[11px] font-normal text-violet-500">Nhiệm vụ do nhân viên tạo được gắn với chính người tạo.</p>
+              </div>
+              <select v-else v-model="form.assigneeId" :class="['w-full bg-slate-50 border rounded-xl px-4 py-2.5 text-slate-900 focus:bg-white focus:ring-4 transition-all outline-none appearance-none cursor-pointer', errors.assignee_code ? 'border-red-300 focus:border-red-300 focus:ring-red-500/10' : 'border-slate-200 focus:border-violet-300 focus:ring-violet-500/10']">
                 <option value="">— Không có —</option>
                 <option v-for="member in members" :key="member.id" :value="member.id">{{ member.name }}</option>
               </select>

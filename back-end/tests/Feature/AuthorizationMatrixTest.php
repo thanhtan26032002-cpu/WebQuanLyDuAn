@@ -62,7 +62,6 @@ class AuthorizationMatrixTest extends TestCase
 
         foreach ([
             ['/api/projects', ['name' => 'Không được tạo']],
-            ['/api/tasks', ['title' => 'Không được tạo']],
             ['/api/customers', ['name' => 'Không được tạo']],
             ['/api/members', ['name' => 'Không được tạo', 'email' => 'blocked@example.com', 'phone' => '0901234567']],
             ['/api/groups', ['name' => 'Không được tạo']],
@@ -70,6 +69,25 @@ class AuthorizationMatrixTest extends TestCase
             $this->withToken($employeeToken)->postJson($endpoint, $payload)->assertForbidden();
         }
         $this->withToken($employeeToken)->getJson('/api/reports')->assertForbidden();
+
+        $employeeTask = $this->withToken($employeeToken)->postJson('/api/tasks', [
+            'project_code' => $project['code'],
+            'title' => 'Nhân viên chủ động tạo nhiệm vụ',
+        ])->assertCreated()->json('task');
+        $this->assertSame($employee->user_code, $employeeTask['assignee_code']);
+        $this->assertSame($employee->user_code, $employeeTask['created_by']);
+
+        $this->withToken($employeeToken)->postJson('/api/tasks', [
+            'project_code' => $project['code'],
+            'title' => 'Không được giao việc cho người khác',
+            'assignee_code' => $manager->user_code,
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors('assignee_code');
+
+        $this->withToken($employeeToken)->postJson('/api/tasks', [
+            'title' => 'Nhiệm vụ độc lập của nhân viên',
+        ])->assertCreated()
+            ->assertJsonPath('task.assignee_code', $employee->user_code);
 
         $this->withToken($managerToken)->postJson('/api/groups', ['name' => 'Nhóm vượt quyền'])->assertForbidden();
         $this->withToken($managerToken)->putJson('/api/members/'.$employee->user_code, [
@@ -92,11 +110,12 @@ class AuthorizationMatrixTest extends TestCase
         $this->assertSame('admin', $admin->user_role);
     }
 
-    public function test_admin_overview_sources_cover_the_company_while_managers_remain_scoped(): void
+    public function test_company_overview_is_shared_while_operational_lists_remain_scoped(): void
     {
         [, $adminToken] = $this->user('admin', 'overview-admin@example.com');
         [$firstManager, $firstManagerToken] = $this->user('project_manager', 'overview-manager-a@example.com');
         [$secondManager, $secondManagerToken] = $this->user('project_manager', 'overview-manager-b@example.com');
+        [, $employeeToken] = $this->user('member', 'overview-employee@example.com');
 
         $firstProject = $this->withToken($firstManagerToken)->postJson('/api/projects', [
             'name' => 'Dự án phòng Kỹ thuật',
@@ -139,6 +158,22 @@ class AuthorizationMatrixTest extends TestCase
             ->assertOk()
             ->assertJsonCount(1)
             ->assertJsonFragment(['title' => 'Nhiệm vụ của phòng Kỹ thuật']);
+
+        foreach ([$adminToken, $firstManagerToken, $employeeToken] as $token) {
+            $this->withToken($token)->getJson('/api/company-overview')
+                ->assertOk()
+                ->assertJsonCount(2, 'projects')
+                ->assertJsonCount(2, 'tasks')
+                ->assertJsonFragment(['name' => 'Dự án phòng Kỹ thuật'])
+                ->assertJsonFragment(['name' => 'Dự án phòng Vận hành'])
+                ->assertJsonFragment(['title' => 'Nhiệm vụ của phòng Kỹ thuật'])
+                ->assertJsonFragment(['title' => 'Nhiệm vụ của phòng Vận hành']);
+        }
+
+        $this->withToken($employeeToken)->postJson('/api/tasks', [
+            'project_code' => $firstProject['code'],
+            'title' => 'Không được thêm vào dự án chỉ nhìn thấy ở Tổng quan',
+        ])->assertForbidden();
     }
 
     public function test_task_accountability_completion_and_restore_rules_are_consistent(): void

@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\ActivityController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\CompanyOverviewController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DownloadController;
 use App\Http\Controllers\FileController;
@@ -28,6 +29,7 @@ Route::middleware('api.token')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
 
     Route::middleware('profile.complete')->group(function () {
+        Route::get('/company-overview', [CompanyOverviewController::class, 'index']);
         Route::get('/my-work', [ReportController::class, 'myWork']);
         Route::get('/reports', [ReportController::class, 'index']);
 

@@ -7,6 +7,8 @@ import { useProjectWorkspace } from "../../composables/useProjectWorkspace";
 const props = defineProps({
   project: { type: Object, required: true },
   compact: Boolean,
+  readOnly: Boolean,
+  clickable: { type: Boolean, default: true },
 });
 
 const router = useRouter();
@@ -22,6 +24,10 @@ const {
 const handleEdit = () => {
   editingProjectId.value = props.project.id;
   projectSettingsModalOpen.value = true;
+};
+
+const openProject = () => {
+  if (props.clickable) router.push(`/projects/${props.project.id}`);
 };
 
 const deadlineState = computed(() =>
@@ -85,8 +91,8 @@ const statusBadge = computed(() => {
 
 <template>
   <article
-    class="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 overflow-hidden group cursor-pointer flex flex-col"
-    @click="router.push(`/projects/${project.id}`)"
+    :class="['bg-white rounded-2xl border border-slate-100 shadow-sm transition-all duration-300 overflow-hidden group flex flex-col', clickable ? 'cursor-pointer hover:shadow-md hover:-translate-y-0.5' : 'cursor-default']"
+    @click="openProject"
   >
     <!-- Gradient Header -->
     <header
@@ -116,6 +122,7 @@ const statusBadge = computed(() => {
           </span>
         </div>
         <button
+          v-if="!readOnly"
           class="text-white/70 hover:text-white hover:bg-white/20 p-1.5 rounded-lg transition-colors shrink-0"
           @click.stop="handleEdit"
           title="Chỉnh sửa dự án"

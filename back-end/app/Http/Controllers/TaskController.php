@@ -115,9 +115,21 @@ class TaskController extends Controller
 
         $validated = $validator->validated();
 
+        // Nhân viên được chủ động tạo việc, nhưng không được giao việc cho người khác.
+        // Mọi nhiệm vụ do nhân viên tạo đều gắn trách nhiệm trực tiếp với chính họ.
+        if (AccessService::role($request->user()) === 'member') {
+            if (($validated['assignee_code'] ?? null)
+                && $validated['assignee_code'] !== $request->user()->user_code) {
+                throw ValidationException::withMessages([
+                    'assignee_code' => 'Nhân viên chỉ có thể tạo nhiệm vụ do chính mình phụ trách.',
+                ]);
+            }
+            $validated['assignee_code'] = $request->user()->user_code;
+        }
+
         if ($validated['project_code'] ?? null) {
             $project = Project::findOrFail($validated['project_code']);
-            AccessService::authorize(AccessService::canManageProject($request->user(), $project), 'Bạn không có quyền tạo nhiệm vụ trong dự án này.');
+            AccessService::authorize(AccessService::canCreateTaskInProject($request->user(), $project), 'Bạn chỉ có thể thêm nhiệm vụ vào dự án mình được tham gia.');
             if ($project->project_status === 'completed') {
                 return response()->json(['message' => 'Hãy mở lại dự án trước khi tạo nhiệm vụ mới.'], 409);
             }
@@ -125,7 +137,7 @@ class TaskController extends Controller
                 return response()->json(['message' => 'Cột mốc không thuộc dự án đã chọn.'], 422);
             }
         } else {
-            AccessService::authorize(AccessService::canCreateProjects($request->user()), 'Chỉ quản trị viên hoặc quản lý dự án mới được tạo nhiệm vụ độc lập.');
+            AccessService::authorize(AccessService::canCreateTasks($request->user()), 'Bạn không có quyền tạo nhiệm vụ.');
         }
 
         $taskData = Task::mapToDbAttributes($validated);
