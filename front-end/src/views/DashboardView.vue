@@ -3,9 +3,7 @@ import { computed, onMounted, onUnmounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import {
   FolderKanban,
-  Clock,
   CheckCircle2,
-  Target,
   ArrowUpRight,
   Plus,
   MoreHorizontal,
@@ -181,17 +179,6 @@ const todayDueCount = computed(
   () => todayTasks.value.length + todayProjects.value.length,
 );
 
-const completedOverviewTasks = computed(
-  () => overviewTasks.value.filter((task) => task.status === "done").length,
-);
-const overviewTaskCompletionRate = computed(() =>
-  overviewTasks.value.length
-    ? Math.round(
-        (completedOverviewTasks.value / overviewTasks.value.length) * 100,
-      )
-    : 0,
-);
-
 const DAY_IN_MILLISECONDS = 24 * 60 * 60 * 1000;
 const toUtcDate = (dateValue) => {
   const [year, month, day] = getLocalDateKey(dateValue)
@@ -252,41 +239,6 @@ const goToMyWork = () => {
   closeDueReminder();
   router.push("/my-work");
 };
-
-const stats = computed(() => [
-  {
-    icon: FolderKanban,
-    color: "text-violet-600",
-    bg: "bg-violet-100",
-    value: overviewProjects.value.length,
-    label: "Dự án toàn công ty",
-    helper: "Tất cả dự án đang hiển thị trong hệ thống",
-  },
-  {
-    icon: Clock,
-    color: "text-amber-600",
-    bg: "bg-amber-100",
-    value: overviewTasks.value.length,
-    label: "Nhiệm vụ toàn công ty",
-    helper: "Tất cả nhiệm vụ thuộc phạm vi công ty",
-  },
-  {
-    icon: CheckCircle2,
-    color: "text-emerald-600",
-    bg: "bg-emerald-100",
-    value: completedOverviewTasks.value,
-    label: "Nhiệm vụ hoàn thành",
-    helper: `Trên tổng số ${overviewTasks.value.length} nhiệm vụ`,
-  },
-  {
-    icon: Target,
-    color: "text-sky-600",
-    bg: "bg-sky-100",
-    value: `${overviewTaskCompletionRate.value}%`,
-    label: "Tỷ lệ hoàn thành",
-    helper: "Tiến độ nhiệm vụ toàn công ty",
-  },
-]);
 
 const columns = ref([
   { id: "todo", title: "Cần làm", color: "bg-slate-400" },
@@ -359,37 +311,6 @@ const showRecentActivities = ref(false);
         >
           <Plus class="w-5 h-5" /> Tạo dự án mới
         </button>
-      </div>
-    </div>
-
-    <!-- Stat Cards -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-      <div
-        v-for="stat in stats"
-        :key="stat.label"
-        class="bg-white border border-slate-100 rounded-2xl p-5 hover:shadow-md hover:-translate-y-1 transition-all duration-300"
-      >
-        <div class="flex justify-between items-start mb-4">
-          <div
-            :class="[
-              'w-10 h-10 rounded-xl flex items-center justify-center',
-              stat.bg,
-              stat.color,
-            ]"
-          >
-            <component :is="stat.icon" class="w-5 h-5" />
-          </div>
-          <div
-            class="rounded-full bg-slate-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-400"
-          >
-            Toàn công ty
-          </div>
-        </div>
-        <h3 class="text-3xl font-display font-bold text-slate-900 mb-1">
-          {{ stat.value }}
-        </h3>
-        <p class="text-sm text-slate-500 font-medium">{{ stat.label }}</p>
-        <p class="mt-1 text-xs text-slate-400">{{ stat.helper }}</p>
       </div>
     </div>
 
