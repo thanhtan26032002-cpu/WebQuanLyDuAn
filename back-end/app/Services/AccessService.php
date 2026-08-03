@@ -42,7 +42,7 @@ class AccessService
 
     public static function canCreateTaskInProject(User $user, Project $project): bool
     {
-        return self::canCreateTasks($user) && self::canViewProject($user, $project);
+        return self::canCreateTasks($user) && self::isProjectParticipant($user, $project);
     }
 
     public static function canViewPrivateProfiles(User $user): bool
@@ -82,6 +82,11 @@ class AccessService
 
     public static function canViewProject(User $user, Project $project): bool
     {
+        return true;
+    }
+
+    public static function isProjectParticipant(User $user, Project $project): bool
+    {
         return self::scopeProjects(Project::query()->whereKey($project->getKey()), $user)->exists();
     }
 
@@ -120,25 +125,24 @@ class AccessService
 
     public static function canViewTask(User $user, Task $task): bool
     {
+        return true;
+    }
+
+    public static function isTaskParticipant(User $user, Task $task): bool
+    {
         if (self::isAdmin($user)) {
             return true;
         }
 
-        if ($task->task_assignee_code === self::userCode($user)) {
+        $userCode = self::userCode($user);
+        if ($task->task_assignee_code === $userCode) {
             return true;
         }
-
-        if (! $task->task_project_code && $task->task_created_by === self::userCode($user)) {
-            return true;
+        if (! $task->task_project_code) {
+            return $task->task_created_by === $userCode;
         }
 
-        if ($task->task_project_code) {
-            $project = $task->project;
-
-            return $project && self::canViewProject($user, $project);
-        }
-
-        return false;
+        return $task->project && self::isProjectParticipant($user, $task->project);
     }
 
     public static function canManageTask(User $user, Task $task): bool

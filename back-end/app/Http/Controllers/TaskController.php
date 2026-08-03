@@ -637,6 +637,9 @@ class TaskController extends Controller
     private function visibleTasks(Request $request, bool $onlyTrashed = false): Builder
     {
         $query = $onlyTrashed ? Task::onlyTrashed() : Task::query();
+        if (! $onlyTrashed) {
+            return $query;
+        }
         if (AccessService::isAdmin($request->user())) {
             return $query;
         }

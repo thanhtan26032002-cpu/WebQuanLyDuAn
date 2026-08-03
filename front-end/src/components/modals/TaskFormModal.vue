@@ -5,6 +5,17 @@ import { useProjectWorkspace } from '../../composables/useProjectWorkspace'
 
 const { projects, tasks, members, currentUser, taskModalOpen, addTask, newTaskProjectId, closeTaskModal } = useProjectWorkspace()
 const isEmployee = computed(() => currentUser.value?.role === 'member')
+const selectableProjects = computed(() => {
+  const role = currentUser.value?.role
+  const userCode = currentUser.value?.code
+  if (!userCode) return []
+  if (role === 'admin') return projects.value
+  return projects.value.filter(project =>
+    project.created_by === userCode ||
+    project.managerId === userCode ||
+    project.memberIds?.includes(userCode)
+  )
+})
 const taskTypes = [
   ['task', 'Công việc chung'], ['analysis', 'Phân tích yêu cầu'], ['ui_ux', 'Thiết kế UI/UX'],
   ['frontend', 'Phát triển Frontend'], ['backend', 'Phát triển Backend'],
@@ -192,7 +203,7 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
               <label class="block text-sm font-semibold text-slate-700">Dự án</label>
               <select v-model="form.projectId" :class="['w-full bg-slate-50 border rounded-xl px-4 py-2.5 text-slate-900 focus:bg-white focus:ring-4 transition-all outline-none appearance-none cursor-pointer', errors.project_code ? 'border-red-300 focus:border-red-300 focus:ring-red-500/10' : 'border-slate-200 focus:border-violet-300 focus:ring-violet-500/10']">
                 <option value="">— Không có —</option>
-                <option v-for="project in projects" :key="project.id" :value="project.id">{{ project.name }}</option>
+                <option v-for="project in selectableProjects" :key="project.id" :value="project.id">{{ project.name }}</option>
               </select>
               <p v-if="errors.project_code" class="text-xs font-medium text-red-500">{{ errors.project_code }}</p>
             </div>

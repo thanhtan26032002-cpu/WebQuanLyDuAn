@@ -1,16 +1,21 @@
 <script setup>
 import { computed, ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { Search, Menu, X, Plus, LogOut } from '@lucide/vue'
 import { useProjectWorkspace } from '../../composables/useProjectWorkspace'
 import NotificationDropdown from './NotificationDropdown.vue'
 import UserAvatar from '../common/UserAvatar.vue'
 
 const route = useRoute()
+const router = useRouter()
 const { sidebarOpen, globalSearchModalOpen, openTaskModal, currentUser, logout } = useProjectWorkspace()
 const searchFocused = ref(false)
 const canCreateTasks = computed(() => Boolean(currentUser.value?.code))
 const systemRoleLabels = { admin: 'Quản trị viên', project_manager: 'Quản lý dự án', member: 'Nhân viên' }
+
+const openProfileSettings = () => {
+  router.push({ name: 'settings', query: { tab: 'profile' } })
+}
 </script>
 
 <template>
@@ -60,7 +65,13 @@ const systemRoleLabels = { admin: 'Quản trị viên', project_manager: 'Quản
         <div class="w-px h-6 bg-slate-200 hidden sm:block"></div>
 
         <!-- Avatar -->
-        <button class="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
+        <button
+          type="button"
+          title="Mở hồ sơ cá nhân"
+          aria-label="Mở hồ sơ cá nhân"
+          class="flex items-center gap-2.5 rounded-xl px-2 py-1.5 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-200"
+          @click="openProfileSettings"
+        >
           <div class="hidden sm:block text-right">
             <p class="text-xs font-semibold text-slate-900 leading-none">{{ currentUser && currentUser.name || 'User' }}</p>
             <p class="text-[10px] text-slate-500 leading-none mt-1">{{ systemRoleLabels[currentUser?.role] || 'Nhân viên' }}</p>

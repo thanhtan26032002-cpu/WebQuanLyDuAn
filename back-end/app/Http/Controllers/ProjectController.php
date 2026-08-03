@@ -21,7 +21,7 @@ class ProjectController extends Controller
     // Lấy danh sách dự án
     public function index(Request $request)
     {
-        $projects = AccessService::scopeProjects(Project::query(), $request->user())
+        $projects = Project::query()
             ->withCount('tasks')
             ->with([
                 'customer',

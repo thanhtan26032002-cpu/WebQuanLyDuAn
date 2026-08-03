@@ -34,6 +34,12 @@ const canManageTask = computed(() => {
     || project.value?.managerId === currentUserCode.value
 })
 const canContributeToTask = computed(() => canManageTask.value || isTaskAssignee.value)
+const canAccessTaskFiles = computed(() => {
+  if (canContributeToTask.value) return true
+  if (!task.value?.projectId) return task.value?.created_by === currentUserCode.value
+  return [project.value?.managerId, project.value?.created_by].includes(currentUserCode.value)
+    || project.value?.memberIds?.includes(currentUserCode.value)
+})
 const canModifyChecklist = computed(() => canContributeToTask.value && task.value?.status !== 'done')
 const isDeadlineExtension = computed(() => {
   const currentDueDate = task.value?.dueDate?.split('T')[0]
@@ -843,7 +849,7 @@ const formatDateTime = (isoStr) => {
               <Paperclip class="w-4 h-4 text-slate-400" /> Tệp đính kèm
             </h3>
             <div class="flex gap-2">
-              <button @click="isDownloadModalOpen = true" :disabled="!task.files?.length" class="text-xs font-medium text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded transition-colors disabled:opacity-50">
+              <button v-if="canAccessTaskFiles" @click="isDownloadModalOpen = true" :disabled="!task.files?.length" class="text-xs font-medium text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded transition-colors disabled:opacity-50">
                 Tải xuống tất cả
               </button>
               <button v-if="canContributeToTask" @click="openTaskFileUpload" :disabled="isTaskFileUploading" class="text-xs font-medium text-violet-600 hover:text-violet-700 bg-violet-50 hover:bg-violet-100 px-2 py-1 rounded transition-colors disabled:opacity-50">
@@ -865,8 +871,7 @@ const formatDateTime = (isoStr) => {
                 </div>
               </div>
               <div class="flex items-center opacity-0 group-hover:opacity-100 transition-opacity gap-1">
-                <button @click.prevent="downloadSingleFile(file.url || file.file_path, file.name, file.code)" title="Tải xuống" class="p-1.5 text-slate-400 hover:text-violet-600 hover:bg-violet-50 rounded-lg"><Download class="w-4 h-4" /></button>
-                <button class="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg"><Trash2 class="w-4 h-4" /></button>
+                <button v-if="canAccessTaskFiles" @click.prevent="downloadSingleFile(file.url || file.file_path, file.name, file.code)" title="Tải xuống" class="p-1.5 text-slate-400 hover:text-violet-600 hover:bg-violet-50 rounded-lg"><Download class="w-4 h-4" /></button>
               </div>
             </div>
           </div>

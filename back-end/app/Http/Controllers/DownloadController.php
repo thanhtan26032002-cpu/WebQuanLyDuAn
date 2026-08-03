@@ -24,8 +24,10 @@ class DownloadController extends Controller
 
         AccessService::authorize(
             $target instanceof Project
-                ? AccessService::canViewProject($request->user(), $target)
-                : AccessService::canViewTask($request->user(), $target)
+                ? AccessService::isProjectParticipant($request->user(), $target)
+                : ($attachment->attachment_target_type === 'TaskComment'
+                    ? AccessService::canViewTask($request->user(), $target)
+                    : AccessService::isTaskParticipant($request->user(), $target))
         );
 
         $relativePath = ltrim(str_replace('/storage/', '', $attachment->attachment_file_path), '/');
@@ -61,8 +63,8 @@ class DownloadController extends Controller
             : Task::with('project')->findOrFail($targetCode);
         AccessService::authorize(
             $target instanceof Project
-                ? AccessService::canViewProject($request->user(), $target)
-                : AccessService::canViewTask($request->user(), $target)
+                ? AccessService::isProjectParticipant($request->user(), $target)
+                : AccessService::isTaskParticipant($request->user(), $target)
         );
 
         // Remove any extension from input file_name to avoid double extensions

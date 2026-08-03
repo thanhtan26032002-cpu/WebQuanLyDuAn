@@ -30,9 +30,19 @@ const {
   getTaskDeadlineState,
   projectSettingsModalOpen,
   editingProjectId,
+  currentUser,
 } = useProjectWorkspace();
 
+const canEditProject = computed(() => {
+  if (props.readOnly) return false;
+  const role = currentUser.value?.role;
+  const userCode = currentUser.value?.code;
+  return role === "admin" ||
+    (["project_manager", "manager"].includes(role) &&
+      [props.project.created_by, props.project.managerId].includes(userCode));
+});
 const handleEdit = () => {
+  if (!canEditProject.value) return;
   editingProjectId.value = props.project.id;
   projectSettingsModalOpen.value = true;
 };
@@ -131,12 +141,12 @@ const visualState = computed(() => {
       visualState.issue ? visualState.panel.split(' ')[0] : 'border-slate-200',
       clickable ? 'cursor-pointer hover:border-violet-200 hover:shadow-md' : 'cursor-default',
     ]"
-    :role="clickable && readOnly ? 'button' : undefined"
-    :tabindex="clickable && readOnly ? 0 : undefined"
-    :aria-label="clickable && readOnly ? 'Mở dự án ' + project.name : undefined"
+    :role="clickable ? 'button' : undefined"
+    :tabindex="clickable ? 0 : undefined"
+    :aria-label="clickable ? 'Mở dự án ' + project.name : undefined"
     @click="openProject"
-    @keydown.enter.prevent="readOnly && openProject()"
-    @keydown.space.prevent="readOnly && openProject()"
+    @keydown.enter.prevent="openProject()"
+    @keydown.space.prevent="openProject()"
   >
     <div :class="['h-1.5 w-full', visualState.accent]"></div>
 
@@ -155,7 +165,7 @@ const visualState = computed(() => {
           <h3 class="line-clamp-2 text-base font-bold leading-snug text-slate-900">{{ project.name }}</h3>
           <p class="mt-1 text-[11px] font-bold uppercase tracking-wide text-slate-400">{{ project.id }}</p>
         </div>
-        <button v-if="!readOnly" class="shrink-0 rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700" @click.stop="handleEdit" title="Chỉnh sửa dự án">
+        <button v-if="canEditProject" class="shrink-0 rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700" @click.stop="handleEdit" title="Chỉnh sửa dự án">
           <MoreHorizontal class="h-4 w-4" />
         </button>
       </header>

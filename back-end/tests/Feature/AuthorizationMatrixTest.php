@@ -110,7 +110,7 @@ class AuthorizationMatrixTest extends TestCase
         $this->assertSame('admin', $admin->user_role);
     }
 
-    public function test_company_overview_is_shared_while_operational_lists_remain_scoped(): void
+    public function test_company_records_are_visible_while_mutations_remain_scoped(): void
     {
         [, $adminToken] = $this->user('admin', 'overview-admin@example.com');
         [$firstManager, $firstManagerToken] = $this->user('project_manager', 'overview-manager-a@example.com');
@@ -126,14 +126,14 @@ class AuthorizationMatrixTest extends TestCase
             'manager_code' => $secondManager->user_code,
         ])->assertCreated()->json('project');
 
-        $this->withToken($firstManagerToken)->postJson('/api/tasks', [
+        $firstTask = $this->withToken($firstManagerToken)->postJson('/api/tasks', [
             'project_code' => $firstProject['code'],
             'title' => 'Nhiệm vụ của phòng Kỹ thuật',
-        ])->assertCreated();
-        $this->withToken($secondManagerToken)->postJson('/api/tasks', [
+        ])->assertCreated()->json('task');
+        $secondTask = $this->withToken($secondManagerToken)->postJson('/api/tasks', [
             'project_code' => $secondProject['code'],
             'title' => 'Nhiệm vụ của phòng Vận hành',
-        ])->assertCreated();
+        ])->assertCreated()->json('task');
 
         $this->withToken($adminToken)->getJson('/api/projects')
             ->assertOk()
@@ -169,12 +169,40 @@ class AuthorizationMatrixTest extends TestCase
 
         $this->withToken($firstManagerToken)->getJson('/api/projects')
             ->assertOk()
-            ->assertJsonCount(1)
-            ->assertJsonFragment(['code' => $firstProject['code']]);
+            ->assertJsonCount(2)
+            ->assertJsonFragment(['code' => $firstProject['code']])
+            ->assertJsonFragment(['code' => $secondProject['code']]);
         $this->withToken($firstManagerToken)->getJson('/api/tasks')
             ->assertOk()
-            ->assertJsonCount(1)
-            ->assertJsonFragment(['title' => 'Nhiệm vụ của phòng Kỹ thuật']);
+            ->assertJsonCount(2)
+            ->assertJsonFragment(['title' => 'Nhiệm vụ của phòng Kỹ thuật'])
+            ->assertJsonFragment(['title' => 'Nhiệm vụ của phòng Vận hành']);
+
+        $this->withToken($employeeToken)->getJson('/api/projects')
+            ->assertOk()
+            ->assertJsonCount(2);
+        $this->withToken($employeeToken)->getJson('/api/tasks')
+            ->assertOk()
+            ->assertJsonCount(2);
+        $this->withToken($employeeToken)->getJson('/api/projects/'.$firstProject['code'])
+            ->assertOk()
+            ->assertJsonPath('code', $firstProject['code']);
+        $this->withToken($employeeToken)->getJson('/api/tasks/'.$firstTask['code'].'/comments')
+            ->assertOk();
+        $this->withToken($employeeToken)->postJson('/api/tasks/'.$firstTask['code'].'/comments', [
+            'text' => 'Nhân viên khác vẫn có thể trao đổi trong nhiệm vụ.',
+        ])->assertCreated()
+            ->assertJsonPath('comment.text', 'Nhân viên khác vẫn có thể trao đổi trong nhiệm vụ.');
+
+        $this->withToken($employeeToken)->putJson('/api/projects/'.$firstProject['code'], [
+            'name' => 'Không được sửa dự án của người khác',
+        ])->assertForbidden();
+        $this->withToken($employeeToken)->putJson('/api/tasks/'.$firstTask['code'], [
+            'title' => 'Không được sửa nhiệm vụ của người khác',
+        ])->assertForbidden();
+        $this->withToken($employeeToken)->patchJson('/api/tasks/'.$firstTask['code'].'/status', [
+            'status' => 'in_progress',
+        ])->assertForbidden();
 
         foreach ([$adminToken, $firstManagerToken, $employeeToken] as $token) {
             $this->withToken($token)->getJson('/api/company-overview')
@@ -210,7 +238,8 @@ class AuthorizationMatrixTest extends TestCase
                 ->json('tasks')
         );
         $this->assertTrue($employeeOverviewTasks->every(
-            fn (array $task) => $task['can_contribute'] === false
+            fn (array $task) => $task['can_view'] === true
+                && $task['can_contribute'] === false
         ));
 
         $this->withToken($employeeToken)->postJson('/api/tasks', [

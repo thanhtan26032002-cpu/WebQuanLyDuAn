@@ -373,7 +373,6 @@ const columns = ref([
   { id: "done", title: "Hoàn thành", color: "bg-emerald-500" },
 ]);
 
-const BOARD_TASK_LIMIT = 5;
 const priorityRank = { high: 0, medium: 1, low: 2 };
 const sortTasksForOverview = (first, second) => {
   const firstOverdue = first.deadlineState === "overdue" ? 0 : 1;
@@ -390,12 +389,49 @@ const getTasksByStatus = (status) =>
   overviewTasks.value.filter((task) => task.status === status);
 const getVisibleTasksByStatus = (status) =>
   [...getTasksByStatus(status)]
-    .sort(sortTasksForOverview)
-    .slice(0, BOARD_TASK_LIMIT);
-const getRemainingTaskCount = (status) =>
-  Math.max(0, getTasksByStatus(status).length - BOARD_TASK_LIMIT);
+    .sort(sortTasksForOverview);
 const recentProjects = computed(() => overviewProjects.value.slice(0, 3));
 const recentActivities = computed(() => overviewActivities.value.slice(0, 5));
+
+const taskViewportFrame = Symbol("taskViewportFrame");
+const taskViewportResizeHandler = Symbol("taskViewportResizeHandler");
+const updateThreeCardViewport = (element) => {
+  window.cancelAnimationFrame(element[taskViewportFrame]);
+  element[taskViewportFrame] = window.requestAnimationFrame(() => {
+    const cards = Array.from(
+      element.querySelectorAll("[data-dashboard-task-card]"),
+    );
+    if (cards.length <= 3) {
+      element.style.maxHeight = "";
+      return;
+    }
+
+    const firstCard = cards[0];
+    const thirdCard = cards[2];
+    const viewportHeight =
+      thirdCard.offsetTop + thirdCard.offsetHeight - firstCard.offsetTop;
+    element.style.maxHeight = `${viewportHeight}px`;
+  });
+};
+const vThreeCardScroll = {
+  mounted(element) {
+    const resizeHandler = () => updateThreeCardViewport(element);
+    element[taskViewportResizeHandler] = resizeHandler;
+    window.addEventListener("resize", resizeHandler);
+    updateThreeCardViewport(element);
+  },
+  updated(element) {
+    updateThreeCardViewport(element);
+  },
+  unmounted(element) {
+    window.cancelAnimationFrame(element[taskViewportFrame]);
+    window.removeEventListener(
+      "resize",
+      element[taskViewportResizeHandler],
+    );
+  },
+};
+
 const taskDragInProgress = ref(false);
 let taskDragReleaseTimer;
 const canContributeTask = (task) => Boolean(task?.canContribute);
@@ -693,60 +729,62 @@ const timeAgo = (dateStr) => {
                 </span>
               </header>
 
-              <draggable
-                :list="getVisibleTasksByStatus(col.id)"
-                group="company-overview-tasks"
-                item-key="id"
-                ghost-class="opacity-40"
-                chosen-class="ring-2"
-                drag-class="rotate-1"
-                :move="canDragTask"
-                class="min-h-32 space-y-3"
-                @start="onTaskDragStart"
-                @end="onTaskDragEnd"
-                @change="onTaskChange($event, col.id)"
+              <div
+                v-three-card-scroll
+                :class="[
+                  'min-h-32',
+                  getTasksByStatus(col.id).length > 3
+                    ? 'overflow-y-auto overscroll-contain pr-2 custom-scrollbar [scrollbar-gutter:stable]'
+                    : '',
+                ]"
               >
-                <template #item="{ element: task }">
-                  <div
-                    role="button"
-                    tabindex="0"
-                    :aria-label="'Mở nhiệm vụ ' + task.title"
-                    :title="canContributeTask(task) ? 'Kéo thả để đổi trạng thái' : 'Bạn chỉ có quyền xem nhiệm vụ này'"
-                    :class="[
-                      'rounded-xl text-left focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-violet-200',
-                      canContributeTask(task) ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer',
-                    ]"
-                    @click="openTask(task)"
-                    @keydown.enter.prevent="openTask(task)"
-                    @keydown.space.prevent="openTask(task)"
-                  >
-                    <TaskCard :task="task" :read-only="!canContributeTask(task)" />
-                  </div>
-                </template>
+                <draggable
+                  :list="getVisibleTasksByStatus(col.id)"
+                  group="company-overview-tasks"
+                  item-key="id"
+                  ghost-class="opacity-40"
+                  chosen-class="ring-2"
+                  drag-class="rotate-1"
+                  :move="canDragTask"
+                  class="min-h-32 space-y-3"
+                  @start="onTaskDragStart"
+                  @end="onTaskDragEnd"
+                  @change="onTaskChange($event, col.id)"
+                >
+                  <template #item="{ element: task }">
+                    <div
+                      data-dashboard-task-card
+                      role="button"
+                      tabindex="0"
+                      :aria-label="'Mở nhiệm vụ ' + task.title"
+                      :title="canContributeTask(task) ? 'Kéo thả để đổi trạng thái' : 'Bạn chỉ có quyền xem nhiệm vụ này'"
+                      :class="[
+                        'rounded-xl text-left focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-violet-200',
+                        canContributeTask(task) ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer',
+                      ]"
+                      @click="openTask(task)"
+                      @keydown.enter.prevent="openTask(task)"
+                      @keydown.space.prevent="openTask(task)"
+                    >
+                      <TaskCard :task="task" :read-only="!canContributeTask(task)" />
+                    </div>
+                  </template>
 
-                <template #footer>
-                  <div
-                    v-if="getVisibleTasksByStatus(col.id).length === 0"
-                    class="flex min-h-32 flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 bg-white/70 px-4 py-6 text-center"
-                  >
-                    <ListTodo class="h-6 w-6 text-slate-400" />
-                    <p class="mt-2 text-sm font-semibold text-slate-700">
-                      Không có nhiệm vụ {{ col.title.toLowerCase() }}
-                    </p>
-                    <p class="mt-1 text-xs text-slate-500">Kéo nhiệm vụ có quyền xử lý vào đây.</p>
-                  </div>
-                </template>
-              </draggable>
+                  <template #footer>
+                    <div
+                      v-if="getVisibleTasksByStatus(col.id).length === 0"
+                      class="flex min-h-32 flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 bg-white/70 px-4 py-6 text-center"
+                    >
+                      <ListTodo class="h-6 w-6 text-slate-400" />
+                      <p class="mt-2 text-sm font-semibold text-slate-700">
+                        Không có nhiệm vụ {{ col.title.toLowerCase() }}
+                      </p>
+                      <p class="mt-1 text-xs text-slate-500">Kéo nhiệm vụ có quyền xử lý vào đây.</p>
+                    </div>
+                  </template>
+                </draggable>
+              </div>
 
-              <button
-                v-if="getRemainingTaskCount(col.id) > 0"
-                type="button"
-                class="mt-3 flex min-h-10 w-full items-center justify-center gap-1 rounded-xl text-sm font-semibold text-violet-700 transition hover:bg-violet-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-200"
-                @click="router.push('/tasks')"
-              >
-                Xem thêm {{ getRemainingTaskCount(col.id) }} nhiệm vụ
-                <ChevronRight class="h-4 w-4" />
-              </button>
             </article>
           </div>
         </section>

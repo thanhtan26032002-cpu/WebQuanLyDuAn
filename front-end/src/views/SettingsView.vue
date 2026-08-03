@@ -1,11 +1,26 @@
 <script setup>
 import { onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { User, Bell, Palette, Moon, Sun, CheckCircle2, KeyRound, ShieldCheck } from '@lucide/vue'
 import { useProjectWorkspace } from '../composables/useProjectWorkspace'
 import { apiFetch, parseApiError } from '../services/api'
 
-const activeTab = ref('profile')
+const route = useRoute()
+const router = useRouter()
+const settingTabIds = new Set(['profile', 'security', 'notifications', 'appearance'])
+const activeTab = ref(settingTabIds.has(route.query.tab) ? route.query.tab : 'profile')
 const { darkMode, setTheme, notify, currentUser, updateUserProfile, BASE_URL } = useProjectWorkspace()
+
+const selectTab = (tabId) => {
+  if (!settingTabIds.has(tabId)) return
+
+  activeTab.value = tabId
+  router.replace({ query: { ...route.query, tab: tabId } })
+}
+
+watch(() => route.query.tab, (tabId) => {
+  activeTab.value = settingTabIds.has(tabId) ? tabId : 'profile'
+})
 
 const userProfile = ref({
   name: currentUser.value?.name || '',
@@ -199,7 +214,7 @@ if (activeColor.value) {
           <button 
             v-for="tab in tabs" 
             :key="tab.id"
-            @click="activeTab = tab.id"
+            @click="selectTab(tab.id)"
             :class="[
               'flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all whitespace-nowrap',
               activeTab === tab.id 

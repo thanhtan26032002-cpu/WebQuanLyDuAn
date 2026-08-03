@@ -125,7 +125,7 @@ class ProfessionalFeaturesTest extends TestCase
             ->assertJsonPath('estimate_vs_actual.0.actual_hours', 1.5);
     }
 
-    public function test_non_manager_cannot_read_an_unrelated_project(): void
+    public function test_company_member_can_read_an_unrelated_project_without_editing_it(): void
     {
         $project = $this->postJson('/api/projects', ['name' => 'Dự án riêng'])
             ->assertCreated()
@@ -140,6 +140,10 @@ class ProfessionalFeaturesTest extends TestCase
 
         $this->withToken($memberToken)
             ->getJson("/api/projects/{$project['code']}")
+            ->assertOk()
+            ->assertJsonPath('code', $project['code']);
+        $this->withToken($memberToken)
+            ->putJson("/api/projects/{$project['code']}", ['name' => 'Không được chỉnh sửa'])
             ->assertForbidden();
     }
 }

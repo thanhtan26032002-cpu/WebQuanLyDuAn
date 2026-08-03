@@ -66,6 +66,13 @@ const canManageProject = computed(() => {
   const userCode = currentUser.value?.code
   return role === 'admin' || (role === 'project_manager' && [project.value?.managerId, project.value?.created_by].includes(userCode))
 })
+const canAccessProjectFiles = computed(() => {
+  const role = currentUser.value?.role
+  const userCode = currentUser.value?.code
+  return role === 'admin' ||
+    [project.value?.managerId, project.value?.created_by].includes(userCode) ||
+    project.value?.memberIds?.includes(userCode)
+})
 const canCreateTaskInProject = computed(() => {
   const userCode = currentUser.value?.code
   return Boolean(userCode) && (
@@ -489,7 +496,7 @@ const projectStatusClasses = {
         <div class="flex items-center justify-between mb-4">
           <h2 class="text-lg font-bold text-slate-900">Tệp đính kèm</h2>
           <div class="flex gap-2">
-            <button @click="isDownloadModalOpen = true" :disabled="!projectFiles.length" class="text-sm font-medium text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50">
+            <button v-if="canAccessProjectFiles" @click="isDownloadModalOpen = true" :disabled="!projectFiles.length" class="text-sm font-medium text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50">
               Tải xuống tất cả
             </button>
             <button v-if="canManageProject" @click="openFileUpload" class="text-sm font-medium text-violet-600 hover:text-violet-700 bg-violet-50 hover:bg-violet-100 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5">
@@ -510,7 +517,7 @@ const projectStatusClasses = {
               </div>
             </div>
             <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-              <button @click.prevent="downloadSingleFile(file.url, file.name, file.code)" title="Tải xuống" class="text-slate-300 hover:text-violet-600 p-2 rounded-lg hover:bg-violet-50 transition-colors flex items-center justify-center">
+              <button v-if="canAccessProjectFiles" @click.prevent="downloadSingleFile(file.url, file.name, file.code)" title="Tải xuống" class="text-slate-300 hover:text-violet-600 p-2 rounded-lg hover:bg-violet-50 transition-colors flex items-center justify-center">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
               </button>
               <button v-if="canManageProject" @click="confirmRemoveFile(idx)" title="Xóa tệp" class="text-slate-300 hover:text-rose-500 p-2 rounded-lg hover:bg-rose-50 transition-colors flex items-center justify-center">
