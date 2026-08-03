@@ -16,7 +16,9 @@ class ReportController extends Controller
         $memberCode = AccessService::userCode($request->user());
         $today = now()->toDateString();
         $upcomingUntil = now()->addDays(7)->toDateString();
-        $assignedQuery = Task::query()->where('task_assignee_code', $memberCode);
+        $assignedQuery = Task::query()
+            ->where('task_assignee_code', $memberCode)
+            ->where(fn (Builder $tasks) => $tasks->whereNull('task_project_code')->orWhereHas('project'));
         $activeTasks = (clone $assignedQuery)
             ->where('task_status', '!=', 'done')
             ->with(['project', 'assignee', 'dependencies'])
@@ -28,6 +30,49 @@ class ReportController extends Controller
             ->orderByDesc('task_updated_at')
             ->limit(20)
             ->get();
+        $personalProjects = Project::query()
+            ->where(function (Builder $query) use ($memberCode) {
+                $query->where('project_created_by', $memberCode)
+                    ->orWhere('project_manager_code', $memberCode)
+                    ->orWhereHas('members', fn (Builder $members) => $members->where('users.user_code', $memberCode));
+            })
+            ->with('manager:user_code,user_name,user_avatar,user_color,user_job_title')
+            ->withCount([
+                'members',
+                'tasks',
+                'tasks as open_tasks_count' => fn (Builder $tasks) => $tasks->where('task_status', '!=', 'done'),
+                'tasks as assigned_tasks_count' => fn (Builder $tasks) => $tasks->where('task_assignee_code', $memberCode),
+            ])
+            ->orderByRaw("CASE WHEN project_status = 'completed' THEN 1 ELSE 0 END")
+            ->orderBy('project_due_date')
+            ->orderByDesc('project_updated_at')
+            ->get();
+
+        $projectItems = $personalProjects->map(function (Project $project) use ($memberCode) {
+            $participationRole = $project->project_manager_code === $memberCode
+                ? 'manager'
+                : ($project->project_created_by === $memberCode ? 'creator' : 'member');
+
+            return [
+                'code' => $project->project_code,
+                'name' => $project->project_name,
+                'description' => $project->project_description,
+                'color' => $project->project_color,
+                'status' => $project->project_status,
+                'health' => $project->project_health,
+                'progress' => (int) $project->project_progress,
+                'start_date' => $project->project_start_date?->toDateString(),
+                'due_date' => $project->project_due_date?->toDateString(),
+                'deadline_state' => $project->deadline_state,
+                'overdue_days' => $project->overdue_days,
+                'participation_role' => $participationRole,
+                'manager' => $project->manager,
+                'member_count' => $project->members_count,
+                'task_count' => $project->tasks_count,
+                'open_task_count' => $project->open_tasks_count,
+                'assigned_task_count' => $project->assigned_tasks_count,
+            ];
+        });
 
         $taskDueDate = fn (Task $task) => $task->task_due_date?->toDateString();
         $sortTasks = fn ($items) => $items->sortBy(function (Task $task) use ($taskDueDate) {
@@ -81,6 +126,16 @@ class ReportController extends Controller
                 'later' => $later,
                 'no_deadline' => $withoutDeadline,
                 'recently_completed' => $recentlyCompleted,
+            ],
+            'projects' => [
+                'summary' => [
+                    'total' => $personalProjects->count(),
+                    'managed' => $personalProjects->where('project_manager_code', $memberCode)->count(),
+                    'participating' => $personalProjects->filter(fn (Project $project) => $project->project_manager_code !== $memberCode)->count(),
+                    'active' => $personalProjects->where('project_status', '!=', 'completed')->count(),
+                    'overdue' => $personalProjects->filter(fn (Project $project) => $project->deadline_state === 'overdue')->count(),
+                ],
+                'items' => $projectItems,
             ],
             'meta' => [
                 'upcoming_days' => 7,

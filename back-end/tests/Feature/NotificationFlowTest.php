@@ -94,7 +94,6 @@ class NotificationFlowTest extends TestCase
         $project = $this->withToken($managerToken)->postJson('/api/projects', [
             'name' => 'Dự án phân công',
             'manager_code' => $manager->user_code,
-            'member_ids' => [$employee->user_code],
         ])->assertCreated()->json('project');
         $task = $this->withToken($managerToken)->postJson('/api/tasks', [
             'project_code' => $project['code'],
@@ -104,9 +103,58 @@ class NotificationFlowTest extends TestCase
 
         $this->withToken($employeeToken)->getJson('/api/notifications')
             ->assertOk()
+            ->assertJsonCount(2)
+            ->assertJsonFragment([
+                'title' => 'Nhiệm vụ mới',
+                'targetType' => 'Task',
+                'targetCode' => $task['code'],
+            ])
+            ->assertJsonFragment([
+                'title' => 'Bạn được thêm vào dự án',
+                'targetType' => 'Project',
+                'targetCode' => $project['code'],
+            ]);
+    }
+
+    public function test_project_members_and_new_manager_receive_one_actionable_notification(): void
+    {
+        [$manager, $managerToken] = $this->user('project_manager', 'project-notify-manager@example.com');
+        [$nextManager, $nextManagerToken] = $this->user('project_manager', 'project-notify-next-manager@example.com');
+        [$employee, $employeeToken] = $this->user('member', 'project-notify-employee@example.com');
+
+        $project = $this->withToken($managerToken)->postJson('/api/projects', [
+            'name' => 'Dự án thông báo thành viên',
+            'manager_code' => $manager->user_code,
+        ])->assertCreated()->json('project');
+
+        $this->withToken($managerToken)->putJson('/api/projects/'.$project['code'].'/members', [
+            'member_ids' => [$manager->user_code, $employee->user_code],
+        ])->assertOk();
+        $this->withToken($managerToken)->putJson('/api/projects/'.$project['code'].'/members', [
+            'member_ids' => [$manager->user_code, $employee->user_code],
+        ])->assertOk();
+
+        $this->withToken($employeeToken)->getJson('/api/notifications')
+            ->assertOk()
             ->assertJsonCount(1)
-            ->assertJsonPath('0.targetType', 'Task')
-            ->assertJsonPath('0.targetCode', $task['code']);
+            ->assertJsonFragment([
+                'title' => 'Bạn được thêm vào dự án',
+                'targetType' => 'Project',
+                'targetCode' => $project['code'],
+                'read' => false,
+            ]);
+
+        $this->withToken($managerToken)->putJson('/api/projects/'.$project['code'], [
+            'manager_code' => $nextManager->user_code,
+        ])->assertOk();
+        $this->withToken($nextManagerToken)->getJson('/api/notifications')
+            ->assertOk()
+            ->assertJsonCount(1)
+            ->assertJsonFragment([
+                'title' => 'Bạn được giao phụ trách dự án',
+                'targetType' => 'Project',
+                'targetCode' => $project['code'],
+            ]);
     }
 
     private function user(string $role, string $email): array

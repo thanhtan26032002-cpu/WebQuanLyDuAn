@@ -142,6 +142,7 @@ class ProjectController extends Controller
             $project->project_code,
             "Đã tạo dự án mới: {$project->project_name}"
         );
+        $this->notifyProjectAssignments($project, $memberIds, $request->user()->user_code);
 
         $project->load('customer', 'manager', 'members', 'attachments', 'tasks');
 
@@ -193,6 +194,7 @@ class ProjectController extends Controller
     {
         $project = Project::findOrFail($code);
         AccessService::authorize(AccessService::canManageProject($request->user(), $project));
+        $previousManagerCode = $project->project_manager_code;
         $this->normalizeOptionalDates($request);
 
         $validated = $request->validate([
@@ -316,6 +318,14 @@ class ProjectController extends Controller
                 "Đã đổi hạn từ {$oldDueDate} sang {$newDueDate}. Lý do: {$extensionReason}"
             );
         }
+        if (($validated['manager_code'] ?? null)
+            && $validated['manager_code'] !== $previousManagerCode) {
+            $this->notifyProjectAssignments(
+                $project,
+                [$validated['manager_code']],
+                $request->user()->user_code
+            );
+        }
 
         return response()->json([
             'message' => 'Đã cập nhật dự án',
@@ -416,11 +426,36 @@ class ProjectController extends Controller
             ($memberChanges !== '' ? $memberChanges.'. ' : 'Danh sách thành viên không thay đổi. ')
                 .'Hiện có '.count($memberIds).' thành viên trong dự án.'
         );
+        $this->notifyProjectAssignments($project, $addedMemberIds, $request->user()->user_code);
 
         return response()->json([
             'message' => 'Đã cập nhật thành viên dự án',
             'project' => $project,
         ]);
+    }
+
+    private function notifyProjectAssignments(Project $project, array $userCodes, string $actorCode): void
+    {
+        User::whereIn('user_code', array_values(array_unique($userCodes)))
+            ->get()
+            ->each(function (User $user) use ($project, $actorCode) {
+                if ($user->user_code === $actorCode
+                    || (($user->user_notification_preferences['assignment'] ?? true) === false)) {
+                    return;
+                }
+
+                $isManager = $user->user_code === $project->project_manager_code;
+                ActivityService::notify(
+                    $user->user_code,
+                    $isManager ? 'Bạn được giao phụ trách dự án' : 'Bạn được thêm vào dự án',
+                    $isManager
+                        ? 'Bạn đã được phân công phụ trách dự án: '.$project->project_name
+                        : 'Bạn đã được thêm vào dự án: '.$project->project_name,
+                    'info',
+                    'Project',
+                    $project->project_code
+                );
+            });
     }
 
     private function normalizeOptionalDates(Request $request): void

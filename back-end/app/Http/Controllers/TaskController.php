@@ -172,6 +172,18 @@ class TaskController extends Controller
                 $task->task_project_code,
                 'Tự động thêm '.($task->assignee?->user_name ?? $task->task_assignee_code).' vào dự án vì được giao nhiệm vụ '.$task->task_title.'.'
             );
+            $newProjectMember = $task->assignee ?: User::find($task->task_assignee_code);
+            if ($newProjectMember
+                && (($newProjectMember->user_notification_preferences['assignment'] ?? true) !== false)) {
+                ActivityService::notify(
+                    $newProjectMember->user_code,
+                    'Bạn được thêm vào dự án',
+                    'Bạn đã được thêm vào dự án '.$task->project->project_name.' khi được phân công nhiệm vụ: '.$task->task_title,
+                    'info',
+                    'Project',
+                    $task->task_project_code
+                );
+            }
         }
 
         if ($task->task_assignee_code) {

@@ -249,18 +249,24 @@ class AuthApiTest extends TestCase
         $this->withToken($admin['token'])->getJson('/api/my-work')
             ->assertOk()
             ->assertJsonPath('summary.total_assigned', 1)
+            ->assertJsonPath('projects.summary.total', 1)
+            ->assertJsonPath('projects.items.0.participation_role', 'creator')
             ->assertJsonCount(1, 'sections.today')
             ->assertJsonPath('sections.today.0.title', 'Việc của quản trị viên');
 
         $this->withToken($employee['token'])->getJson('/api/my-work')
             ->assertOk()
             ->assertJsonPath('summary.total_assigned', 1)
+            ->assertJsonPath('projects.summary.total', 1)
+            ->assertJsonPath('projects.items.0.participation_role', 'member')
+            ->assertJsonPath('projects.items.0.assigned_task_count', 1)
             ->assertJsonCount(1, 'sections.today')
             ->assertJsonPath('sections.today.0.title', 'Việc của nhân viên');
 
         $this->withToken($manager['token'])->getJson('/api/my-work')
             ->assertOk()
             ->assertJsonPath('summary.total_assigned', 1)
+            ->assertJsonPath('projects.summary.total', 1)
             ->assertJsonPath('sections.today.0.title', 'Việc được giao cho quản lý');
 
         $this->withToken($manager['token'])->patchJson("/api/tasks/{$managerTask['code']}/status", [
@@ -298,7 +304,9 @@ class AuthApiTest extends TestCase
         $this->withToken($outsider['token'])->getJson('/api/my-work')
             ->assertOk()
             ->assertJsonPath('summary.total_assigned', 0)
-            ->assertJsonPath('summary.active', 0);
+            ->assertJsonPath('summary.active', 0)
+            ->assertJsonPath('projects.summary.total', 0)
+            ->assertJsonCount(0, 'projects.items');
 
         $this->assertDatabaseHas('tasks', [
             'task_code' => $employeeTaskCode,
