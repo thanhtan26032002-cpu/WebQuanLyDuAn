@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { useRouter } from "vue-router";
+import draggable from "vuedraggable";
 import {
   FolderKanban,
   CheckCircle2,
@@ -35,6 +36,7 @@ const {
   activeTaskId,
   importProjectModalOpen,
   notify,
+  moveTask,
 } = useProjectWorkspace();
 
 const getLocalDateKey = (dateValue = new Date()) => {
@@ -118,7 +120,12 @@ const mapCompanyTask = (task) => ({
   deadlineState: task.deadline_state || "none",
   overdueDays: Number(task.overdue_days || 0),
   lateDays: Number(task.late_days || 0),
+  isBlocked: Boolean(task.is_blocked),
+  blockedReason: task.blocked_reason || "",
+  delayReason: task.delay_reason || "",
+  recoveryPlan: task.recovery_plan || "",
   canView: Boolean(task.can_view),
+  canContribute: Boolean(task.can_contribute),
 });
 
 const mapCompanyActivity = (activity) => {
@@ -190,6 +197,7 @@ onUnmounted(() => {
   document.removeEventListener("click", closeProjectActions);
   document.removeEventListener("keydown", handleDashboardKeydown);
   window.clearTimeout(overviewRefreshTimer);
+  window.clearTimeout(taskDragReleaseTimer);
 });
 
 const DAY_IN_MILLISECONDS = 24 * 60 * 60 * 1000;
@@ -388,8 +396,48 @@ const getRemainingTaskCount = (status) =>
   Math.max(0, getTasksByStatus(status).length - BOARD_TASK_LIMIT);
 const recentProjects = computed(() => overviewProjects.value.slice(0, 3));
 const recentActivities = computed(() => overviewActivities.value.slice(0, 5));
+const taskDragInProgress = ref(false);
+let taskDragReleaseTimer;
+const canContributeTask = (task) => Boolean(task?.canContribute);
+const canDragTask = (event) =>
+  canContributeTask(event.draggedContext?.element);
+const onTaskDragStart = () => {
+  window.clearTimeout(taskDragReleaseTimer);
+  taskDragInProgress.value = true;
+};
+const onTaskDragEnd = () => {
+  taskDragReleaseTimer = window.setTimeout(() => {
+    taskDragInProgress.value = false;
+  }, 0);
+};
+const onTaskChange = async (event, newStatus) => {
+  if (!event.added) return;
+
+  const task = event.added.element;
+  if (!canContributeTask(task)) {
+    notify("Bạn chỉ có quyền xem nhiệm vụ này.");
+    await loadCompanyOverview({ silent: true });
+    return;
+  }
+
+  const previousStatus = task.status;
+  if (previousStatus === newStatus) return;
+
+  task.status = newStatus;
+  if (newStatus === "done") task.progress = 100;
+
+  const updated = await moveTask(task.id, newStatus);
+  if (!updated) {
+    task.status = previousStatus;
+    await loadCompanyOverview({ silent: true });
+    return;
+  }
+
+  refreshCompanyOverview();
+};
 
 const openTask = (task) => {
+  if (taskDragInProgress.value) return;
   if (task.canView) {
     activeTaskId.value = task.id;
     return;
@@ -617,7 +665,7 @@ const timeAgo = (dateStr) => {
                 Bảng nhiệm vụ toàn công ty
               </h2>
               <p class="text-sm text-slate-600">
-                Ưu tiên nhiệm vụ quá hạn, gần đến hạn và có mức ưu tiên cao.
+                Ưu tiên nhiệm vụ quá hạn, gần đến hạn; kéo thả thẻ bạn có quyền xử lý để đổi trạng thái.
               </p>
             </div>
             <button
@@ -645,32 +693,50 @@ const timeAgo = (dateStr) => {
                 </span>
               </header>
 
-              <div v-if="getVisibleTasksByStatus(col.id).length" class="space-y-3">
-                <div
-                  v-for="task in getVisibleTasksByStatus(col.id)"
-                  :key="task.id"
-                  role="button"
-                  tabindex="0"
-                  :aria-label="'Mở nhiệm vụ ' + task.title"
-                  class="rounded-xl text-left focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-violet-200"
-                  @click="openTask(task)"
-                  @keydown.enter.prevent="openTask(task)"
-                  @keydown.space.prevent="openTask(task)"
-                >
-                  <TaskCard :task="task" read-only />
-                </div>
-              </div>
-
-              <div
-                v-else
-                class="flex min-h-32 flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 bg-white/70 px-4 py-6 text-center"
+              <draggable
+                :list="getVisibleTasksByStatus(col.id)"
+                group="company-overview-tasks"
+                item-key="id"
+                ghost-class="opacity-40"
+                chosen-class="ring-2"
+                drag-class="rotate-1"
+                :move="canDragTask"
+                class="min-h-32 space-y-3"
+                @start="onTaskDragStart"
+                @end="onTaskDragEnd"
+                @change="onTaskChange($event, col.id)"
               >
-                <ListTodo class="h-6 w-6 text-slate-400" />
-                <p class="mt-2 text-sm font-semibold text-slate-700">
-                  Không có nhiệm vụ {{ col.title.toLowerCase() }}
-                </p>
-                <p class="mt-1 text-xs text-slate-500">Cột này đang trống.</p>
-              </div>
+                <template #item="{ element: task }">
+                  <div
+                    role="button"
+                    tabindex="0"
+                    :aria-label="'Mở nhiệm vụ ' + task.title"
+                    :title="canContributeTask(task) ? 'Kéo thả để đổi trạng thái' : 'Bạn chỉ có quyền xem nhiệm vụ này'"
+                    :class="[
+                      'rounded-xl text-left focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-violet-200',
+                      canContributeTask(task) ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer',
+                    ]"
+                    @click="openTask(task)"
+                    @keydown.enter.prevent="openTask(task)"
+                    @keydown.space.prevent="openTask(task)"
+                  >
+                    <TaskCard :task="task" :read-only="!canContributeTask(task)" />
+                  </div>
+                </template>
+
+                <template #footer>
+                  <div
+                    v-if="getVisibleTasksByStatus(col.id).length === 0"
+                    class="flex min-h-32 flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 bg-white/70 px-4 py-6 text-center"
+                  >
+                    <ListTodo class="h-6 w-6 text-slate-400" />
+                    <p class="mt-2 text-sm font-semibold text-slate-700">
+                      Không có nhiệm vụ {{ col.title.toLowerCase() }}
+                    </p>
+                    <p class="mt-1 text-xs text-slate-500">Kéo nhiệm vụ có quyền xử lý vào đây.</p>
+                  </div>
+                </template>
+              </draggable>
 
               <button
                 v-if="getRemainingTaskCount(col.id) > 0"

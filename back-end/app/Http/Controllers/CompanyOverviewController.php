@@ -52,7 +52,8 @@ class CompanyOverviewController extends Controller
             ->where(fn ($query) => $query->whereNull('task_project_code')->orWhereHas('project'))
             ->with([
                 'assignee:user_code,user_name,user_avatar,user_color,user_job_title',
-                'project:project_code,project_name',
+                'project:project_code,project_name,project_created_by,project_manager_code',
+                'dependencies:task_code,task_status',
             ])
             ->orderByDesc('task_updated_at')
             ->get()
@@ -67,6 +68,10 @@ class CompanyOverviewController extends Controller
                     'due_date' => $task->task_due_date?->format('Y-m-d'),
                     'assignee_code' => $task->task_assignee_code,
                     'progress' => (int) $task->task_progress,
+                    'is_blocked' => $task->is_blocked,
+                    'blocked_reason' => $task->task_blocked_reason,
+                    'delay_reason' => $task->task_delay_reason,
+                    'recovery_plan' => $task->task_recovery_plan,
                     'tags' => $task->task_tags,
                     'deadline_state' => $task->deadline_state,
                     'overdue_days' => $task->overdue_days,
@@ -74,6 +79,7 @@ class CompanyOverviewController extends Controller
                     'project' => $task->project,
                     'assignee' => $task->assignee,
                     'can_view' => AccessService::canViewTask($user, $task),
+                    'can_contribute' => AccessService::canContributeToTask($user, $task),
                 ];
             });
 

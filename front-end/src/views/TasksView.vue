@@ -119,9 +119,9 @@ const onTaskChange = (event, newStatus) => {
 }
 
 const columns = [
-  { id: 'todo', title: 'Cần làm', bg: 'bg-slate-100', text: 'text-slate-700', border: 'border-slate-200' },
-  { id: 'in_progress', title: 'Đang làm', bg: 'bg-amber-100', text: 'text-amber-700', border: 'border-amber-200' },
-  { id: 'done', title: 'Hoàn thành', bg: 'bg-emerald-100', text: 'text-emerald-700', border: 'border-emerald-200' }
+  { id: 'todo', title: 'Cần làm', bg: 'bg-slate-400', text: 'text-slate-700', border: 'border-slate-500' },
+  { id: 'in_progress', title: 'Đang làm', bg: 'bg-amber-500', text: 'text-amber-700', border: 'border-amber-600' },
+  { id: 'done', title: 'Hoàn thành', bg: 'bg-emerald-500', text: 'text-emerald-700', border: 'border-emerald-600' }
 ]
 
 const getTasksByStatus = (statusId) => {
@@ -298,7 +298,7 @@ const getTasksByStatus = (statusId) => {
         <div 
           v-for="col in columns" 
           :key="col.id" 
-          class="flex-1 min-w-[300px] bg-slate-50/50 rounded-2xl border border-slate-200/60 p-4 flex flex-col"
+          class="flex min-w-[300px] flex-1 flex-col rounded-2xl border border-slate-300 bg-slate-50/70 p-4 shadow-sm"
         >
           <!-- Column Header -->
           <div class="flex items-center justify-between mb-4">
@@ -335,15 +335,15 @@ const getTasksByStatus = (statusId) => {
                     class="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
                     title="Chuyển sang Cần làm"
                   >
-                    <div class="w-3 h-3 rounded-sm bg-slate-300"></div>
+                    <div class="w-3 h-3 rounded-sm bg-slate-400"></div>
                   </button>
                   <button
                     v-if="col.id !== 'in_progress'"
                     @click.stop="moveTaskStatus(task, 'in_progress')"
-                    class="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                    class="p-1.5 text-slate-400 hover:text-amber-700 hover:bg-amber-50 rounded-lg transition-colors"
                     title="Chuyển sang Đang làm"
                   >
-                    <div class="w-3 h-3 rounded-sm bg-blue-400"></div>
+                    <div class="w-3 h-3 rounded-sm bg-amber-500"></div>
                   </button>
                   <button
                     v-if="col.id !== 'done'"

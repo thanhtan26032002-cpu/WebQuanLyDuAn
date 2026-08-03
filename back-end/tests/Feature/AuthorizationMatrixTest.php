@@ -187,6 +187,32 @@ class AuthorizationMatrixTest extends TestCase
                 ->assertJsonFragment(['title' => 'Nhiệm vụ của phòng Vận hành']);
         }
 
+        $adminOverviewTasks = collect(
+            $this->withToken($adminToken)->getJson('/api/company-overview')
+                ->assertOk()
+                ->json('tasks')
+        );
+        $this->assertTrue($adminOverviewTasks->every(
+            fn (array $task) => $task['can_contribute'] === true
+        ));
+
+        $managerOverviewTasks = collect(
+            $this->withToken($firstManagerToken)->getJson('/api/company-overview')
+                ->assertOk()
+                ->json('tasks')
+        )->keyBy('title');
+        $this->assertTrue($managerOverviewTasks['Nhiệm vụ của phòng Kỹ thuật']['can_contribute']);
+        $this->assertFalse($managerOverviewTasks['Nhiệm vụ của phòng Vận hành']['can_contribute']);
+
+        $employeeOverviewTasks = collect(
+            $this->withToken($employeeToken)->getJson('/api/company-overview')
+                ->assertOk()
+                ->json('tasks')
+        );
+        $this->assertTrue($employeeOverviewTasks->every(
+            fn (array $task) => $task['can_contribute'] === false
+        ));
+
         $this->withToken($employeeToken)->postJson('/api/tasks', [
             'project_code' => $firstProject['code'],
             'title' => 'Không được thêm vào dự án chỉ nhìn thấy ở Tổng quan',
