@@ -86,6 +86,7 @@ Route::middleware('api.token')->group(function () {
 
         Route::post('/upload', [FileController::class, 'upload']);
         Route::delete('/attachments/{code}', [FileController::class, 'destroy']);
+        Route::get('/attachments/{code}/download', [DownloadController::class, 'downloadAttachment']);
         Route::post('/download-archive', [DownloadController::class, 'downloadArchive']);
         Route::get('/activities', [ActivityController::class, 'index']);
 

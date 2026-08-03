@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Attachment;
 use App\Models\DeadlineExtension;
 use App\Models\Project;
 use App\Models\Task;
@@ -132,7 +133,11 @@ class TaskController extends Controller
         $task = Task::create($taskData);
         $task->unsetRelation('project');
         $task->load('project');
+        $addedAssigneeToProject = false;
         if ($task->task_project_code && $task->task_assignee_code) {
+            $addedAssigneeToProject = ! $task->project?->members()
+                ->where('users.user_code', $task->task_assignee_code)
+                ->exists();
             $task->project?->members()->syncWithoutDetaching([$task->task_assignee_code]);
         }
         ProjectProgressService::sync($task->task_project_code);
@@ -147,6 +152,15 @@ class TaskController extends Controller
             $task->task_code,
             "Đã tạo nhiệm vụ mới: {$task->task_title}"
         );
+        if ($addedAssigneeToProject) {
+            ActivityService::log(
+                $userCode,
+                'thêm thành viên vào dự án',
+                'Project',
+                $task->task_project_code,
+                'Tự động thêm '.($task->assignee?->user_name ?? $task->task_assignee_code).' vào dự án vì được giao nhiệm vụ '.$task->task_title.'.'
+            );
+        }
 
         if ($task->task_assignee_code) {
             $assignedUser = User::find($task->task_assignee_code);
@@ -207,6 +221,7 @@ class TaskController extends Controller
         $validated = $validator->validated();
         $extensionReason = trim((string) ($validated['extension_reason'] ?? ''));
         unset($validated['extension_reason']);
+        $updateDetail = $this->describeTaskChanges($task, $validated);
         $oldDueDate = $task->task_due_date?->toDateString();
         $newDueDate = array_key_exists('due_date', $validated) && $validated['due_date']
             ? Carbon::parse($validated['due_date'])->toDateString()
@@ -305,7 +320,11 @@ class TaskController extends Controller
             }
             AutomationService::taskStatusChanged($task->loadMissing(['project.automations', 'project.manager']), $previousStatus);
         }
+        $addedAssigneeToProject = false;
         if ($task->task_project_code && $task->task_assignee_code) {
+            $addedAssigneeToProject = ! $task->project?->members()
+                ->where('users.user_code', $task->task_assignee_code)
+                ->exists();
             $task->project?->members()->syncWithoutDetaching([$task->task_assignee_code]);
         }
         if ($task->task_assignee_code && $task->task_assignee_code !== $previousAssigneeCode) {
@@ -331,8 +350,17 @@ class TaskController extends Controller
             'cập nhật nhiệm vụ',
             'Task',
             $task->task_code,
-            "Đã cập nhật nhiệm vụ: {$task->task_title}"
+            $updateDetail
         );
+        if ($addedAssigneeToProject) {
+            ActivityService::log(
+                $userCode,
+                'thêm thành viên vào dự án',
+                'Project',
+                $task->task_project_code,
+                'Tự động thêm '.($task->assignee?->user_name ?? $task->task_assignee_code).' vào dự án vì được giao nhiệm vụ '.$task->task_title.'.'
+            );
+        }
         if ($isExtension) {
             ActivityService::log(
                 $userCode,
@@ -498,6 +526,12 @@ class TaskController extends Controller
             ->with('user:user_code,user_name,user_avatar')
             ->orderBy('comment_created_at', 'desc')
             ->get();
+        $attachmentCodes = Attachment::where('attachment_target_type', 'TaskComment')
+            ->where('attachment_target_code', $taskCode)
+            ->pluck('attachment_code', 'attachment_file_path');
+        $comments->each(function (TaskComment $comment) use ($attachmentCodes) {
+            $comment->setAttribute('attachment_code', $attachmentCodes[$comment->comment_file_url] ?? null);
+        });
 
         return response()->json($comments);
     }
@@ -511,11 +545,21 @@ class TaskController extends Controller
             'text' => 'nullable|string',
             'file_url' => 'nullable|string',
             'file_name' => 'nullable|string',
+            'attachment_code' => 'nullable|string|exists:attachments,attachment_code',
         ]);
+
+        $commentAttachment = null;
+        if (! empty($validated['attachment_code'])) {
+            $commentAttachment = Attachment::whereKey($validated['attachment_code'])
+                ->where('attachment_target_type', 'TaskComment')
+                ->where('attachment_target_code', $taskCode)
+                ->where('attachment_uploaded_by', $request->user()->user_code)
+                ->firstOrFail();
+        }
 
         // Đảm bảo ít nhất có text hoặc file
         $text = $validated['text'] ?? '';
-        $fileUrl = $validated['file_url'] ?? null;
+        $fileUrl = $commentAttachment?->attachment_file_path ?? ($validated['file_url'] ?? null);
         if (empty(trim($text)) && empty($fileUrl)) {
             return response()->json([
                 'message' => 'Vui lòng nhập nội dung hoặc đính kèm tệp.',
@@ -529,17 +573,18 @@ class TaskController extends Controller
             'comment_user_code' => $userCode,
             'comment_text' => $text,
             'comment_file_url' => $fileUrl,
-            'comment_file_name' => $validated['file_name'] ?? null,
+            'comment_file_name' => $commentAttachment?->attachment_file_name ?? ($validated['file_name'] ?? null),
         ]);
 
         $comment->load('user:user_code,user_name,user_avatar');
+        $comment->setAttribute('attachment_code', $commentAttachment?->attachment_code);
 
         ActivityService::log(
             $userCode,
             'bình luận',
             'Task',
             $taskCode,
-            'Đã thêm bình luận vào nhiệm vụ'
+            'Đã thêm bình luận vào nhiệm vụ'.($commentAttachment ? ' kèm tệp '.$commentAttachment->attachment_file_name : '')
         );
 
         $this->notifyTaskWatchers($task, $userCode, 'Bình luận mới', $request->user()->user_name.' đã bình luận trong '.$task->task_title);
@@ -580,6 +625,85 @@ class TaskController extends Controller
                     });
             }
         });
+    }
+
+    private function describeTaskChanges(Task $task, array $validated): string
+    {
+        $labels = [
+            'title' => 'Tên nhiệm vụ',
+            'description' => 'Mô tả',
+            'type' => 'Loại nhiệm vụ',
+            'status' => 'Trạng thái',
+            'priority' => 'Độ ưu tiên',
+            'start_date' => 'Ngày bắt đầu',
+            'due_date' => 'Hạn hoàn thành',
+            'progress' => 'Tiến độ',
+            'estimated_hours' => 'Thời gian ước tính',
+            'assignee_code' => 'Người phụ trách',
+            'project_code' => 'Dự án',
+            'milestone_code' => 'Cột mốc',
+            'tags' => 'Nhãn',
+            'blocked_reason' => 'Lý do bị chặn',
+            'recurrence' => 'Lặp lại',
+            'recurrence_until' => 'Ngày kết thúc lặp',
+            'delay_reason' => 'Lý do chậm',
+            'recovery_plan' => 'Kế hoạch khắc phục',
+        ];
+        $dbData = Task::mapToDbAttributes($validated);
+        $changes = [];
+
+        foreach ($validated as $field => $newValue) {
+            if (! isset($labels[$field])) {
+                continue;
+            }
+            $dbField = array_key_first(Task::mapToDbAttributes([$field => $newValue]));
+            $oldValue = $task->getAttribute($dbField);
+            if ($this->normalizeAuditValue($oldValue) === $this->normalizeAuditValue($dbData[$dbField] ?? null)) {
+                continue;
+            }
+            if (in_array($field, ['description', 'blocked_reason', 'delay_reason', 'recovery_plan'], true)) {
+                $changes[] = $labels[$field];
+
+                continue;
+            }
+            $changes[] = $labels[$field].': '.$this->displayTaskAuditValue($field, $oldValue).' → '.$this->displayTaskAuditValue($field, $newValue);
+        }
+
+        return $changes
+            ? 'Đã thay đổi '.implode('; ', $changes).'.'
+            : 'Đã lưu nhiệm vụ nhưng không có dữ liệu nào thay đổi.';
+    }
+
+    private function normalizeAuditValue(mixed $value): string
+    {
+        if ($value instanceof \DateTimeInterface) {
+            return $value->format('Y-m-d');
+        }
+
+        return trim((string) ($value ?? ''));
+    }
+
+    private function displayTaskAuditValue(string $field, mixed $value): string
+    {
+        if ($value === null || $value === '') {
+            return 'Chưa đặt';
+        }
+        if ($value instanceof \DateTimeInterface) {
+            $value = $value->format('Y-m-d');
+        }
+
+        $mapped = match ($field) {
+            'status' => ['todo' => 'Cần làm', 'in_progress' => 'Đang làm', 'done' => 'Hoàn thành'][$value] ?? $value,
+            'priority' => ['low' => 'Thấp', 'medium' => 'Trung bình', 'high' => 'Cao'][$value] ?? $value,
+            'progress' => $value.'%',
+            'estimated_hours' => $value.' giờ',
+            'assignee_code' => User::whereKey($value)->value('user_name') ?: $value,
+            'project_code' => Project::whereKey($value)->value('project_name') ?: $value,
+            'recurrence' => ['daily' => 'Hằng ngày', 'weekly' => 'Hằng tuần', 'monthly' => 'Hằng tháng'][$value] ?? $value,
+            default => $value,
+        };
+
+        return mb_strimwidth((string) $mapped, 0, 120, '…');
     }
 
     private function taskRelations(): array

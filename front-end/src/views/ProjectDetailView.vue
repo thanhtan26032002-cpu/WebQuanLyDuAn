@@ -137,7 +137,7 @@ const projectFiles = computed(() => project.value?.files || [])
 const projectActivities = ref([])
 const activityMeta = ref({ currentPage: 0, lastPage: 1, total: 0 })
 const activitiesLoading = ref(false)
-const showProjectActivities = ref(false)
+const showProjectActivities = ref(true)
 
 const mapProjectActivity = (activity) => {
   const actorName = activity.user?.name || 'Người dùng hệ thống'
@@ -202,13 +202,30 @@ onUnmounted(() => {
 
 // Calculate time ago string
 const timeAgo = (dateStr) => {
-  const diffMs = new Date() - new Date(dateStr)
-  const diffMins = Math.round(diffMs / 60000)
+  const timestamp = new Date(dateStr)
+  if (Number.isNaN(timestamp.getTime())) return 'Không rõ thời gian'
+  const diffMins = Math.max(0, Math.floor((Date.now() - timestamp.getTime()) / 60000))
+  if (diffMins < 1) return 'Vừa xong'
   if (diffMins < 60) return `${diffMins} phút trước`
-  const diffHours = Math.round(diffMins / 60)
+  const diffHours = Math.floor(diffMins / 60)
   if (diffHours < 24) return `${diffHours} giờ trước`
-  return `${Math.round(diffHours / 24)} ngày trước`
+  const diffDays = Math.floor(diffHours / 24)
+  if (diffDays < 30) return `${diffDays} ngày trước`
+  return timestamp.toLocaleDateString('vi-VN')
 }
+
+const formatActivityTime = (dateStr) => {
+  const timestamp = new Date(dateStr)
+  return Number.isNaN(timestamp.getTime())
+    ? ''
+    : timestamp.toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' })
+}
+
+const activityTargetLabel = (targetType) => ({
+  Project: 'Dự án',
+  Task: 'Nhiệm vụ',
+  TaskComment: 'Bình luận nhiệm vụ',
+}[targetType] || 'Hoạt động')
 
 const stats = computed(() => [
   { label: 'Cần làm', value: projectTasks.value.filter(t => t.status === 'todo').length, icon: ListTodo, color: 'text-slate-600', bg: 'bg-slate-100' },
@@ -492,7 +509,7 @@ const projectStatusClasses = {
               </div>
             </div>
             <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-              <button @click.prevent="downloadSingleFile(file.url, file.name)" title="Tải xuống" class="text-slate-300 hover:text-violet-600 p-2 rounded-lg hover:bg-violet-50 transition-colors flex items-center justify-center">
+              <button @click.prevent="downloadSingleFile(file.url, file.name, file.code)" title="Tải xuống" class="text-slate-300 hover:text-violet-600 p-2 rounded-lg hover:bg-violet-50 transition-colors flex items-center justify-center">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
               </button>
               <button v-if="canManageProject" @click="confirmRemoveFile(idx)" title="Xóa tệp" class="text-slate-300 hover:text-rose-500 p-2 rounded-lg hover:bg-rose-50 transition-colors flex items-center justify-center">
@@ -537,10 +554,15 @@ const projectStatusClasses = {
                     <span class="text-slate-500"> {{ activity.action }} </span>
                     <span class="font-medium text-slate-800">{{ activity.target }}</span>
                   </p>
+                  <span class="mt-1 inline-flex rounded-md bg-violet-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-violet-600">
+                    {{ activityTargetLabel(activity.target_type) }}
+                  </span>
                   <div v-if="activity.detail" class="mt-1.5 p-2.5 bg-slate-50 border border-slate-100 rounded-lg text-sm text-slate-600 inline-block">
                     {{ activity.detail }}
                   </div>
-                  <p class="text-xs text-slate-400 mt-1.5 font-medium">{{ timeAgo(activity.createdAt) }}</p>
+                  <p class="text-xs text-slate-400 mt-1.5 font-medium" :title="formatActivityTime(activity.createdAt)">
+                    {{ timeAgo(activity.createdAt) }} · {{ formatActivityTime(activity.createdAt) }}
+                  </p>
                 </div>
               </div>
             </div>
@@ -555,7 +577,7 @@ const projectStatusClasses = {
           </div>
         </div>
         <div v-else class="text-center py-8 text-slate-400 text-sm font-medium">
-          Chưa có hoạt động nào (hoặc đang ẩn).
+          {{ activitiesLoading ? 'Đang tải nhật ký hoạt động...' : (showProjectActivities ? 'Chưa có hoạt động nào trong dự án.' : 'Nhật ký hoạt động đang được ẩn.') }}
         </div>
       </div>
 

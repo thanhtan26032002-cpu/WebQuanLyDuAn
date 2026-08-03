@@ -200,7 +200,7 @@ const submitComment = async () => {
   const fileUrl = attachedFile.value?.file_path || null
   const fileName = attachedFile.value?.file_name || null
 
-  const res = await addComment(task.value.id, newComment.value, fileUrl, fileName)
+  const res = await addComment(task.value.id, newComment.value, fileUrl, fileName, attachedFile.value?.code || null)
   
   if (res && res.success === false && res.errors) {
     alert(res.errors._general || 'Vui lòng kiểm tra lại dữ liệu.')
@@ -865,7 +865,7 @@ const formatDateTime = (isoStr) => {
                 </div>
               </div>
               <div class="flex items-center opacity-0 group-hover:opacity-100 transition-opacity gap-1">
-                <button @click.prevent="downloadSingleFile(file.url || file.file_path, file.name)" title="Tải xuống" class="p-1.5 text-slate-400 hover:text-violet-600 hover:bg-violet-50 rounded-lg"><Download class="w-4 h-4" /></button>
+                <button @click.prevent="downloadSingleFile(file.url || file.file_path, file.name, file.code)" title="Tải xuống" class="p-1.5 text-slate-400 hover:text-violet-600 hover:bg-violet-50 rounded-lg"><Download class="w-4 h-4" /></button>
                 <button class="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg"><Trash2 class="w-4 h-4" /></button>
               </div>
             </div>
@@ -939,7 +939,7 @@ const formatDateTime = (isoStr) => {
                     <div class="flex-1 min-w-0 pr-4">
                       <p class="text-sm font-medium text-slate-700 truncate max-w-[200px]" :title="comment.file_name">{{ comment.file_name || 'File đính kèm' }}</p>
                     </div>
-                    <button @click.prevent="downloadSingleFile(comment.file_url, comment.file_name)" title="Tải xuống" class="p-1.5 text-slate-400 hover:text-violet-600 hover:bg-violet-50 rounded transition-colors shrink-0">
+                    <button @click.prevent="downloadSingleFile(comment.file_url, comment.file_name, comment.attachment_code)" title="Tải xuống" class="p-1.5 text-slate-400 hover:text-violet-600 hover:bg-violet-50 rounded transition-colors shrink-0">
                       <Download class="w-4 h-4" />
                     </button>
                   </div>

@@ -1082,7 +1082,7 @@ export function useProjectWorkspace() {
     }
   }
 
-  async function addComment(taskId, text, fileUrl = null, fileName = null) {
+  async function addComment(taskId, text, fileUrl = null, fileName = null, attachmentCode = null) {
     try {
       const res = await fetch(`${API_URL}/tasks/${taskId}/comments`, {
         method: 'POST',
@@ -1091,6 +1091,7 @@ export function useProjectWorkspace() {
           text, 
           file_url: fileUrl, 
           file_name: fileName,
+          attachment_code: attachmentCode,
           user_code: currentUser.value.code
         })
       })
@@ -1238,11 +1239,28 @@ export function useProjectWorkspace() {
     }
   }
 
-  async function downloadSingleFile(url, fileName) {
+  async function downloadSingleFile(url, fileName, attachmentCode = null) {
     try {
       if (!url) {
         notify('Không tìm thấy đường dẫn tệp.')
         return
+      }
+      if (attachmentCode) {
+        const response = await fetch(`${API_URL}/attachments/${attachmentCode}/download`)
+        if (!response.ok) {
+          notify((await response.json().catch(() => ({}))).message || 'Không thể tải tệp xuống.')
+          return false
+        }
+        const blobUrl = window.URL.createObjectURL(await response.blob())
+        const link = document.createElement('a')
+        link.href = blobUrl
+        link.download = fileName || 'download'
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        window.URL.revokeObjectURL(blobUrl)
+        window.dispatchEvent(new CustomEvent('ringnet:activity-changed'))
+        return true
       }
       // url = '/storage/attachments/...', so we need full URL
       const fullUrl = url.startsWith('http') || url.startsWith('blob:') ? url : `${BASE_URL}${url.startsWith('/') ? '' : '/'}${url}`
@@ -1257,6 +1275,7 @@ export function useProjectWorkspace() {
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
+      return true
     } catch (error) {
       console.error('Download error:', error)
       notify('Lỗi kết nối khi tải tệp xuống.')

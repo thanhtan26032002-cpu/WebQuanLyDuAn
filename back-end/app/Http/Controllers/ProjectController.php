@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\DeadlineExtension;
 use App\Models\Project;
 use App\Models\Task;
+use App\Models\User;
 use App\Services\AccessService;
 use App\Services\ActivityService;
 use App\Services\ProjectProgressService;
@@ -217,6 +218,7 @@ class ProjectController extends Controller
         $validated = $this->discardFieldsMissingFromLegacySchema($validated);
         $extensionReason = trim((string) ($validated['extension_reason'] ?? ''));
         unset($validated['extension_reason']);
+        $updateDetail = $this->describeProjectChanges($project, $validated);
         $oldDueDate = $project->project_due_date?->toDateString();
         $newDueDate = array_key_exists('due_date', $validated) && $validated['due_date']
             ? Carbon::parse($validated['due_date'])->toDateString()
@@ -281,7 +283,19 @@ class ProjectController extends Controller
             $project->refresh();
         }
         if (! empty($validated['manager_code'])) {
+            $managerWasMember = $project->members()
+                ->where('users.user_code', $validated['manager_code'])
+                ->exists();
             $project->members()->syncWithoutDetaching([$validated['manager_code']]);
+            if (! $managerWasMember) {
+                ActivityService::log(
+                    $request->user()->user_code,
+                    'thêm thành viên vào dự án',
+                    'Project',
+                    $project->project_code,
+                    'Tự động thêm '.(User::whereKey($validated['manager_code'])->value('user_name') ?: $validated['manager_code']).' vào dự án với vai trò quản lý dự án.'
+                );
+            }
         }
         $project->load('customer', 'manager', 'members', 'attachments', 'deadlineExtensions.actor');
 
@@ -291,7 +305,7 @@ class ProjectController extends Controller
             'cập nhật dự án',
             'Project',
             $project->project_code,
-            "Đã cập nhật thông tin dự án: {$project->project_name}"
+            $updateDetail
         );
         if ($isExtension) {
             ActivityService::log(
@@ -377,15 +391,30 @@ class ProjectController extends Controller
             ->unique()
             ->values()
             ->all();
+        $previousMemberIds = $project->members()->pluck('users.user_code')->all();
+        $addedMemberIds = array_values(array_diff($memberIds, $previousMemberIds));
+        $removedMemberIds = array_values(array_diff($previousMemberIds, $memberIds));
         $project->members()->sync($memberIds);
         $project->load('members');
 
+        $memberNames = User::whereIn('user_code', array_values(array_unique(array_merge($addedMemberIds, $removedMemberIds))))
+            ->pluck('user_name', 'user_code');
+        $addedNames = collect($addedMemberIds)->map(fn ($id) => $memberNames[$id] ?? $id)->implode(', ');
+        $removedNames = collect($removedMemberIds)->map(fn ($id) => $memberNames[$id] ?? $id)->implode(', ');
+        $memberChanges = collect([
+            $addedNames !== '' ? 'Thêm: '.$addedNames : null,
+            $removedNames !== '' ? 'Loại khỏi dự án: '.$removedNames : null,
+        ])->filter()->implode('. ');
+
         ActivityService::log(
             $request->user()->user_code,
-            'cập nhật thành viên dự án',
+            $addedMemberIds && ! $removedMemberIds
+                ? 'thêm thành viên vào dự án'
+                : (! $addedMemberIds && $removedMemberIds ? 'xóa thành viên khỏi dự án' : 'cập nhật thành viên dự án'),
             'Project',
             $project->project_code,
-            'Danh sách thành viên hiện có '.count($memberIds).' người.'
+            ($memberChanges !== '' ? $memberChanges.'. ' : 'Danh sách thành viên không thay đổi. ')
+                .'Hiện có '.count($memberIds).' thành viên trong dự án.'
         );
 
         return response()->json([
@@ -410,6 +439,78 @@ class ProjectController extends Controller
         }
 
         return $validated;
+    }
+
+    private function describeProjectChanges(Project $project, array $validated): string
+    {
+        $labels = [
+            'name' => 'Tên dự án',
+            'description' => 'Mô tả',
+            'customer_code' => 'Khách hàng',
+            'manager_code' => 'Quản lý dự án',
+            'color' => 'Màu nhận diện',
+            'status' => 'Trạng thái',
+            'health' => 'Sức khỏe dự án',
+            'update_cadence' => 'Chu kỳ cập nhật',
+            'start_date' => 'Ngày bắt đầu',
+            'due_date' => 'Hạn hoàn thành',
+            'progress' => 'Tiến độ',
+            'delay_reason' => 'Lý do chậm',
+            'recovery_plan' => 'Kế hoạch khắc phục',
+        ];
+        $dbData = Project::mapToDbAttributes($validated);
+        $changes = [];
+
+        foreach ($validated as $field => $newValue) {
+            if (! isset($labels[$field])) {
+                continue;
+            }
+            $dbField = array_key_first(Project::mapToDbAttributes([$field => $newValue]));
+            $oldValue = $project->getAttribute($dbField);
+            if ($this->normalizeAuditValue($oldValue) === $this->normalizeAuditValue($dbData[$dbField] ?? null)) {
+                continue;
+            }
+            if (in_array($field, ['description', 'delay_reason', 'recovery_plan'], true)) {
+                $changes[] = $labels[$field];
+
+                continue;
+            }
+            $changes[] = $labels[$field].': '.$this->displayAuditValue($field, $oldValue).' → '.$this->displayAuditValue($field, $newValue);
+        }
+
+        return $changes
+            ? 'Đã thay đổi '.implode('; ', $changes).'.'
+            : 'Đã lưu thông tin dự án nhưng không có dữ liệu nào thay đổi.';
+    }
+
+    private function normalizeAuditValue(mixed $value): string
+    {
+        if ($value instanceof \DateTimeInterface) {
+            return $value->format('Y-m-d');
+        }
+
+        return trim((string) ($value ?? ''));
+    }
+
+    private function displayAuditValue(string $field, mixed $value): string
+    {
+        if ($value === null || $value === '') {
+            return 'Chưa đặt';
+        }
+        if ($value instanceof \DateTimeInterface) {
+            $value = $value->format('Y-m-d');
+        }
+
+        $mapped = match ($field) {
+            'status' => ['planning' => 'Lập kế hoạch', 'active' => 'Đang triển khai', 'on_hold' => 'Tạm dừng', 'completed' => 'Hoàn thành'][$value] ?? $value,
+            'health' => ['on_track' => 'Đúng hướng', 'at_risk' => 'Có rủi ro', 'off_track' => 'Chệch hướng'][$value] ?? $value,
+            'update_cadence' => ['weekly' => 'Hằng tuần', 'biweekly' => 'Hai tuần', 'monthly' => 'Hằng tháng', 'never' => 'Không nhắc'][$value] ?? $value,
+            'progress' => $value.'%',
+            'manager_code' => User::whereKey($value)->value('user_name') ?: $value,
+            default => $value,
+        };
+
+        return mb_strimwidth((string) $mapped, 0, 120, '…');
     }
 
     private function trashItem(Project $project, bool $canRestoreByUser): array

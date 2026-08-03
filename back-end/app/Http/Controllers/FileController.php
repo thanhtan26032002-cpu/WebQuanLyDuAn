@@ -59,9 +59,10 @@ class FileController extends Controller
 
             ActivityService::log(
                 $userCode,
-                'Đã tải lên tệp: '.$attachment->attachment_file_name,
+                'tải tệp lên',
                 $validated['target_type'],
-                $validated['target_code']
+                $validated['target_code'],
+                'Đã tải lên tệp: '.$attachment->attachment_file_name
             );
 
             return response()->json([
