@@ -105,6 +105,13 @@ class Project extends Model
             ->orderByDesc('update_created_at');
     }
 
+    public function notes()
+    {
+        return $this->hasMany(ProjectNote::class, 'note_project_code', 'project_code')
+            ->orderByDesc('note_is_pinned')
+            ->orderByDesc('note_updated_at');
+    }
+
     public function milestones()
     {
         return $this->hasMany(ProjectMilestone::class, 'milestone_project_code', 'project_code')

@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { FolderKanban, Calendar, Clock, ArrowLeft, Plus, MoreVertical, ListTodo, Paperclip, MoreHorizontal, Check, Settings, ShieldAlert, LogOut, CheckCircle2, Users, CalendarDays, Tag, LayoutGrid, List, Activity, Building2, UserRound, HeartPulse, Flag, Trash2, Zap } from '@lucide/vue'
+import { FolderKanban, Calendar, Clock, ArrowLeft, Plus, MoreVertical, ListTodo, Paperclip, MoreHorizontal, Check, Settings, ShieldAlert, LogOut, CheckCircle2, Users, CalendarDays, Tag, LayoutGrid, List, Activity, Building2, UserRound, HeartPulse, Flag, Trash2, Zap, StickyNote, Pin, Pencil } from '@lucide/vue'
 import draggable from 'vuedraggable'
 import { useProjectWorkspace } from '../composables/useProjectWorkspace'
 import TaskCard from '../components/common/TaskCard.vue'
@@ -12,7 +12,7 @@ import { apiFetch } from '../services/api'
 
 const route = useRoute()
 const router = useRouter()
-const { projects, tasks, members, projectStatusMap, priorityMap, taskStatusMap, findMember, formatDate, getTaskDeadlineState, taskModalOpen, openTaskModal, projectSettingsModalOpen, fileUploadModalOpen, manageMembersModalOpen, editingProjectId, removeFileFromProject, removeMemberFromProject, moveTask, activeTaskId, downloadArchive, downloadSingleFile, activeMemberId, memberDetailModalOpen, addProjectUpdate, addProjectMilestone, deleteProjectMilestone, setProjectAutomation, currentUser } = useProjectWorkspace()
+const { projects, tasks, members, projectStatusMap, priorityMap, taskStatusMap, findMember, formatDate, getTaskDeadlineState, taskModalOpen, openTaskModal, projectSettingsModalOpen, fileUploadModalOpen, manageMembersModalOpen, editingProjectId, removeFileFromProject, removeMemberFromProject, moveTask, activeTaskId, downloadArchive, downloadSingleFile, activeMemberId, memberDetailModalOpen, addProjectUpdate, addProjectMilestone, deleteProjectMilestone, setProjectAutomation, currentUser, notify } = useProjectWorkspace()
 
 const updateDraft = ref({ health: 'on_track', completed: '', risks: '', next_steps: '' })
 const milestoneDraft = ref({ name: '', target_date: '' })
@@ -65,6 +65,13 @@ const canManageProject = computed(() => {
   const role = currentUser.value?.role
   const userCode = currentUser.value?.code
   return role === 'admin' || (role === 'project_manager' && [project.value?.managerId, project.value?.created_by].includes(userCode))
+})
+const canContributeProjectNotes = computed(() => {
+  const userCode = currentUser.value?.code
+  return Boolean(userCode) && (
+    canManageProject.value ||
+    project.value?.memberIds?.includes(userCode)
+  )
 })
 const canAccessProjectFiles = computed(() => {
   const role = currentUser.value?.role
@@ -152,6 +159,157 @@ const projectActivities = ref([])
 const activityMeta = ref({ currentPage: 0, lastPage: 1, total: 0 })
 const activitiesLoading = ref(false)
 const showProjectActivities = ref(true)
+const projectNotes = ref([])
+const notesLoading = ref(false)
+const noteSaving = ref(false)
+const showNoteForm = ref(false)
+const editingNoteId = ref(null)
+const noteError = ref('')
+const noteDraft = ref({ title: '', content: '', isPinned: false })
+
+const mapProjectNote = (note) => ({
+  ...note,
+  id: note.code || note.id,
+  authorCode: note.author_code || note.authorCode,
+  isPinned: Boolean(note.is_pinned ?? note.isPinned),
+  createdAt: note.created_at || note.createdAt,
+  updatedAt: note.updated_at || note.updatedAt,
+  author: note.author || null,
+})
+
+const sortProjectNotes = (notes) => [...notes].sort((first, second) => {
+  if (first.isPinned !== second.isPinned) return first.isPinned ? -1 : 1
+  return new Date(second.updatedAt || second.createdAt || 0) - new Date(first.updatedAt || first.createdAt || 0)
+})
+
+const canChangeProjectNote = (note) =>
+  canManageProject.value || note.authorCode === currentUser.value?.code
+
+const resetNoteForm = () => {
+  showNoteForm.value = false
+  editingNoteId.value = null
+  noteError.value = ''
+  noteDraft.value = { title: '', content: '', isPinned: false }
+}
+
+const loadProjectNotes = async () => {
+  if (!projectId.value || notesLoading.value) return
+  notesLoading.value = true
+  try {
+    const response = await apiFetch(`/api/projects/${projectId.value}/notes`)
+    if (!response.ok) {
+      noteError.value = 'Không thể tải ghi chú dự án.'
+      return
+    }
+    projectNotes.value = sortProjectNotes((await response.json()).map(mapProjectNote))
+    noteError.value = ''
+  } catch {
+    noteError.value = 'Không thể kết nối để tải ghi chú dự án.'
+  } finally {
+    notesLoading.value = false
+  }
+}
+
+const openCreateNote = () => {
+  editingNoteId.value = null
+  noteDraft.value = { title: '', content: '', isPinned: false }
+  noteError.value = ''
+  showNoteForm.value = true
+}
+
+const openEditNote = (note) => {
+  editingNoteId.value = note.id
+  noteDraft.value = { title: note.title, content: note.content, isPinned: note.isPinned }
+  noteError.value = ''
+  showNoteForm.value = true
+}
+
+const noteResponseError = async (response) => {
+  const payload = await response.json().catch(() => ({}))
+  const errors = payload.errors ? Object.values(payload.errors).flat() : []
+  return errors[0] || payload.message || 'Không thể lưu ghi chú.'
+}
+
+const saveProjectNote = async () => {
+  const title = noteDraft.value.title.trim()
+  const content = noteDraft.value.content.trim()
+  if (!title || !content) {
+    noteError.value = 'Vui lòng nhập tiêu đề và nội dung ghi chú.'
+    return
+  }
+
+  noteSaving.value = true
+  noteError.value = ''
+  try {
+    const noteId = editingNoteId.value
+    const response = await apiFetch(
+      noteId
+        ? `/api/projects/${projectId.value}/notes/${noteId}`
+        : `/api/projects/${projectId.value}/notes`,
+      {
+        method: noteId ? 'PUT' : 'POST',
+        body: JSON.stringify({ title, content, is_pinned: noteDraft.value.isPinned }),
+      },
+    )
+    if (!response.ok) {
+      noteError.value = await noteResponseError(response)
+      return
+    }
+
+    const saved = mapProjectNote((await response.json()).note)
+    projectNotes.value = sortProjectNotes([
+      saved,
+      ...projectNotes.value.filter(note => note.id !== saved.id),
+    ])
+    notify(noteId ? 'Đã cập nhật ghi chú dự án' : 'Đã thêm ghi chú dự án')
+    resetNoteForm()
+    window.dispatchEvent(new CustomEvent('ringnet:activity-changed'))
+  } catch {
+    noteError.value = 'Không thể kết nối để lưu ghi chú.'
+  } finally {
+    noteSaving.value = false
+  }
+}
+
+const toggleProjectNotePin = async (note) => {
+  if (!canChangeProjectNote(note)) return
+  try {
+    const response = await apiFetch(`/api/projects/${projectId.value}/notes/${note.id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ is_pinned: !note.isPinned }),
+    })
+    if (!response.ok) {
+      notify(await noteResponseError(response))
+      return
+    }
+    const saved = mapProjectNote((await response.json()).note)
+    projectNotes.value = sortProjectNotes([
+      saved,
+      ...projectNotes.value.filter(item => item.id !== saved.id),
+    ])
+    notify(saved.isPinned ? 'Đã ghim ghi chú quan trọng' : 'Đã bỏ ghim ghi chú')
+    window.dispatchEvent(new CustomEvent('ringnet:activity-changed'))
+  } catch {
+    notify('Không thể cập nhật trạng thái ghim')
+  }
+}
+
+const deleteProjectNote = async (note) => {
+  if (!canChangeProjectNote(note) || !confirm(`Xóa ghi chú “${note.title}”?`)) return
+  try {
+    const response = await apiFetch(`/api/projects/${projectId.value}/notes/${note.id}`, { method: 'DELETE' })
+    if (!response.ok) {
+      notify(await noteResponseError(response))
+      return
+    }
+    projectNotes.value = projectNotes.value.filter(item => item.id !== note.id)
+    if (editingNoteId.value === note.id) resetNoteForm()
+    notify('Đã xóa ghi chú dự án')
+    window.dispatchEvent(new CustomEvent('ringnet:activity-changed'))
+  } catch {
+    notify('Không thể xóa ghi chú dự án')
+  }
+}
 
 const mapProjectActivity = (activity) => {
   const actorName = activity.user?.name || 'Người dùng hệ thống'
@@ -206,7 +364,10 @@ const handleActivityChanged = () => {
 watch(projectId, () => {
   projectActivities.value = []
   activityMeta.value = { currentPage: 0, lastPage: 1, total: 0 }
+  projectNotes.value = []
+  resetNoteForm()
   loadProjectActivityPage(1)
+  loadProjectNotes()
 }, { immediate: true })
 onMounted(() => window.addEventListener('ringnet:activity-changed', handleActivityChanged))
 onUnmounted(() => {
@@ -394,6 +555,73 @@ const projectStatusClasses = {
             <p class="mt-2 text-xs text-slate-400">{{ item.actor?.name || 'Người quản lý' }} · {{ formatDate(item.createdAt) }}</p>
           </article>
         </div>
+      </div>
+    </section>
+
+    <section class='rounded-2xl border border-violet-100 bg-white p-5 shadow-sm sm:p-6'>
+      <header class='flex flex-wrap items-start justify-between gap-3'>
+        <div>
+          <h2 class='flex items-center gap-2 text-lg font-bold text-slate-900'>
+            <StickyNote class='h-5 w-5 text-violet-500' /> Ghi chú dự án
+            <span v-if='projectNotes.length' class='rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500'>{{ projectNotes.length }}</span>
+          </h2>
+          <p class='mt-1 text-sm text-slate-500'>Lưu quyết định và thông tin quan trọng để mọi người cùng nắm.</p>
+        </div>
+        <button v-if='canContributeProjectNotes && !showNoteForm' type='button' class='flex items-center gap-1.5 rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-violet-700' @click='openCreateNote'>
+          <Plus class='h-4 w-4' /> Thêm ghi chú
+        </button>
+      </header>
+      <form v-if='showNoteForm' class='mt-5 rounded-2xl border border-violet-100 bg-violet-50/40 p-4' @submit.prevent='saveProjectNote'>
+        <div class='flex flex-wrap items-center justify-between gap-2'>
+          <p class='font-bold text-slate-800'>{{ editingNoteId ? 'Chỉnh sửa ghi chú' : 'Ghi chú mới' }}</p>
+          <label class='flex cursor-pointer items-center gap-2 rounded-lg bg-white px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm'>
+            <input v-model='noteDraft.isPinned' type='checkbox' class='accent-violet-600' />
+            <Pin class='h-3.5 w-3.5 text-amber-500' /> Ghim là quan trọng
+          </label>
+        </div>
+        <input v-model='noteDraft.title' maxlength='255' placeholder='Tiêu đề ghi chú' class='mt-4 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-violet-300' />
+        <textarea v-model='noteDraft.content' rows='4' maxlength='10000' placeholder='Nội dung cần mọi người lưu ý...' class='mt-3 w-full resize-y rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm leading-6 outline-none focus:border-violet-300'></textarea>
+        <p v-if='noteError' class='mt-2 text-sm font-medium text-rose-600'>{{ noteError }}</p>
+        <div class='mt-4 flex justify-end gap-2'>
+          <button type='button' class='rounded-lg px-4 py-2 text-sm font-semibold text-slate-500 hover:bg-white' @click='resetNoteForm'>Hủy</button>
+          <button :disabled='noteSaving' class='rounded-lg bg-violet-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50'>
+            <span v-if='noteSaving'>Đang lưu...</span><span v-else-if='editingNoteId'>Lưu thay đổi</span><span v-else>Lưu ghi chú</span>
+          </button>
+        </div>
+      </form>
+      <p v-if='noteError && !showNoteForm' class='mt-4 rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-600'>{{ noteError }}</p>
+      <div v-if='notesLoading' class='mt-6 rounded-xl border border-dashed border-slate-200 py-10 text-center text-sm text-slate-400'>Đang tải ghi chú dự án...</div>
+      <div v-else-if='projectNotes.length' class='mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3'>
+        <article v-for='note in projectNotes' :key='note.id' :class='[`group flex min-h-52 flex-col rounded-2xl border p-4`, note.isPinned ? `border-amber-200 bg-amber-50/60` : `border-slate-200 bg-slate-50/60`]'>
+          <div class='flex items-start justify-between gap-3'>
+            <div class='min-w-0'>
+              <span v-if='note.isPinned' class='mb-2 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-1 text-[10px] font-bold uppercase text-amber-700'><Pin class='h-3 w-3' /> Quan trọng</span>
+              <h3 class='break-words font-bold leading-6 text-slate-900'>{{ note.title }}</h3>
+            </div>
+            <div v-if='canChangeProjectNote(note)' class='flex shrink-0 items-center gap-1'>
+              <button type='button' :title='note.isPinned ? `Bỏ ghim` : `Ghim`' class='rounded-lg p-2 text-slate-400 hover:bg-amber-100 hover:text-amber-600' @click='toggleProjectNotePin(note)'><Pin class='h-4 w-4' /></button>
+              <button type='button' title='Sửa' class='rounded-lg p-2 text-slate-400 hover:bg-violet-100 hover:text-violet-600' @click='openEditNote(note)'><Pencil class='h-4 w-4' /></button>
+              <button type='button' title='Xóa' class='rounded-lg p-2 text-slate-400 hover:bg-rose-100 hover:text-rose-600' @click='deleteProjectNote(note)'><Trash2 class='h-4 w-4' /></button>
+            </div>
+          </div>
+          <p class='mt-3 flex-1 whitespace-pre-wrap break-words text-sm leading-6 text-slate-600'>{{ note.content }}</p>
+          <footer class='mt-4 flex items-center justify-between gap-3 border-t border-slate-200/70 pt-3'>
+            <div class='flex min-w-0 items-center gap-2'>
+              <UserAvatar v-if='note.authorCode' :member-id='note.authorCode' size='sm' :show-popover='false' />
+              <div class='min-w-0'>
+                <p class='truncate text-xs font-semibold text-slate-700'>{{ note.author?.name || findMember(note.authorCode).name }}</p>
+                <p class='text-[10px] text-slate-400'>{{ formatActivityTime(note.updatedAt || note.createdAt) }}</p>
+              </div>
+            </div>
+            <span v-if='note.updatedAt && note.updatedAt !== note.createdAt' class='shrink-0 text-[10px] text-slate-400'>Đã chỉnh sửa</span>
+          </footer>
+        </article>
+      </div>
+      <div v-else-if='!showNoteForm' class='mt-6 rounded-2xl border border-dashed border-slate-200 bg-slate-50/60 py-10 text-center'>
+        <StickyNote class='mx-auto h-8 w-8 text-slate-300' />
+        <p class='mt-3 text-sm font-semibold text-slate-600'>Chưa có ghi chú nào trong dự án</p>
+        <p v-if='canContributeProjectNotes' class='mt-1 text-xs text-slate-400'>Thêm ghi chú đầu tiên để mọi thành viên cùng theo dõi.</p>
+        <p v-else class='mt-1 text-xs text-slate-400'>Thành viên dự án sẽ cập nhật thông tin quan trọng tại đây.</p>
       </div>
     </section>
 

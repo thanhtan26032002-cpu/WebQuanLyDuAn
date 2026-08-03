@@ -34,9 +34,10 @@
 - Tổ chức các thành viên vào các nhóm (Groups) hoặc phòng ban cụ thể để dễ dàng quản lý tài nguyên nhân sự.
 
 ### 5. Vận hành chuyên nghiệp
-- Đăng nhập bằng API token và phân quyền `admin`, `project_manager`, `member`, `viewer` trên toàn bộ API.
+- Đăng nhập bằng API token và phân quyền ba vai trò `admin`, `project_manager`, `member` trên toàn bộ API.
 - Trang **Công việc của tôi**, báo cáo quá hạn/khối lượng/ước lượng so với thực tế và chế độ xem đã lưu.
 - Sức khỏe dự án, cập nhật định kỳ, cột mốc, phụ thuộc/chặn nhiệm vụ, người theo dõi và thông báo lưu trong database.
+- Ghi chú dùng chung trong dự án: thành viên tham gia được tạo ghi chú, ghim nội dung quan trọng và quản lý ghi chú của mình; mọi thay đổi được lưu vào nhật ký dự án.
 - Nhiệm vụ lặp, mẫu dự án, nhật ký thời gian và các tự động hóa nhắc hạn/báo hoàn thành/bàn giao trạng thái.
 
 ---
