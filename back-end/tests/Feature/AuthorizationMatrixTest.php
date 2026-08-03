@@ -149,6 +149,23 @@ class AuthorizationMatrixTest extends TestCase
             ->assertOk()
             ->assertJsonFragment(['detail' => 'Đã tạo nhiệm vụ mới: Nhiệm vụ của phòng Kỹ thuật'])
             ->assertJsonFragment(['detail' => 'Đã tạo nhiệm vụ mới: Nhiệm vụ của phòng Vận hành']);
+        $this->withToken($adminToken)->getJson('/api/activities?paginated=1&per_page=10')
+            ->assertOk()
+            ->assertJsonStructure([
+                'data' => [
+                    '*' => ['code', 'action', 'target_type', 'target_code', 'target_label', 'created_at'],
+                ],
+                'current_page',
+                'last_page',
+                'per_page',
+                'total',
+            ])
+            ->assertJsonFragment(['target_label' => 'Nhiệm vụ của phòng Kỹ thuật'])
+            ->assertJsonFragment(['target_label' => 'Nhiệm vụ của phòng Vận hành']);
+        $this->withToken($adminToken)->getJson('/api/activities?paginated=1&type=Task&search=Vận hành')
+            ->assertOk()
+            ->assertJsonFragment(['target_label' => 'Nhiệm vụ của phòng Vận hành'])
+            ->assertJsonMissing(['target_label' => 'Dự án phòng Kỹ thuật']);
 
         $this->withToken($firstManagerToken)->getJson('/api/projects')
             ->assertOk()

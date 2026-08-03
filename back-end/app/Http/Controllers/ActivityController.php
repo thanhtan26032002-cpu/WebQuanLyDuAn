@@ -6,6 +6,8 @@ use App\Models\Activity;
 use App\Models\Project;
 use App\Models\Task;
 use App\Services\AccessService;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 use Illuminate\Http\Request;
 
 class ActivityController extends Controller
@@ -21,12 +23,66 @@ class ActivityController extends Controller
                     ->orWhereIn('activity_project_code', $projectCodes);
             });
         }
-        $activities = $query
-            ->orderBy('activity_created_at', 'desc')
-            ->limit(50)
-            ->get();
 
-        return response()->json($activities);
+        $type = $request->string('type')->toString();
+        if (in_array($type, ['Project', 'Task', 'TaskComment'], true)) {
+            $query->where('activity_target_type', $type);
+        }
+
+        $keyword = trim(mb_substr($request->string('search')->toString(), 0, 100));
+        if ($keyword !== '') {
+            $this->applySearch($query, $keyword);
+        }
+
+        $query->orderByDesc('activity_created_at');
+        if ($request->boolean('paginated')) {
+            $perPage = min(100, max(10, $request->integer('per_page', 30)));
+            $activities = $query->paginate($perPage);
+            $activities->setCollection($this->withTargetLabels($activities->getCollection()));
+
+            return response()->json($activities);
+        }
+
+        return response()->json(
+            $this->withTargetLabels($query->limit(50)->get())
+        );
+    }
+
+    private function applySearch(Builder $query, string $keyword): void
+    {
+        $like = '%'.$keyword.'%';
+        $projectCodes = Project::withTrashed()
+            ->where('project_name', 'like', $like)
+            ->pluck('project_code');
+        $taskCodes = Task::withTrashed()
+            ->where('task_title', 'like', $like)
+            ->pluck('task_code');
+
+        $query->where(function (Builder $search) use ($like, $projectCodes, $taskCodes) {
+            $search->where('activity_action', 'like', $like)
+                ->orWhere('activity_detail', 'like', $like)
+                ->orWhere('activity_target_code', 'like', $like)
+                ->orWhereIn('activity_target_code', $projectCodes)
+                ->orWhereIn('activity_target_code', $taskCodes)
+                ->orWhereHas('user', fn (Builder $user) => $user->where('user_name', 'like', $like));
+        });
+    }
+
+    private function withTargetLabels(Collection $activities): Collection
+    {
+        $projectLabels = Project::withTrashed()->pluck('project_name', 'project_code');
+        $taskLabels = Task::withTrashed()->pluck('task_title', 'task_code');
+
+        return $activities->map(function (Activity $activity) use ($projectLabels, $taskLabels) {
+            $targetLabel = match ($activity->activity_target_type) {
+                'Project' => $projectLabels[$activity->activity_target_code] ?? $activity->activity_target_code,
+                'Task', 'TaskComment' => $taskLabels[$activity->activity_target_code] ?? $activity->activity_target_code,
+                default => $activity->activity_target_code,
+            };
+            $activity->setAttribute('target_label', $targetLabel);
+
+            return $activity;
+        });
     }
 
     public function project(Request $request, string $code)

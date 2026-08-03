@@ -549,17 +549,19 @@ const projectStatusClasses = {
                 <UserAvatar v-if="activity.userId" :member-id="activity.userId" size="md" :show-popover="false" class="relative z-10 ring-4 ring-white rounded-full" />
                 <div v-else class="relative z-10 w-10 h-10 rounded-full flex items-center justify-center shrink-0 border-4 border-white bg-slate-500 shadow-sm text-xs font-bold text-white">HT</div>
                 <!-- Content -->
-                <div class="pt-2">
-                  <p class="text-sm text-slate-900">
+                <div class="min-w-0 flex-1 pt-2">
+                  <p class="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5 text-sm leading-relaxed text-slate-900">
                     <span class="font-semibold">{{ activity.actor?.name || 'Người dùng hệ thống' }}</span>
-                    <span class="text-slate-500"> {{ activity.action }} </span>
+                    <span class="text-slate-500">{{ activity.action }}</span>
                     <span class="font-medium text-slate-800">{{ activity.target }}</span>
                   </p>
-                  <span class="mt-1 inline-flex rounded-md bg-violet-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-violet-600">
-                    {{ activityTargetLabel(activity.target_type) }}
-                  </span>
-                  <div v-if="activity.detail" class="mt-1.5 p-2.5 bg-slate-50 border border-slate-100 rounded-lg text-sm text-slate-600 inline-block">
-                    {{ activity.detail }}
+                  <div class="mt-2 flex flex-wrap items-start gap-2">
+                    <span class="inline-flex rounded-md bg-violet-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-violet-600">
+                      {{ activityTargetLabel(activity.target_type) }}
+                    </span>
+                    <div v-if="activity.detail" class="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-sm leading-relaxed text-slate-600">
+                      {{ activity.detail }}
+                    </div>
                   </div>
                   <p class="text-xs text-slate-400 mt-1.5 font-medium" :title="formatActivityTime(activity.createdAt)">
                     {{ timeAgo(activity.createdAt) }} · {{ formatActivityTime(activity.createdAt) }}

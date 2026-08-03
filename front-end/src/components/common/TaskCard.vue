@@ -29,7 +29,7 @@ const deadlineClass = computed(() => {
   if (deadlineState.value === "completed_late") {
     return "text-amber-700 bg-amber-50 border-amber-200";
   }
-  return "text-slate-400 bg-transparent border-transparent";
+  return "text-slate-500 bg-transparent border-transparent";
 });
 
 const priorityDotMap = {
@@ -98,7 +98,7 @@ const statusBadgeMap = {
     </h3>
 
     <!-- Project name -->
-    <p class="text-xs text-slate-400 mb-3 truncate">
+    <p class="text-xs text-slate-500 mb-3 truncate">
       {{ task.projectName || project?.name || "Không thuộc dự án" }}
     </p>
 

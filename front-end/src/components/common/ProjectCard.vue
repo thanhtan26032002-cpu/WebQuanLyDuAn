@@ -127,15 +127,20 @@ const visualState = computed(() => {
 <template>
   <article
     :class="[
-      'relative flex flex-col overflow-hidden rounded-2xl border bg-white shadow-sm transition-all duration-300',
+      'relative flex flex-col overflow-hidden rounded-2xl border bg-white shadow-sm transition-all duration-200 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-violet-200',
       visualState.issue ? visualState.panel.split(' ')[0] : 'border-slate-200',
-      clickable ? 'cursor-pointer hover:-translate-y-0.5 hover:shadow-lg' : 'cursor-default',
+      clickable ? 'cursor-pointer hover:border-violet-200 hover:shadow-md' : 'cursor-default',
     ]"
+    :role="clickable && readOnly ? 'button' : undefined"
+    :tabindex="clickable && readOnly ? 0 : undefined"
+    :aria-label="clickable && readOnly ? 'Mở dự án ' + project.name : undefined"
     @click="openProject"
+    @keydown.enter.prevent="readOnly && openProject()"
+    @keydown.space.prevent="readOnly && openProject()"
   >
     <div :class="['h-1.5 w-full', visualState.accent]"></div>
 
-    <div class="flex flex-1 flex-col p-5">
+    <div :class="['flex flex-1 flex-col', compact ? 'p-4' : 'p-5']">
       <header class="flex items-start justify-between gap-3">
         <div class="min-w-0 flex-1">
           <div class="mb-2 flex flex-wrap items-center gap-2">
@@ -155,20 +160,23 @@ const visualState = computed(() => {
         </button>
       </header>
 
-      <div :class="['mt-4 flex items-start gap-2 rounded-xl border px-3 py-2.5 text-xs leading-relaxed', visualState.panel]">
+      <div
+        v-if="visualState.issue || !compact"
+        :class="['mt-4 flex items-start gap-2 rounded-xl border px-3 py-2.5 text-xs leading-relaxed', visualState.panel]"
+      >
         <component :is="visualState.icon" class="mt-0.5 h-4 w-4 shrink-0" />
         <span class="line-clamp-2">{{ visualState.detail }}</span>
       </div>
 
-      <p class="mt-4 line-clamp-2 min-h-10 text-sm leading-relaxed text-slate-500">{{ project.description || "Chưa có mô tả dự án." }}</p>
+      <p v-if="!compact" class="mt-4 line-clamp-2 min-h-10 text-sm leading-relaxed text-slate-600">{{ project.description || "Chưa có mô tả dự án." }}</p>
 
-      <div class="mt-4 grid grid-cols-2 gap-2 text-xs">
+      <div :class="['mt-4 grid gap-2 text-xs', compact ? 'grid-cols-1' : 'grid-cols-2']">
         <div class="min-w-0 rounded-xl bg-slate-50 px-3 py-2.5">
-          <span class="flex items-center gap-1.5 text-slate-400"><UserRound class="h-3.5 w-3.5" /> Phụ trách</span>
+          <span class="flex items-center gap-1.5 text-slate-500"><UserRound class="h-3.5 w-3.5" /> Phụ trách</span>
           <p class="mt-1 truncate font-bold text-slate-700">{{ managerName }}</p>
         </div>
-        <div class="min-w-0 rounded-xl bg-slate-50 px-3 py-2.5">
-          <span class="flex items-center gap-1.5 text-slate-400"><Building2 class="h-3.5 w-3.5" /> Khách hàng</span>
+        <div v-if="!compact" class="min-w-0 rounded-xl bg-slate-50 px-3 py-2.5">
+          <span class="flex items-center gap-1.5 text-slate-500"><Building2 class="h-3.5 w-3.5" /> Khách hàng</span>
           <p class="mt-1 truncate font-bold text-slate-700">{{ project.customer?.name || "Chưa cập nhật" }}</p>
         </div>
       </div>

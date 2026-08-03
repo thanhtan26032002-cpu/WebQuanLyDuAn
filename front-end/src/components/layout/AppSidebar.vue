@@ -17,8 +17,11 @@ import { useProjectWorkspace } from "../../composables/useProjectWorkspace";
 
 const route = useRoute();
 const router = useRouter();
-const { projectModalOpen, tasks, currentUser } = useProjectWorkspace();
+const { projectModalOpen, projects, tasks, currentUser } = useProjectWorkspace();
 const canManageWorkspace = computed(() => ['admin', 'project_manager', 'manager'].includes(currentUser.value?.role));
+
+// Tổng số dự án đang hoạt động trong hệ thống (không tính dự án ở thùng rác).
+const activeProjectsCount = computed(() => projects.value.length);
 
 // Badge for Tasks that are not done
 const pendingTasksCount = computed(
@@ -28,7 +31,12 @@ const pendingTasksCount = computed(
 const navigation = computed(() => [
   { name: 'C\u00f4ng vi\u1ec7c c\u1ee7a t\u00f4i', href: '/my-work', icon: UserRoundCheck },
   { name: "Tổng quan", href: "/", icon: LayoutDashboard },
-  { name: "Dự án", href: "/projects", icon: FolderKanban },
+  {
+    name: "Dự án",
+    href: "/projects",
+    icon: FolderKanban,
+    badge: activeProjectsCount.value,
+  },
   {
     name: "Nhiệm vụ",
     href: "/tasks",

@@ -8,16 +8,19 @@ import {
   Plus,
   MoreHorizontal,
   Activity,
-  CalendarDays,
   UploadCloud,
   CheckSquare,
   ChevronRight,
   BellRing,
+  AlertTriangle,
+  RefreshCw,
+  ListTodo,
+  History,
   X,
 } from "@lucide/vue";
-import draggable from "vuedraggable";
 import ProjectCard from "../components/common/ProjectCard.vue";
 import TaskCard from "../components/common/TaskCard.vue";
+import UserAvatar from "../components/common/UserAvatar.vue";
 import { useProjectWorkspace } from "../composables/useProjectWorkspace";
 import { apiFetch } from "../services/api";
 
@@ -26,11 +29,8 @@ const {
   projects,
   tasks,
   currentUser,
-  projectStatusMap,
-  priorityMap,
   projectModalOpen,
   taskModalOpen,
-  findProject,
   formatDate,
   activeTaskId,
   importProjectModalOpen,
@@ -82,6 +82,10 @@ const myTasks = computed(() => {
 const companyProjects = ref([]);
 const companyTasks = ref([]);
 const overviewActivities = ref([]);
+const overviewLoading = ref(true);
+const overviewError = ref("");
+const hasLoadedOverview = ref(false);
+const projectActionsMenu = ref(null);
 const overviewProjects = computed(() => companyProjects.value);
 const overviewTasks = computed(() => companyTasks.value);
 
@@ -125,6 +129,7 @@ const mapCompanyActivity = (activity) => {
     target: activity.target_label || "",
     createdAt: activity.created_at,
     actor: {
+      id: activity.user?.code || "",
       name: actorName,
       initials: actorName.split(" ").filter(Boolean).map((part) => part[0]).join("").toUpperCase().slice(0, 2) || "HT",
       color: activity.user?.color || "slate",
@@ -132,7 +137,10 @@ const mapCompanyActivity = (activity) => {
   };
 };
 
-const loadCompanyOverview = async () => {
+const loadCompanyOverview = async ({ silent = false } = {}) => {
+  if (!silent || !hasLoadedOverview.value) overviewLoading.value = true;
+  overviewError.value = "";
+
   try {
     const response = await apiFetch("/api/company-overview");
     if (!response.ok) throw new Error("overview-request-failed");
@@ -140,44 +148,49 @@ const loadCompanyOverview = async () => {
     companyProjects.value = (payload.projects || []).map(mapCompanyProject);
     companyTasks.value = (payload.tasks || []).map(mapCompanyTask);
     overviewActivities.value = (payload.activities || []).map(mapCompanyActivity);
+    hasLoadedOverview.value = true;
   } catch {
-    notify("Không thể tải Tổng quan toàn công ty. Vui lòng thử lại.");
+    if (silent && hasLoadedOverview.value) {
+      notify("Không thể làm mới Tổng quan. Vui lòng thử lại.");
+    } else {
+      overviewError.value = "Không thể tải dữ liệu Tổng quan toàn công ty.";
+    }
+  } finally {
+    overviewLoading.value = false;
   }
 };
 
 let overviewRefreshTimer;
+const closeProjectActions = (event) => {
+  if (
+    projectActionsMenu.value?.open &&
+    (!event || !projectActionsMenu.value.contains(event.target))
+  ) {
+    projectActionsMenu.value.removeAttribute("open");
+  }
+};
+const handleDashboardKeydown = (event) => {
+  if (event.key === "Escape") closeProjectActions();
+};
 const refreshCompanyOverview = () => {
   window.clearTimeout(overviewRefreshTimer);
-  overviewRefreshTimer = window.setTimeout(loadCompanyOverview, 300);
+  overviewRefreshTimer = window.setTimeout(
+    () => loadCompanyOverview({ silent: true }),
+    300,
+  );
 };
 onMounted(() => {
   loadCompanyOverview();
   window.addEventListener("ringnet:activity-changed", refreshCompanyOverview);
+  document.addEventListener("click", closeProjectActions);
+  document.addEventListener("keydown", handleDashboardKeydown);
 });
 onUnmounted(() => {
   window.removeEventListener("ringnet:activity-changed", refreshCompanyOverview);
+  document.removeEventListener("click", closeProjectActions);
+  document.removeEventListener("keydown", handleDashboardKeydown);
   window.clearTimeout(overviewRefreshTimer);
 });
-
-const todayTasks = computed(() =>
-  overviewTasks.value.filter(
-    (task) =>
-      Boolean(task.dueDate) &&
-      getLocalDateKey(task.dueDate) === todayKey &&
-      task.status !== "done",
-  ),
-);
-const todayProjects = computed(() =>
-  overviewProjects.value.filter(
-    (project) =>
-      Boolean(project.dueDate) &&
-      getLocalDateKey(project.dueDate) === todayKey &&
-      project.status !== "completed",
-  ),
-);
-const todayDueCount = computed(
-  () => todayTasks.value.length + todayProjects.value.length,
-);
 
 const DAY_IN_MILLISECONDS = 24 * 60 * 60 * 1000;
 const toUtcDate = (dateValue) => {
@@ -188,6 +201,107 @@ const toUtcDate = (dateValue) => {
 };
 const daysUntil = (dateValue) =>
   Math.round((toUtcDate(dateValue) - toUtcDate(todayKey)) / DAY_IN_MILLISECONDS);
+
+const buildAttentionItem = (record, type) => {
+  const isProject = type === "project";
+  const isComplete = isProject
+    ? record.status === "completed"
+    : record.status === "done";
+  if (isComplete) return null;
+
+  const days = record.dueDate ? daysUntil(record.dueDate) : null;
+  let level = "";
+  let label = "";
+  let rank = 99;
+
+  if (days !== null && days < 0) {
+    level = "overdue";
+    label = `Quá hạn ${Math.abs(days)} ngày`;
+    rank = days;
+  } else if (days === 0) {
+    level = "today";
+    label = "Đến hạn hôm nay";
+    rank = 10;
+  } else if (isProject && record.health === "off_track") {
+    level = "risk";
+    label = "Chậm tiến độ";
+    rank = 20;
+  } else if (isProject && record.status === "on_hold") {
+    level = "risk";
+    label = "Đang tạm dừng";
+    rank = 21;
+  } else if (isProject && record.health === "at_risk") {
+    level = "risk";
+    label = "Có rủi ro";
+    rank = 22;
+  } else if (days !== null && days <= 3) {
+    level = "soon";
+    label = days === 1 ? "Đến hạn ngày mai" : `Còn ${days} ngày`;
+    rank = 30 + days;
+  } else if (days !== null && days <= 7) {
+    level = "upcoming";
+    label = `Còn ${days} ngày`;
+    rank = 40 + days;
+  }
+
+  if (!level) return null;
+
+  return {
+    key: `${type}-${record.id}`,
+    type,
+    typeLabel: isProject ? "Dự án" : "Nhiệm vụ",
+    title: isProject ? record.name : record.title,
+    context: isProject
+      ? record.manager?.name || "Chưa phân công quản lý"
+      : record.projectName || "Không thuộc dự án",
+    days,
+    level,
+    label,
+    rank,
+    record,
+  };
+};
+
+const attentionItems = computed(() =>
+  [
+    ...overviewProjects.value.map((project) =>
+      buildAttentionItem(project, "project"),
+    ),
+    ...overviewTasks.value.map((task) => buildAttentionItem(task, "task")),
+  ]
+    .filter(Boolean)
+    .sort((first, second) => first.rank - second.rank),
+);
+
+const attentionSummary = computed(() => ({
+  overdue: attentionItems.value.filter((item) => item.level === "overdue").length,
+  today: attentionItems.value.filter((item) => item.level === "today").length,
+  monitoring: attentionItems.value.filter((item) =>
+    ["risk", "soon", "upcoming"].includes(item.level),
+  ).length,
+}));
+
+const attentionTone = (level) => {
+  if (level === "overdue") {
+    return {
+      badge: "bg-rose-100 text-rose-700",
+      icon: "bg-rose-50 text-rose-600",
+      border: "border-rose-100 hover:border-rose-200",
+    };
+  }
+  if (["today", "risk", "soon"].includes(level)) {
+    return {
+      badge: "bg-amber-100 text-amber-800",
+      icon: "bg-amber-50 text-amber-700",
+      border: "border-amber-100 hover:border-amber-200",
+    };
+  }
+  return {
+    badge: "bg-blue-100 text-blue-700",
+    icon: "bg-blue-50 text-blue-600",
+    border: "border-blue-100 hover:border-blue-200",
+  };
+};
 
 const dueReminderItems = computed(() => {
   const projectItems = myProjects.value
@@ -240,15 +354,40 @@ const goToMyWork = () => {
   router.push("/my-work");
 };
 
+const openImportProject = () => {
+  importProjectModalOpen.value = true;
+  projectActionsMenu.value?.removeAttribute("open");
+};
+
 const columns = ref([
   { id: "todo", title: "Cần làm", color: "bg-slate-400" },
   { id: "in_progress", title: "Đang làm", color: "bg-amber-500" },
   { id: "done", title: "Hoàn thành", color: "bg-emerald-500" },
 ]);
 
-const getTasksByStatus = (status) => {
-  return overviewTasks.value.filter((t) => t.status === status);
+const BOARD_TASK_LIMIT = 5;
+const priorityRank = { high: 0, medium: 1, low: 2 };
+const sortTasksForOverview = (first, second) => {
+  const firstOverdue = first.deadlineState === "overdue" ? 0 : 1;
+  const secondOverdue = second.deadlineState === "overdue" ? 0 : 1;
+  if (firstOverdue !== secondOverdue) return firstOverdue - secondOverdue;
+
+  const firstDays = first.dueDate ? daysUntil(first.dueDate) : 9999;
+  const secondDays = second.dueDate ? daysUntil(second.dueDate) : 9999;
+  if (firstDays !== secondDays) return firstDays - secondDays;
+
+  return (priorityRank[first.priority] ?? 9) - (priorityRank[second.priority] ?? 9);
 };
+const getTasksByStatus = (status) =>
+  overviewTasks.value.filter((task) => task.status === status);
+const getVisibleTasksByStatus = (status) =>
+  [...getTasksByStatus(status)]
+    .sort(sortTasksForOverview)
+    .slice(0, BOARD_TASK_LIMIT);
+const getRemainingTaskCount = (status) =>
+  Math.max(0, getTasksByStatus(status).length - BOARD_TASK_LIMIT);
+const recentProjects = computed(() => overviewProjects.value.slice(0, 3));
+const recentActivities = computed(() => overviewActivities.value.slice(0, 5));
 
 const openTask = (task) => {
   if (task.canView) {
@@ -266,6 +405,28 @@ const openProject = (project) => {
   notify("Bạn đang xem thông tin tổng quan; chi tiết dự án chỉ dành cho thành viên dự án.");
 };
 
+const openAttentionItem = (item) => {
+  if (item.type === "project") openProject(item.record);
+  else openTask(item.record);
+};
+
+const activityTarget = (activity) => {
+  if (activity.target_type === "Project") {
+    return overviewProjects.value.find((project) => project.id === activity.target_code);
+  }
+  if (["Task", "TaskComment"].includes(activity.target_type)) {
+    return overviewTasks.value.find((task) => task.id === activity.target_code);
+  }
+  return null;
+};
+
+const openActivity = (activity) => {
+  const target = activityTarget(activity);
+  if (!target) return;
+  if (activity.target_type === "Project") openProject(target);
+  else openTask(target);
+};
+
 const timeAgo = (dateStr) => {
   const diff = (new Date() - new Date(dateStr)) / 1000;
   if (diff < 60) return "Vừa xong";
@@ -274,7 +435,6 @@ const timeAgo = (dateStr) => {
   return formatDate(dateStr);
 };
 
-const showRecentActivities = ref(false);
 </script>
 
 <template>
@@ -287,7 +447,7 @@ const showRecentActivities = ref(false);
         <h1 class="text-2xl font-bold text-slate-900 mb-1">
           Xin chào, {{ currentUserName }} 👋
         </h1>
-        <p class="text-slate-500 text-sm">
+        <p v-if="!overviewLoading && !overviewError" class="text-slate-600 text-sm">
           Toàn công ty hiện có
           <strong class="font-semibold text-indigo-700">
             {{ overviewProjects.length }} dự án
@@ -297,366 +457,430 @@ const showRecentActivities = ref(false);
             {{ overviewTasks.length }} nhiệm vụ
           </strong>.
         </p>
+        <div v-else-if="overviewLoading" class="mt-2 flex items-center gap-2" aria-hidden="true">
+          <span class="h-4 w-32 animate-pulse rounded bg-slate-200"></span>
+          <span class="h-4 w-20 animate-pulse rounded bg-slate-200"></span>
+        </div>
+        <p v-else class="text-sm text-slate-600">Bảng điều hành chung của công ty.</p>
       </div>
-      <div v-if="canManageProjects" class="flex items-center gap-3 shrink-0">
+      <div class="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
         <button
-          @click="importProjectModalOpen = true"
-          class="bg-white border border-slate-200 text-slate-700 px-5 py-2.5 rounded-xl font-medium hover:bg-slate-50 transition-all flex items-center gap-2"
+          v-if="canCreateTasks"
+          type="button"
+          class="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-violet-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-violet-200 sm:flex-none"
+          @click="taskModalOpen = true"
         >
-          <UploadCloud class="w-5 h-5" /> Tải dự án lên
+          <Plus class="h-5 w-5" /> Tạo nhiệm vụ
         </button>
         <button
+          v-if="canManageProjects"
+          type="button"
           @click="projectModalOpen = true"
-          class="bg-gradient-to-r from-violet-500 to-indigo-600 text-white px-5 py-2.5 rounded-xl font-medium hover:shadow-premium transition-all shadow-md shadow-violet-500/25 flex items-center gap-2"
+          class="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl border border-violet-200 bg-white px-5 py-2.5 text-sm font-semibold text-violet-700 transition hover:border-violet-300 hover:bg-violet-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-violet-100 sm:flex-none"
         >
-          <Plus class="w-5 h-5" /> Tạo dự án mới
+          <FolderKanban class="h-5 w-5" /> Tạo dự án
         </button>
+        <details
+          v-if="canManageProjects"
+          ref="projectActionsMenu"
+          class="relative"
+        >
+          <summary
+            class="flex h-11 w-11 cursor-pointer list-none items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-200 [&::-webkit-details-marker]:hidden"
+            aria-label="Thêm hành động dự án"
+            title="Thêm hành động dự án"
+          >
+            <MoreHorizontal class="h-5 w-5" />
+          </summary>
+          <div
+            class="absolute right-0 z-30 mt-2 w-56 rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl shadow-slate-900/10"
+          >
+            <button
+              type="button"
+              class="flex min-h-10 w-full items-center gap-2 rounded-lg px-3 text-left text-sm font-medium text-slate-700 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-200"
+              @click="openImportProject"
+            >
+              <UploadCloud class="h-4 w-4 text-slate-500" />
+              Nhập dự án từ tệp
+            </button>
+          </div>
+        </details>
       </div>
     </div>
 
-    <!-- Main Content Grid -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-      <!-- Left Column: Kanban -->
-      <div class="lg:col-span-2 space-y-8">
-        <div>
-          <div class="flex items-end justify-between mb-4">
-            <div>
-              <h2 class="text-lg font-bold text-slate-900">
-                Bảng nhiệm vụ toàn công ty
-              </h2>
-              <p class="text-sm text-slate-500">
-                Theo dõi chung; cập nhật chi tiết tại tab Nhiệm vụ
-              </p>
-            </div>
-            <button
-              @click="router.push('/tasks')"
-              class="text-violet-600 font-medium text-sm hover:text-violet-700 flex items-center"
-            >
-              Xem tất cả <ArrowUpRight class="w-4 h-4 ml-1" />
-            </button>
-          </div>
-
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div
-              v-for="col in columns"
-              :key="col.id"
-              class="bg-slate-50 rounded-2xl p-4 border-2 border-slate-200 flex flex-col h-[500px]"
-            >
-              <div class="flex items-center justify-between mb-4 px-1">
-                <div class="flex items-center gap-2">
-                  <div :class="['w-2.5 h-2.5 rounded-full', col.color]"></div>
-                  <h3 class="font-bold text-slate-700">{{ col.title }}</h3>
-                  <span
-                    class="bg-slate-200 text-slate-600 text-xs font-bold px-2 py-0.5 rounded-full"
-                  >
-                    {{ getTasksByStatus(col.id).length }}
-                  </span>
-                </div>
-              </div>
-
-              <div class="flex-1 overflow-y-auto custom-scrollbar">
-                <draggable
-                  class="min-h-full space-y-3 pb-4 pr-1"
-                  :list="getTasksByStatus(col.id)"
-                  group="tasks"
-                  item-key="id"
-                  :disabled="true"
-                  ghost-class="opacity-50"
-                >
-                  <template #item="{ element }">
-                    <div @click="openTask(element)">
-                      <TaskCard :task="element" read-only />
-                    </div>
-                  </template>
-                </draggable>
-              </div>
-
-              <button
-                v-if="canCreateTasks"
-                @click="taskModalOpen = true"
-                class="w-full mt-2 py-2 flex items-center justify-center gap-2 text-slate-500 hover:text-slate-800 hover:bg-slate-200/50 rounded-xl transition-colors font-medium text-sm"
-              >
-                <Plus class="w-4 h-4" /> Thêm thẻ
-              </button>
+    <div
+      v-if="overviewLoading"
+      class="space-y-6"
+      aria-live="polite"
+      aria-label="Đang tải Tổng quan"
+    >
+      <div class="h-20 animate-pulse rounded-2xl bg-white"></div>
+      <div class="grid grid-cols-1 gap-8 lg:grid-cols-3">
+        <div class="space-y-4 lg:col-span-2">
+          <div class="h-10 w-72 animate-pulse rounded-xl bg-white"></div>
+          <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <div v-for="index in 3" :key="index" class="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div class="h-6 w-28 animate-pulse rounded-lg bg-slate-200"></div>
+              <div v-for="card in 2" :key="card" class="h-32 animate-pulse rounded-xl bg-white"></div>
             </div>
           </div>
         </div>
+        <div class="h-96 animate-pulse rounded-2xl bg-white"></div>
+      </div>
+    </div>
 
-        <div>
-          <div class="flex items-end justify-between mb-4">
+    <section
+      v-else-if="overviewError"
+      class="rounded-2xl border border-rose-200 bg-white px-6 py-10 text-center shadow-sm"
+      role="alert"
+    >
+      <span class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-rose-50 text-rose-600">
+        <AlertTriangle class="h-6 w-6" />
+      </span>
+      <h2 class="mt-4 text-lg font-bold text-slate-900">Chưa tải được Tổng quan</h2>
+      <p class="mt-1 text-sm text-slate-600">{{ overviewError }}</p>
+      <button
+        type="button"
+        class="mx-auto mt-5 flex min-h-11 items-center justify-center gap-2 rounded-xl bg-violet-600 px-5 text-sm font-semibold text-white transition hover:bg-violet-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-violet-200"
+        @click="loadCompanyOverview()"
+      >
+        <RefreshCw class="h-4 w-4" />
+        Thử lại
+      </button>
+    </section>
+
+    <template v-else>
+      <section
+        :class="[
+          'flex flex-col gap-4 rounded-2xl border px-5 py-4 sm:flex-row sm:items-center sm:justify-between',
+          attentionItems.length
+            ? attentionSummary.overdue
+              ? 'border-rose-200 bg-rose-50/70'
+              : 'border-amber-200 bg-amber-50/70'
+            : 'border-emerald-200 bg-emerald-50/70',
+        ]"
+        aria-labelledby="attention-summary-title"
+      >
+        <div class="flex items-start gap-3">
+          <span
+            :class="[
+              'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white shadow-sm',
+              attentionItems.length
+                ? attentionSummary.overdue
+                  ? 'text-rose-600'
+                  : 'text-amber-700'
+                : 'text-emerald-600',
+            ]"
+          >
+            <AlertTriangle v-if="attentionItems.length" class="h-5 w-5" />
+            <CheckCircle2 v-else class="h-5 w-5" />
+          </span>
+          <div>
+            <h2 id="attention-summary-title" class="font-bold text-slate-900">
+              {{
+                attentionItems.length
+                  ? "Công ty có " + attentionItems.length + " mục cần chú ý"
+                  : "Tiến độ chung đang ổn định"
+              }}
+            </h2>
+            <p class="mt-0.5 text-sm text-slate-600">
+              {{
+                attentionItems.length
+                  ? "Ưu tiên các mục quá hạn và đến hạn gần nhất."
+                  : "Không có dự án hoặc nhiệm vụ nào cần cảnh báo trong 7 ngày tới."
+              }}
+            </p>
+          </div>
+        </div>
+
+        <div v-if="attentionItems.length" class="flex flex-wrap items-center gap-2 sm:justify-end">
+          <span v-if="attentionSummary.overdue" class="rounded-full bg-white px-3 py-1.5 text-xs font-bold text-rose-700 ring-1 ring-rose-200">
+            {{ attentionSummary.overdue }} quá hạn
+          </span>
+          <span v-if="attentionSummary.today" class="rounded-full bg-white px-3 py-1.5 text-xs font-bold text-amber-800 ring-1 ring-amber-200">
+            {{ attentionSummary.today }} hôm nay
+          </span>
+          <span v-if="attentionSummary.monitoring" class="rounded-full bg-white px-3 py-1.5 text-xs font-bold text-blue-700 ring-1 ring-blue-200">
+            {{ attentionSummary.monitoring }} cần theo dõi
+          </span>
+          <a href="#company-attention" class="inline-flex min-h-9 items-center gap-1 rounded-lg px-2 text-xs font-bold text-slate-700 transition hover:bg-white/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300">
+            Xem ngay <ChevronRight class="h-4 w-4" />
+          </a>
+        </div>
+      </section>
+
+      <div class="grid grid-cols-1 items-start gap-8 2xl:grid-cols-3">
+        <section class="order-2 2xl:order-1 2xl:col-span-2" aria-labelledby="company-task-board-title">
+          <div class="mb-4 flex flex-wrap items-end justify-between gap-3">
             <div>
-              <h2 class="text-lg font-bold text-slate-900">
-                Dự án toàn công ty gần đây
+              <h2 id="company-task-board-title" class="text-lg font-bold text-slate-900">
+                Bảng nhiệm vụ toàn công ty
               </h2>
-              <p class="text-sm text-slate-500">
-                Các dự án gần đây đang hoạt động
+              <p class="text-sm text-slate-600">
+                Ưu tiên nhiệm vụ quá hạn, gần đến hạn và có mức ưu tiên cao.
               </p>
             </div>
             <button
-              @click="router.push('/projects')"
-              class="text-violet-600 font-medium text-sm hover:text-violet-700 flex items-center"
+              type="button"
+              class="flex min-h-10 items-center gap-1 rounded-lg px-2 text-sm font-semibold text-violet-700 transition hover:bg-violet-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-200"
+              @click="router.push('/tasks')"
             >
-              Tất cả dự án <ArrowUpRight class="w-4 h-4 ml-1" />
+              Xem tất cả <ArrowUpRight class="h-4 w-4" />
             </button>
           </div>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+          <div class="grid grid-cols-1 items-start gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <article
+              v-for="col in columns"
+              :key="col.id"
+              class="rounded-2xl border border-slate-200 bg-slate-50/80 p-4"
+            >
+              <header class="mb-4 flex items-center justify-between gap-2 px-1">
+                <div class="flex items-center gap-2">
+                  <span :class="['h-2.5 w-2.5 rounded-full', col.color]"></span>
+                  <h3 class="font-bold text-slate-800">{{ col.title }}</h3>
+                </div>
+                <span class="rounded-full bg-white px-2.5 py-1 text-xs font-bold text-slate-600 ring-1 ring-slate-200">
+                  {{ getTasksByStatus(col.id).length }}
+                </span>
+              </header>
+
+              <div v-if="getVisibleTasksByStatus(col.id).length" class="space-y-3">
+                <div
+                  v-for="task in getVisibleTasksByStatus(col.id)"
+                  :key="task.id"
+                  role="button"
+                  tabindex="0"
+                  :aria-label="'Mở nhiệm vụ ' + task.title"
+                  class="rounded-xl text-left focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-violet-200"
+                  @click="openTask(task)"
+                  @keydown.enter.prevent="openTask(task)"
+                  @keydown.space.prevent="openTask(task)"
+                >
+                  <TaskCard :task="task" read-only />
+                </div>
+              </div>
+
+              <div
+                v-else
+                class="flex min-h-32 flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 bg-white/70 px-4 py-6 text-center"
+              >
+                <ListTodo class="h-6 w-6 text-slate-400" />
+                <p class="mt-2 text-sm font-semibold text-slate-700">
+                  Không có nhiệm vụ {{ col.title.toLowerCase() }}
+                </p>
+                <p class="mt-1 text-xs text-slate-500">Cột này đang trống.</p>
+              </div>
+
+              <button
+                v-if="getRemainingTaskCount(col.id) > 0"
+                type="button"
+                class="mt-3 flex min-h-10 w-full items-center justify-center gap-1 rounded-xl text-sm font-semibold text-violet-700 transition hover:bg-violet-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-200"
+                @click="router.push('/tasks')"
+              >
+                Xem thêm {{ getRemainingTaskCount(col.id) }} nhiệm vụ
+                <ChevronRight class="h-4 w-4" />
+              </button>
+            </article>
+          </div>
+        </section>
+        <aside
+          id="company-attention"
+          class="order-1 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm 2xl:order-2"
+          aria-labelledby="company-attention-title"
+        >
+          <header class="border-b border-slate-100 bg-slate-50/70 px-5 py-4">
+            <div class="flex items-center justify-between gap-3">
+              <h2 id="company-attention-title" class="flex items-center gap-2 font-bold text-slate-900">
+                <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-amber-700 shadow-sm">
+                  <AlertTriangle class="h-4 w-4" />
+                </span>
+                Công việc cần xử lý
+              </h2>
+              <span
+                :class="[
+                  'flex h-8 min-w-8 items-center justify-center rounded-full px-2 text-sm font-bold',
+                  attentionItems.length
+                    ? 'bg-rose-500 text-white'
+                    : 'bg-emerald-100 text-emerald-700',
+                ]"
+              >
+                {{ attentionItems.length }}
+              </span>
+            </div>
+            <p class="ml-10 mt-1 text-xs text-slate-600">
+              Quá hạn, hôm nay, rủi ro và hạn trong 7 ngày.
+            </p>
+          </header>
+
+          <div v-if="attentionItems.length" class="max-h-[560px] space-y-2 overflow-y-auto p-4 custom-scrollbar">
+            <button
+              v-for="item in attentionItems"
+              :key="item.key"
+              type="button"
+              :class="[
+                'group flex min-h-20 w-full items-start gap-3 rounded-xl border bg-white p-3.5 text-left transition hover:shadow-sm focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-violet-100',
+                attentionTone(item.level).border,
+              ]"
+              @click="openAttentionItem(item)"
+            >
+              <span
+                :class="[
+                  'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg',
+                  attentionTone(item.level).icon,
+                ]"
+              >
+                <FolderKanban v-if="item.type === 'project'" class="h-4.5 w-4.5" />
+                <CheckSquare v-else class="h-4.5 w-4.5" />
+              </span>
+              <span class="min-w-0 flex-1">
+                <span class="flex flex-wrap items-center gap-1.5">
+                  <span class="text-[10px] font-bold uppercase tracking-wide text-slate-500">
+                    {{ item.typeLabel }}
+                  </span>
+                  <span :class="['rounded-full px-2 py-0.5 text-[10px] font-bold', attentionTone(item.level).badge]">
+                    {{ item.label }}
+                  </span>
+                </span>
+                <span class="mt-1 block line-clamp-2 text-sm font-semibold leading-snug text-slate-900 group-hover:text-violet-700">
+                  {{ item.title }}
+                </span>
+                <span class="mt-1 block truncate text-xs text-slate-500">{{ item.context }}</span>
+              </span>
+              <ChevronRight class="mt-2 h-4 w-4 shrink-0 text-slate-300 transition group-hover:text-violet-600" />
+            </button>
+          </div>
+
+          <div v-else class="px-5 py-10 text-center">
+            <span class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
+              <CheckCircle2 class="h-6 w-6" />
+            </span>
+            <p class="mt-3 text-sm font-semibold text-slate-900">Chưa có mục cần xử lý</p>
+            <p class="mt-1 text-xs leading-relaxed text-slate-500">
+              Công ty không có công việc quá hạn hoặc sắp đến hạn trong 7 ngày.
+            </p>
+          </div>
+        </aside>
+      </div>
+
+      <div class="grid grid-cols-1 items-start gap-8 2xl:grid-cols-3">
+        <section class="2xl:col-span-2" aria-labelledby="recent-projects-title">
+          <div class="mb-4 flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h2 id="recent-projects-title" class="text-lg font-bold text-slate-900">
+                Dự án gần đây
+              </h2>
+              <p class="text-sm text-slate-600">Ba dự án được cập nhật gần nhất.</p>
+            </div>
+            <button
+              type="button"
+              class="flex min-h-10 items-center gap-1 rounded-lg px-2 text-sm font-semibold text-violet-700 transition hover:bg-violet-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-200"
+              @click="router.push('/projects')"
+            >
+              Tất cả dự án <ArrowUpRight class="h-4 w-4" />
+            </button>
+          </div>
+
+          <div v-if="recentProjects.length" class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
             <ProjectCard
-              v-for="project in overviewProjects.slice(0, 2)"
+              v-for="project in recentProjects"
               :key="project.id"
               :project="project"
+              compact
               read-only
               :clickable="project.canView"
             />
           </div>
-        </div>
-      </div>
-
-      <!-- Right Column: Widgets -->
-      <div class="space-y-8">
-        <!-- Today's Due Items Widget -->
-        <div
-          class="bg-white rounded-2xl border border-amber-100 shadow-sm overflow-hidden"
-        >
           <div
-            class="px-5 py-4 border-b border-amber-100 bg-gradient-to-r from-amber-50 to-rose-50 flex items-center justify-between gap-3"
+            v-else
+            class="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-10 text-center"
           >
-            <div>
-              <h2 class="font-bold text-slate-900 flex items-center gap-2">
-                <span
-                  class="w-8 h-8 rounded-lg bg-white/80 shadow-sm flex items-center justify-center"
-                >
-                  <CalendarDays class="w-4.5 h-4.5 text-rose-500" />
-                </span>
-                Đến hạn hôm nay toàn công ty
-              </h2>
-              <p class="text-xs text-slate-500 mt-1 ml-10">
-                Ưu tiên xử lý trước khi kết thúc ngày
-              </p>
-            </div>
-            <span
-              class="min-w-8 h-8 px-2 bg-rose-500 text-white text-sm font-bold rounded-full flex items-center justify-center shadow-sm shadow-rose-200"
-              >{{ todayDueCount }}</span
-            >
-          </div>
-
-          <div class="p-5">
-            <div
-              v-if="todayDueCount > 0"
-              class="space-y-5 max-h-[480px] overflow-y-auto custom-scrollbar pr-1"
-            >
-              <section v-if="todayProjects.length > 0">
-                <div class="flex items-center justify-between mb-2.5">
-                  <h3
-                    class="text-[11px] font-bold uppercase tracking-wider text-indigo-700 flex items-center gap-1.5"
-                  >
-                    <FolderKanban class="w-4 h-4" />
-                    Dự án
-                  </h3>
-                  <span
-                    class="bg-indigo-50 text-indigo-700 text-[11px] font-bold px-2 py-0.5 rounded-full"
-                  >
-                    {{ todayProjects.length }}
-                  </span>
-                </div>
-
-                <div class="space-y-2">
-                  <button
-                    v-for="project in todayProjects"
-                    :key="`project-${project.id}`"
-                    type="button"
-                    class="group w-full text-left p-3.5 bg-indigo-50/60 rounded-xl border border-indigo-100 hover:bg-indigo-50 hover:border-indigo-200 hover:shadow-sm transition-all"
-                    @click="openProject(project)"
-                  >
-                    <span class="flex items-start gap-3">
-                      <span
-                        class="w-9 h-9 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center shrink-0"
-                      >
-                        <FolderKanban class="w-4.5 h-4.5" />
-                      </span>
-                      <span class="flex-1 min-w-0">
-                        <span class="flex items-center gap-2 mb-1">
-                          <span
-                            class="px-2 py-0.5 bg-indigo-600 text-white rounded text-[10px] font-bold uppercase tracking-wide"
-                          >
-                            Dự án
-                          </span>
-                          <span class="text-[11px] font-medium text-indigo-600">
-                            {{ projectStatusMap[project.status]?.label }}
-                          </span>
-                        </span>
-                        <span
-                          class="block font-semibold text-slate-900 text-sm leading-snug group-hover:text-indigo-700 transition-colors"
-                        >
-                          {{ project.name }}
-                        </span>
-                        <span class="block text-xs text-slate-500 mt-1">
-                          Tiến độ hiện tại: {{ project.progress || 0 }}%
-                        </span>
-                      </span>
-                      <ChevronRight
-                        class="w-4 h-4 text-indigo-300 group-hover:text-indigo-600 mt-2 transition-colors shrink-0"
-                      />
-                    </span>
-                  </button>
-                </div>
-              </section>
-
-              <section v-if="todayTasks.length > 0">
-                <div class="flex items-center justify-between mb-2.5">
-                  <h3
-                    class="text-[11px] font-bold uppercase tracking-wider text-rose-700 flex items-center gap-1.5"
-                  >
-                    <CheckSquare class="w-4 h-4" />
-                    Nhiệm vụ
-                  </h3>
-                  <span
-                    class="bg-rose-50 text-rose-700 text-[11px] font-bold px-2 py-0.5 rounded-full"
-                  >
-                    {{ todayTasks.length }}
-                  </span>
-                </div>
-
-                <div class="space-y-2">
-                  <button
-                    v-for="task in todayTasks"
-                    :key="`task-${task.id}`"
-                    type="button"
-                    class="group w-full text-left p-3.5 bg-rose-50/60 rounded-xl border border-rose-100 hover:bg-rose-50 hover:border-rose-200 hover:shadow-sm transition-all"
-                    @click="openTask(task)"
-                  >
-                    <span class="flex items-start gap-3">
-                      <span
-                        class="w-9 h-9 rounded-lg bg-rose-100 text-rose-600 flex items-center justify-center shrink-0"
-                      >
-                        <CheckSquare class="w-4.5 h-4.5" />
-                      </span>
-                      <span class="flex-1 min-w-0">
-                        <span class="flex items-center gap-2 mb-1">
-                          <span
-                            class="px-2 py-0.5 bg-rose-500 text-white rounded text-[10px] font-bold uppercase tracking-wide"
-                          >
-                            Nhiệm vụ
-                          </span>
-                          <span class="text-[11px] font-medium text-rose-600">
-                            Ưu tiên
-                            {{
-                              priorityMap[
-                                task.priority
-                              ]?.label?.toLowerCase() || "trung bình"
-                            }}
-                          </span>
-                        </span>
-                        <span
-                          class="block font-semibold text-slate-900 text-sm leading-snug group-hover:text-rose-700 transition-colors"
-                        >
-                          {{ task.title }}
-                        </span>
-                        <span
-                          class="block text-xs text-slate-500 mt-1 truncate"
-                        >
-                          {{
-                            task.projectName || findProject(task.projectId)?.name ||
-                            "Không thuộc dự án"
-                          }}
-                        </span>
-                      </span>
-                      <ChevronRight
-                        class="w-4 h-4 text-rose-300 group-hover:text-rose-600 mt-2 transition-colors shrink-0"
-                      />
-                    </span>
-                  </button>
-                </div>
-              </section>
-            </div>
-
-            <div v-else class="text-center py-6">
-              <div
-                class="w-12 h-12 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-3"
-              >
-                <CheckCircle2 class="w-6 h-6 text-emerald-500" />
-              </div>
-              <p class="text-sm font-medium text-slate-900 mb-1">
-                Không có hạn chót hôm nay
-              </p>
-              <p class="text-xs text-slate-500">
-                Toàn công ty không có dự án hoặc nhiệm vụ nào cần hoàn thành trong ngày.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <!-- Activity Feed Widget -->
-        <div
-          class="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden flex flex-col h-[500px]"
-        >
-          <div class="px-5 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
-            <h2 class="font-bold text-slate-900 flex items-center gap-2">
-              <Activity class="w-5 h-5 text-violet-500" />
-              Hoạt động toàn công ty gần đây
-            </h2>
+            <FolderKanban class="mx-auto h-8 w-8 text-slate-400" />
+            <p class="mt-3 font-semibold text-slate-800">Chưa có dự án nào</p>
+            <p class="mt-1 text-sm text-slate-500">Dự án mới sẽ xuất hiện tại đây.</p>
             <button
-              @click="showRecentActivities = !showRecentActivities"
-              class="text-xs font-semibold text-violet-600 hover:text-violet-700 bg-violet-50 hover:bg-violet-100 px-2.5 py-1 rounded-lg transition-colors cursor-pointer shadow-2xs"
+              v-if="canManageProjects"
+              type="button"
+              class="mt-4 min-h-10 rounded-xl bg-violet-600 px-4 text-sm font-semibold text-white transition hover:bg-violet-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-violet-200"
+              @click="projectModalOpen = true"
             >
-              {{ showRecentActivities ? 'Ẩn' : 'Xem' }}
+              Tạo dự án
+            </button>
+          </div>
+        </section>
+        <section
+          class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+          aria-labelledby="recent-activity-title"
+        >
+          <header class="flex items-start justify-between gap-3 border-b border-slate-100 bg-slate-50/70 px-5 py-4">
+            <div>
+              <h2 id="recent-activity-title" class="flex items-center gap-2 font-bold text-slate-900">
+                <Activity class="h-5 w-5 text-violet-600" />
+                Hoạt động gần đây
+              </h2>
+              <p class="mt-1 text-xs text-slate-600">Năm thay đổi mới nhất trong công ty.</p>
+            </div>
+            <button
+              type="button"
+              class="flex min-h-9 shrink-0 items-center gap-1.5 rounded-lg border border-violet-100 bg-white px-3 text-xs font-bold text-violet-700 transition hover:border-violet-200 hover:bg-violet-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-200"
+              @click="router.push('/activities')"
+            >
+              <History class="h-4 w-4" />
+              Lịch sử
+            </button>
+          </header>
+
+          <div v-if="recentActivities.length" class="divide-y divide-slate-100">
+            <button
+              v-for="activityItem in recentActivities"
+              :key="activityItem.id"
+              type="button"
+              :disabled="!activityTarget(activityItem)"
+              class="group flex min-h-20 w-full items-start gap-3 px-5 py-4 text-left transition enabled:hover:bg-slate-50 enabled:focus-visible:outline-none enabled:focus-visible:ring-4 enabled:focus-visible:ring-inset enabled:focus-visible:ring-violet-100 disabled:cursor-default"
+              @click="openActivity(activityItem)"
+            >
+              <UserAvatar
+                v-if="activityItem.actor?.id"
+                :member-id="activityItem.actor.id"
+                size="sm"
+                :show-popover="false"
+              />
+              <span
+                v-else
+                class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-500 text-[10px] font-bold text-white"
+              >
+                {{ activityItem.actor?.initials || "HT" }}
+              </span>
+              <span class="min-w-0 flex-1">
+                <span class="block text-sm leading-snug text-slate-600">
+                  <strong class="font-semibold text-slate-900">
+                    {{ activityItem.actor?.name || "Người dùng hệ thống" }}
+                  </strong>
+                  {{ activityItem.action }}
+                  <strong class="font-semibold text-slate-800">{{ activityItem.target }}</strong>
+                </span>
+                <span v-if="activityItem.detail" class="mt-1 block line-clamp-2 text-xs text-slate-500">
+                  {{ activityItem.detail }}
+                </span>
+                <span class="mt-1.5 block text-[11px] font-medium text-slate-500">
+                  {{ timeAgo(activityItem.createdAt) }}
+                </span>
+              </span>
+              <ChevronRight
+                v-if="activityTarget(activityItem)"
+                class="mt-2 h-4 w-4 shrink-0 text-slate-300 transition group-hover:text-violet-600"
+              />
             </button>
           </div>
 
-          <div class="p-5 flex-1 overflow-y-auto custom-scrollbar">
-            <div
-              v-if="showRecentActivities && overviewActivities.length"
-              class="relative border-l border-slate-200 ml-4 space-y-6 pb-4"
-            >
-              <div
-                v-for="activity in overviewActivities.slice(0, 8)"
-                :key="activity.id"
-                class="relative pl-6"
-              >
-                <!-- Timeline dot -->
-                <div class="absolute -left-[17px] top-1">
-                  <div
-                    :class="[
-                      'w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold text-white shadow-sm ring-4 ring-white',
-                      `bg-${activity.actor?.color || 'slate'}-500`,
-                    ]"
-                  >
-                    {{ activity.actor?.initials || "HT" }}
-                  </div>
-                </div>
-
-                <div class="bg-slate-50 rounded-xl p-3 border border-slate-100">
-                  <p class="text-sm text-slate-600 leading-snug">
-                    <span class="font-bold text-slate-900">{{
-                      activity.actor?.name || "Người dùng hệ thống"
-                    }}</span>
-                    {{ activity.action }}
-                    <span class="font-medium text-slate-900">{{
-                      activity.target
-                    }}</span>
-                  </p>
-                  <p
-                    v-if="activity.detail"
-                    class="text-xs text-slate-500 mt-1 italic"
-                  >
-                    "{{ activity.detail }}"
-                  </p>
-                  <p
-                    class="text-[10px] font-medium text-slate-400 mt-2 uppercase tracking-wide"
-                  >
-                    {{ timeAgo(activity.createdAt) }}
-                  </p>
-                </div>
-              </div>
-            </div>
-            <div v-else class="text-center py-8">
-              <p class="text-slate-500 text-sm">
-                Chưa có hoạt động nào (hoặc đang ẩn).
-              </p>
-            </div>
+          <div v-else class="px-5 py-10 text-center">
+            <Activity class="mx-auto h-7 w-7 text-slate-400" />
+            <p class="mt-3 text-sm font-semibold text-slate-800">Chưa có hoạt động nào</p>
+            <p class="mt-1 text-xs text-slate-500">Các thay đổi mới sẽ xuất hiện tại đây.</p>
           </div>
-        </div>
+        </section>
       </div>
-    </div>
+    </template>
   </div>
 
   <Teleport to="body">

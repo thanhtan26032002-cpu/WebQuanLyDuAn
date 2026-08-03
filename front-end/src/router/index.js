@@ -11,6 +11,7 @@ const routes = [
   { path: '/team', name: 'team', component: () => import('../views/TeamView.vue'), meta: { title: 'Nhóm' } },
   { path: '/calendar', name: 'calendar', component: () => import('../views/CalendarView.vue'), meta: { title: 'Lịch' } },
   { path: '/notifications', name: 'notifications', component: () => import('../views/NotificationsView.vue'), meta: { title: 'Thông báo' } },
+  { path: '/activities', name: 'activity-history', component: () => import('../views/ActivityHistoryView.vue'), meta: { title: 'Lịch sử hoạt động' } },
   { path: '/reports', name: 'reports', component: () => import('../views/ReportsView.vue'), meta: { title: 'Báo cáo', roles: ['admin', 'project_manager', 'manager'] } },
   { path: '/trash', name: 'trash', component: () => import('../views/TrashView.vue'), meta: { title: 'Thùng rác' } },
   { path: '/settings', name: 'settings', component: () => import('../views/SettingsView.vue'), meta: { title: 'Cài đặt' } },
