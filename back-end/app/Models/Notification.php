@@ -9,13 +9,16 @@ use Illuminate\Database\Eloquent\Model;
 
 class Notification extends Model
 {
-    use HasFactory, GeneratesCode, MapsAttributes;
+    use GeneratesCode, HasFactory, MapsAttributes;
 
     protected $primaryKey = 'notif_code';
+
     public $incrementing = false;
+
     protected $keyType = 'string';
 
     const CREATED_AT = 'notif_created_at';
+
     const UPDATED_AT = 'notif_updated_at';
 
     protected $fillable = [
@@ -23,11 +26,13 @@ class Notification extends Model
         'notif_title',
         'notif_message',
         'notif_type',
-        'notif_is_read'
+        'notif_target_type',
+        'notif_target_code',
+        'notif_is_read',
     ];
 
     protected $casts = [
-        'notif_is_read' => 'boolean'
+        'notif_is_read' => 'boolean',
     ];
 
     public function getCodePrefix()
@@ -43,6 +48,8 @@ class Notification extends Model
             'notif_title' => 'title',
             'notif_message' => 'message',
             'notif_type' => 'type',
+            'notif_target_type' => 'target_type',
+            'notif_target_code' => 'target_code',
             'notif_is_read' => 'is_read',
             'notif_created_at' => 'created_at',
             'notif_updated_at' => 'updated_at',

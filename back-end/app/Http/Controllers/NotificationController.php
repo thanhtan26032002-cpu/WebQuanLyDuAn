@@ -9,18 +9,17 @@ class NotificationController extends Controller
 {
     public function index(Request $request)
     {
-        $notifications = Notification::where('notif_user_code', $request->user()->user_code)
-            ->orderBy('notif_created_at', 'desc')
-            ->limit(50)
-            ->get()
-            ->map(fn (Notification $notification) => [
-                'id' => $notification->notif_code,
-                'title' => $notification->notif_title,
-                'message' => $notification->notif_message,
-                'type' => $notification->notif_type,
-                'read' => $notification->notif_is_read,
-                'createdAt' => $notification->notif_created_at,
-            ]);
+        $query = Notification::where('notif_user_code', $request->user()->user_code)
+            ->orderByDesc('notif_created_at');
+
+        if ($request->boolean('paginate')) {
+            $notifications = $query->paginate(min(100, max(10, $request->integer('per_page', 30))));
+            $notifications->getCollection()->transform(fn (Notification $notification) => $this->formatNotification($notification));
+
+            return response()->json($notifications);
+        }
+
+        $notifications = $query->limit(50)->get()->map(fn (Notification $notification) => $this->formatNotification($notification));
 
         return response()->json($notifications);
     }
@@ -69,6 +68,20 @@ class NotificationController extends Controller
             'comments' => true,
             'mentions' => true,
             'blocked' => true,
+        ];
+    }
+
+    private function formatNotification(Notification $notification): array
+    {
+        return [
+            'id' => $notification->notif_code,
+            'title' => $notification->notif_title,
+            'message' => $notification->notif_message,
+            'type' => $notification->notif_type,
+            'targetType' => $notification->notif_target_type,
+            'targetCode' => $notification->notif_target_code,
+            'read' => $notification->notif_is_read,
+            'createdAt' => $notification->notif_created_at,
         ];
     }
 }

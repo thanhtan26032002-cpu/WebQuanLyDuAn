@@ -174,11 +174,14 @@ CREATE TABLE `notifications` (
   `notif_title` varchar(255) NOT NULL,
   `notif_message` text NOT NULL,
   `notif_type` varchar(255) NOT NULL DEFAULT 'info',
+  `notif_target_type` varchar(30) DEFAULT NULL,
+  `notif_target_code` varchar(50) DEFAULT NULL,
   `notif_is_read` tinyint(1) NOT NULL DEFAULT 0,
   `notif_created_at` timestamp NULL DEFAULT NULL,
   `notif_updated_at` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`notif_code`),
   KEY `notif_user_code` (`notif_user_code`),
+  KEY `notifications_user_target_index` (`notif_user_code`,`notif_target_type`,`notif_target_code`),
   CONSTRAINT `notifications_ibfk_1` FOREIGN KEY (`notif_user_code`) REFERENCES `users` (`user_code`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -507,7 +510,8 @@ INSERT INTO `migrations` VALUES
 (22,'2026_07_31_000001_add_task_created_by_to_tasks_table',6),
 (23,'2026_07_31_000002_backfill_task_created_by',7),
 (24,'2026_07_31_000003_add_project_code_to_activities_table',8),
-(25,'2026_08_03_000001_add_deadline_governance',9);
+(25,'2026_08_03_000001_add_deadline_governance',9),
+(26,'2026_08_03_000002_add_targets_to_notifications_table',10);
 UNLOCK TABLES;
 
 -- Tài khoản thử nghiệm không được ghi cứng vào mã nguồn.

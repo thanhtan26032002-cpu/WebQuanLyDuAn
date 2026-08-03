@@ -20,7 +20,14 @@ class AutomationService
         if ($task->task_status === 'done' && $previousStatus !== 'done' && $rules->contains('automation_rule', 'completion_notify_manager')) {
             $managerUser = $project->manager;
             if ($managerUser) {
-                ActivityService::notify($managerUser->user_code, 'Nhiệm vụ đã hoàn thành', $task->task_title.' đã được hoàn thành.', 'success');
+                ActivityService::notify(
+                    $managerUser->user_code,
+                    'Nhiệm vụ đã hoàn thành',
+                    $task->task_title.' đã được hoàn thành.',
+                    'success',
+                    'Task',
+                    $task->task_code
+                );
             }
         }
 
@@ -36,7 +43,9 @@ class AutomationService
                         $nextAssignee->user_code,
                         'Nhiệm vụ được bàn giao',
                         'Bạn đã được bàn giao nhiệm vụ: '.$task->task_title,
-                        'info'
+                        'info',
+                        'Task',
+                        $task->task_code
                     );
                 }
             }
@@ -73,7 +82,14 @@ class AutomationService
                         ->whereDate('notif_created_at', now()->toDateString())
                         ->exists();
                     if (! $alreadySent) {
-                        ActivityService::notify($user->user_code, 'Nhắc hạn nhiệm vụ', $message, 'warning');
+                        ActivityService::notify(
+                            $user->user_code,
+                            'Nhắc hạn nhiệm vụ',
+                            $message,
+                            'warning',
+                            'Task',
+                            $task->task_code
+                        );
                         $count++;
                     }
                 }
@@ -110,7 +126,14 @@ class AutomationService
                         .$level.' ngày (hạn '.$task->task_due_date->toDateString().').';
                     foreach ($recipients->filter()->unique('user_code') as $recipient) {
                         if (self::deadlineNotificationsEnabled($recipient)
-                            && self::notifyOnce($recipient->user_code, 'Cảnh báo nhiệm vụ quá hạn', $message, 'danger')) {
+                            && self::notifyOnce(
+                                $recipient->user_code,
+                                'Cảnh báo nhiệm vụ quá hạn',
+                                $message,
+                                'danger',
+                                'Task',
+                                $task->task_code
+                            )) {
                             $count++;
                         }
                     }
@@ -145,7 +168,14 @@ class AutomationService
                         .$level.' ngày (hạn '.$project->project_due_date->toDateString().').';
                     foreach ($recipients->filter()->unique('user_code') as $recipient) {
                         if (self::deadlineNotificationsEnabled($recipient)
-                            && self::notifyOnce($recipient->user_code, 'Cảnh báo dự án quá hạn', $message, 'danger')) {
+                            && self::notifyOnce(
+                                $recipient->user_code,
+                                'Cảnh báo dự án quá hạn',
+                                $message,
+                                'danger',
+                                'Project',
+                                $project->project_code
+                            )) {
                             $count++;
                         }
                     }
@@ -170,13 +200,19 @@ class AutomationService
         return ($user->user_notification_preferences['deadline'] ?? true) !== false;
     }
 
-    private static function notifyOnce(string $userCode, string $title, string $message, string $type): bool
-    {
+    private static function notifyOnce(
+        string $userCode,
+        string $title,
+        string $message,
+        string $type,
+        string $targetType,
+        string $targetCode
+    ): bool {
         if (Notification::where('notif_user_code', $userCode)->where('notif_message', $message)->exists()) {
             return false;
         }
 
-        ActivityService::notify($userCode, $title, $message, $type);
+        ActivityService::notify($userCode, $title, $message, $type, $targetType, $targetCode);
 
         return true;
     }

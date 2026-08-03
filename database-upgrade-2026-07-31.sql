@@ -189,3 +189,43 @@ UPDATE `projects`
 SET `project_completed_at` = `project_updated_at`
 WHERE `project_status` = 'completed'
   AND `project_completed_at` IS NULL;
+
+-- Dinh tuyen thong bao den dung du an hoac nhiem vu.
+SET @notification_target_type_exists = (
+  SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'notifications' AND COLUMN_NAME = 'notif_target_type'
+);
+SET @notification_target_type_sql = IF(
+  @notification_target_type_exists = 0,
+  'ALTER TABLE `notifications` ADD COLUMN `notif_target_type` varchar(30) NULL AFTER `notif_type`',
+  'SELECT ''notifications.notif_target_type already exists'' AS message'
+);
+PREPARE notification_target_type_statement FROM @notification_target_type_sql;
+EXECUTE notification_target_type_statement;
+DEALLOCATE PREPARE notification_target_type_statement;
+
+SET @notification_target_code_exists = (
+  SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'notifications' AND COLUMN_NAME = 'notif_target_code'
+);
+SET @notification_target_code_sql = IF(
+  @notification_target_code_exists = 0,
+  'ALTER TABLE `notifications` ADD COLUMN `notif_target_code` varchar(50) NULL AFTER `notif_target_type`',
+  'SELECT ''notifications.notif_target_code already exists'' AS message'
+);
+PREPARE notification_target_code_statement FROM @notification_target_code_sql;
+EXECUTE notification_target_code_statement;
+DEALLOCATE PREPARE notification_target_code_statement;
+
+SET @notification_target_index_exists = (
+  SELECT COUNT(*) FROM information_schema.STATISTICS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'notifications' AND INDEX_NAME = 'notifications_user_target_index'
+);
+SET @notification_target_index_sql = IF(
+  @notification_target_index_exists = 0,
+  'ALTER TABLE `notifications` ADD INDEX `notifications_user_target_index` (`notif_user_code`, `notif_target_type`, `notif_target_code`)',
+  'SELECT ''notifications_user_target_index already exists'' AS message'
+);
+PREPARE notification_target_index_statement FROM @notification_target_index_sql;
+EXECUTE notification_target_index_statement;
+DEALLOCATE PREPARE notification_target_index_statement;

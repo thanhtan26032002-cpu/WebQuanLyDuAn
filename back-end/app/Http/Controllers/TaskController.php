@@ -169,7 +169,9 @@ class TaskController extends Controller
                     $task->task_assignee_code,
                     'Nhiệm vụ mới',
                     'Bạn đã được phân công nhiệm vụ: '.$task->task_title,
-                    'info'
+                    'info',
+                    'Task',
+                    $task->task_code
                 );
             }
         }
@@ -334,7 +336,9 @@ class TaskController extends Controller
                     $assignedUser->user_code,
                     'Nhiệm vụ mới được phân công',
                     'Bạn đã được phân công nhiệm vụ: '.$task->task_title,
-                    'info'
+                    'info',
+                    'Task',
+                    $task->task_code
                 );
             }
         }
@@ -746,7 +750,14 @@ class TaskController extends Controller
     {
         $task->watchers()->where('users.user_code', '!=', $actorCode)->get()
             ->filter(fn (User $user) => ($user->user_notification_preferences['comments'] ?? true) !== false)
-            ->each(fn (User $user) => ActivityService::notify($user->user_code, $title, $message, 'info'));
+            ->each(fn (User $user) => ActivityService::notify(
+                $user->user_code,
+                $title,
+                $message,
+                'info',
+                'Task',
+                $task->task_code
+            ));
     }
 
     private function trashItem(Task $task, bool $canRestoreByUser): array

@@ -38,13 +38,21 @@ class ActivityService
     /**
      * Gửi thông báo cho một thành viên.
      */
-    public static function notify($userCode, $title, $message, $type = 'info')
-    {
+    public static function notify(
+        $userCode,
+        $title,
+        $message,
+        $type = 'info',
+        $targetType = null,
+        $targetCode = null
+    ) {
         return Notification::create([
             'notif_user_code' => $userCode,
             'notif_title' => $title,
             'notif_message' => $message,
             'notif_type' => $type,
+            'notif_target_type' => $targetType,
+            'notif_target_code' => $targetCode,
             'notif_is_read' => false,
         ]);
     }

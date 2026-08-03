@@ -1,14 +1,19 @@
 <script setup>
 import { computed, onMounted, onUnmounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { Bell, MessageSquare, AtSign, Settings, CheckCheck, AlertTriangle } from '@lucide/vue'
 import { useProjectWorkspace } from '../../composables/useProjectWorkspace'
+import { notificationDestination, notificationTimeAgo } from '../../utils/notifications'
+
+const router = useRouter()
 
 const { 
   notifications, 
   notificationDropdownOpen, 
   markNotificationAsRead, 
   markAllNotificationsAsRead,
-  timeAgo
+  activeTaskId,
+  refreshLiveData,
 } = useProjectWorkspace()
 
 const unreadCount = computed(() => notifications.value.filter(n => !n.read).length)
@@ -17,8 +22,33 @@ const markAllRead = () => {
   markAllNotificationsAsRead()
 }
 
-const markAsRead = (id) => {
-  markNotificationAsRead(id)
+const toggleDropdown = () => {
+  notificationDropdownOpen.value = !notificationDropdownOpen.value
+  if (notificationDropdownOpen.value) refreshLiveData()
+}
+
+const openNotification = async (notification) => {
+  await markNotificationAsRead(notification.id)
+  const destination = notificationDestination(notification)
+  notificationDropdownOpen.value = false
+  if (!destination) {
+    await router.push({ name: 'notifications' })
+    return
+  }
+  if ((notification.targetType || notification.target_type) === 'Task') {
+    activeTaskId.value = notification.targetCode || notification.target_code
+  }
+  await router.push(destination)
+}
+
+const openAllNotifications = () => {
+  notificationDropdownOpen.value = false
+  router.push({ name: 'notifications' })
+}
+
+const openNotificationSettings = () => {
+  notificationDropdownOpen.value = false
+  router.push({ name: 'settings' })
 }
 
 const getIcon = (type) => {
@@ -43,7 +73,8 @@ const getColor = (type) => {
 
 // Click outside to close
 const closeDropdown = (e) => {
-  if (notificationDropdownOpen.value && !e.target.closest('#notification-container')) {
+  const clickedInside = e.target instanceof Element && e.target.closest('#notification-container')
+  if (notificationDropdownOpen.value && !clickedInside) {
     notificationDropdownOpen.value = false
   }
 }
@@ -55,7 +86,10 @@ onUnmounted(() => document.removeEventListener('click', closeDropdown))
   <div id="notification-container" class="relative">
     <!-- Trigger Button -->
     <button 
-      @click="notificationDropdownOpen = !notificationDropdownOpen"
+      @click="toggleDropdown"
+      :aria-expanded="notificationDropdownOpen"
+      aria-haspopup="true"
+      aria-label="Mở thông báo"
       class="relative p-2.5 rounded-xl hover:bg-slate-100 text-slate-500 transition-colors"
       :class="{'bg-slate-100 text-violet-600': notificationDropdownOpen}"
     >
@@ -86,7 +120,7 @@ onUnmounted(() => document.removeEventListener('click', closeDropdown))
             <button @click="markAllRead" class="p-1.5 text-slate-400 hover:text-violet-600 hover:bg-violet-50 rounded-lg transition-colors" title="Đánh dấu đã đọc tất cả">
               <CheckCheck class="w-4 h-4" />
             </button>
-            <button class="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors" title="Cài đặt">
+            <button @click="openNotificationSettings" class="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors" title="Cài đặt">
               <Settings class="w-4 h-4" />
             </button>
           </div>
@@ -101,7 +135,7 @@ onUnmounted(() => document.removeEventListener('click', closeDropdown))
           <div 
             v-for="notif in notifications" 
             :key="notif.id"
-            @click="markAsRead(notif.id)"
+            @click="openNotification(notif)"
             class="p-4 border-b border-slate-50/50 hover:bg-white transition-colors cursor-pointer flex gap-4 relative group"
             :class="!notif.read ? 'bg-violet-50/30' : ''"
           >
@@ -117,14 +151,14 @@ onUnmounted(() => document.removeEventListener('click', closeDropdown))
             <div class="flex-1 min-w-0">
               <p class="text-sm font-semibold text-slate-900 mb-0.5">{{ notif.title }}</p>
               <p class="text-xs text-slate-600 line-clamp-2 leading-relaxed mb-1.5">{{ notif.message }}</p>
-              <span class="text-[10px] font-medium text-slate-400 uppercase tracking-wide">{{ notif.createdAt ? timeAgo(notif.createdAt) : (notif.time || '') }}</span>
+              <span class="text-[10px] font-medium text-slate-400 uppercase tracking-wide">{{ notif.createdAt ? notificationTimeAgo(notif.createdAt) : (notif.time || '') }}</span>
             </div>
           </div>
         </div>
         
         <!-- Footer -->
         <div class="p-3 bg-slate-50/50 border-t border-slate-100/50 text-center">
-          <button class="text-sm font-medium text-violet-600 hover:text-violet-700 transition-colors">Xem tất cả thông báo</button>
+          <button @click="openAllNotifications" class="text-sm font-medium text-violet-600 hover:text-violet-700 transition-colors">Xem tất cả thông báo</button>
         </div>
       </div>
     </Transition>

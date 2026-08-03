@@ -1,5 +1,6 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { Plus, Search, List, KanbanSquare, MoreHorizontal, Check, CheckSquare, CalendarDays, BookmarkPlus, Trash2 } from '@lucide/vue'
 import draggable from 'vuedraggable'
 import TaskCard from '../components/common/TaskCard.vue'
@@ -9,6 +10,7 @@ import { useProjectWorkspace } from '../composables/useProjectWorkspace'
 import { apiFetch, parseApiError } from '../services/api'
 
 const statusFilter = ref('all')
+const route = useRoute()
 const priorityFilter = ref('all')
 const viewMode = ref('kanban')
 const { tasks, globalSearch, taskModalOpen, priorityMap, taskStatusMap, findMember, findProject, formatDate, getTaskDeadlineState, toggleTaskComplete, activeTaskId, moveTask, notify, currentUser } = useProjectWorkspace()
@@ -56,6 +58,16 @@ const deleteSavedView = async () => {
 }
 
 onMounted(loadSavedViews)
+
+watch(
+  [() => route.query.task, () => tasks.value.length],
+  ([taskCode]) => {
+    if (taskCode && tasks.value.some(task => task.id === taskCode)) {
+      activeTaskId.value = taskCode
+    }
+  },
+  { immediate: true },
+)
 
 const deadlineDateClass = (task) => {
   const state = getTaskDeadlineState(task.dueDate, task.status)
