@@ -61,7 +61,7 @@ const emptyData = () => ({
 const loading = ref(true);
 const error = ref("");
 const data = ref(emptyData());
-const workspaceView = ref("tasks");
+const activeSection = ref("tasks");
 const activeTab = ref("active");
 const projectFilter = ref("all");
 const searchQuery = ref("");
@@ -280,7 +280,7 @@ function selectSummary(card) {
 }
 
 function switchWorkspace(view) {
-  workspaceView.value = view;
+  activeSection.value = view;
   searchQuery.value = "";
   if (view === "tasks" && !["active", "completed", "overdue"].includes(activeTab.value)) activeTab.value = "active";
 }
@@ -297,7 +297,7 @@ onMounted(load);
     <header class="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
       <div>
         <p class="text-xs font-bold uppercase tracking-[0.2em] text-violet-600">
-          Không gian làm việc cá nhân
+          Khu vực cá nhân
         </p>
         <h1 class="mt-1 text-3xl font-bold text-slate-900">Công việc của tôi</h1>
         <p class="mt-2 max-w-2xl text-sm leading-relaxed text-slate-500">
@@ -325,14 +325,14 @@ onMounted(load);
       <div class="inline-flex rounded-2xl border border-slate-200 bg-white p-1.5 shadow-sm">
         <button
           type="button"
-          :class="['flex min-w-36 items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold transition', workspaceView === 'tasks' ? 'bg-gradient-to-r from-violet-500 to-indigo-600 text-white shadow-md shadow-violet-200' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800']"
+          :class="['flex min-w-36 items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold transition', activeSection === 'tasks' ? 'bg-gradient-to-r from-violet-500 to-indigo-600 text-white shadow-md shadow-violet-200' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800']"
           @click="switchWorkspace('tasks')"
         >
           <ListTodo class="h-4 w-4" /> Nhiệm vụ
         </button>
         <button
           type="button"
-          :class="['flex min-w-36 items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold transition', workspaceView === 'projects' ? 'bg-gradient-to-r from-violet-500 to-indigo-600 text-white shadow-md shadow-violet-200' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800']"
+          :class="['flex min-w-36 items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold transition', activeSection === 'projects' ? 'bg-gradient-to-r from-violet-500 to-indigo-600 text-white shadow-md shadow-violet-200' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800']"
           @click="switchWorkspace('projects')"
         >
           <FolderKanban class="h-4 w-4" /> Dự án
@@ -349,7 +349,7 @@ onMounted(load);
       <button class="font-bold underline" @click="load">Thử lại</button>
     </div>
 
-    <div v-if="workspaceView === 'tasks'" class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <div v-if="activeSection === 'tasks'" class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <button
         v-for="card in summaryCards"
         :key="card.id"
@@ -387,7 +387,7 @@ onMounted(load);
       </button>
     </div>
 
-    <section v-if="workspaceView === 'tasks'" class="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
+    <section v-if="activeSection === 'tasks'" class="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
       <div class="flex flex-col gap-4 border-b border-slate-100 p-4 sm:flex-row sm:items-center sm:justify-between">
         <div class="flex flex-wrap rounded-xl bg-slate-100 p-1">
           <button

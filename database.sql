@@ -1,3 +1,8 @@
+-- MariaDB dump 10.19  Distrib 10.4.32-MariaDB, for Win64 (AMD64)
+--
+-- Host: localhost    Database: web_quan_ly_du_an
+-- ------------------------------------------------------
+-- Server version	10.4.32-MariaDB
 
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
 /*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
@@ -10,11 +15,10 @@
 /*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
 /*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
 
-/*!40000 DROP DATABASE IF EXISTS `web_quan_ly_du_an`*/;
+--
+-- Table structure for table `activities`
+--
 
-CREATE DATABASE /*!32312 IF NOT EXISTS*/ `web_quan_ly_du_an` /*!40100 DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci */;
-
-USE `web_quan_ly_du_an`;
 DROP TABLE IF EXISTS `activities`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
@@ -31,10 +35,24 @@ CREATE TABLE `activities` (
   PRIMARY KEY (`activity_code`),
   KEY `activity_user_code` (`activity_user_code`),
   KEY `activities_project_created_index` (`activity_project_code`,`activity_created_at`),
-  CONSTRAINT `activities_ibfk_1` FOREIGN KEY (`activity_user_code`) REFERENCES `users` (`user_code`) ON DELETE CASCADE,
-  CONSTRAINT `activities_activity_project_code_foreign` FOREIGN KEY (`activity_project_code`) REFERENCES `projects` (`project_code`) ON DELETE SET NULL
+  CONSTRAINT `activities_activity_project_code_foreign` FOREIGN KEY (`activity_project_code`) REFERENCES `projects` (`project_code`) ON DELETE SET NULL,
+  CONSTRAINT `activities_ibfk_1` FOREIGN KEY (`activity_user_code`) REFERENCES `users` (`user_code`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `activities`
+--
+
+LOCK TABLES `activities` WRITE;
+/*!40000 ALTER TABLE `activities` DISABLE KEYS */;
+/*!40000 ALTER TABLE `activities` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `attachments`
+--
+
 DROP TABLE IF EXISTS `attachments`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
@@ -54,6 +72,20 @@ CREATE TABLE `attachments` (
   CONSTRAINT `attachments_ibfk_1` FOREIGN KEY (`attachment_uploaded_by`) REFERENCES `users` (`user_code`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `attachments`
+--
+
+LOCK TABLES `attachments` WRITE;
+/*!40000 ALTER TABLE `attachments` DISABLE KEYS */;
+/*!40000 ALTER TABLE `attachments` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `cache`
+--
+
 DROP TABLE IF EXISTS `cache`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
@@ -65,6 +97,20 @@ CREATE TABLE `cache` (
   KEY `cache_expiration_index` (`expiration`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `cache`
+--
+
+LOCK TABLES `cache` WRITE;
+/*!40000 ALTER TABLE `cache` DISABLE KEYS */;
+/*!40000 ALTER TABLE `cache` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `cache_locks`
+--
+
 DROP TABLE IF EXISTS `cache_locks`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
@@ -76,6 +122,20 @@ CREATE TABLE `cache_locks` (
   KEY `cache_locks_expiration_index` (`expiration`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `cache_locks`
+--
+
+LOCK TABLES `cache_locks` WRITE;
+/*!40000 ALTER TABLE `cache_locks` DISABLE KEYS */;
+/*!40000 ALTER TABLE `cache_locks` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `customers`
+--
+
 DROP TABLE IF EXISTS `customers`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
@@ -92,6 +152,54 @@ CREATE TABLE `customers` (
   PRIMARY KEY (`customer_code`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `customers`
+--
+
+LOCK TABLES `customers` WRITE;
+/*!40000 ALTER TABLE `customers` DISABLE KEYS */;
+INSERT INTO `customers` VALUES ('KH0001','Nguyễn Văn A','Công ty cổ phần ABC','a@gmail.com','0123456789',NULL,NULL,'2026-08-03 02:19:25','2026-08-03 02:19:25');
+/*!40000 ALTER TABLE `customers` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `deadline_extensions`
+--
+
+DROP TABLE IF EXISTS `deadline_extensions`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `deadline_extensions` (
+  `extension_code` varchar(50) NOT NULL,
+  `extension_target_type` varchar(20) NOT NULL,
+  `extension_target_code` varchar(50) NOT NULL,
+  `extension_old_due_date` date NOT NULL,
+  `extension_new_due_date` date NOT NULL,
+  `extension_reason` text NOT NULL,
+  `extension_created_by` varchar(50) NOT NULL,
+  `extension_created_at` timestamp NULL DEFAULT NULL,
+  `extension_updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`extension_code`),
+  KEY `deadline_extensions_extension_created_by_foreign` (`extension_created_by`),
+  KEY `deadline_extension_target_index` (`extension_target_type`,`extension_target_code`,`extension_created_at`),
+  CONSTRAINT `deadline_extensions_extension_created_by_foreign` FOREIGN KEY (`extension_created_by`) REFERENCES `users` (`user_code`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `deadline_extensions`
+--
+
+LOCK TABLES `deadline_extensions` WRITE;
+/*!40000 ALTER TABLE `deadline_extensions` DISABLE KEYS */;
+/*!40000 ALTER TABLE `deadline_extensions` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `failed_jobs`
+--
+
 DROP TABLE IF EXISTS `failed_jobs`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
@@ -108,6 +216,20 @@ CREATE TABLE `failed_jobs` (
   KEY `failed_jobs_connection_queue_failed_at_index` (`connection`,`queue`,`failed_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `failed_jobs`
+--
+
+LOCK TABLES `failed_jobs` WRITE;
+/*!40000 ALTER TABLE `failed_jobs` DISABLE KEYS */;
+/*!40000 ALTER TABLE `failed_jobs` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `groups`
+--
+
 DROP TABLE IF EXISTS `groups`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
@@ -123,6 +245,20 @@ CREATE TABLE `groups` (
   PRIMARY KEY (`group_code`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `groups`
+--
+
+LOCK TABLES `groups` WRITE;
+/*!40000 ALTER TABLE `groups` DISABLE KEYS */;
+/*!40000 ALTER TABLE `groups` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `job_batches`
+--
+
 DROP TABLE IF EXISTS `job_batches`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
@@ -140,6 +276,20 @@ CREATE TABLE `job_batches` (
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `job_batches`
+--
+
+LOCK TABLES `job_batches` WRITE;
+/*!40000 ALTER TABLE `job_batches` DISABLE KEYS */;
+/*!40000 ALTER TABLE `job_batches` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `jobs`
+--
+
 DROP TABLE IF EXISTS `jobs`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
@@ -155,6 +305,20 @@ CREATE TABLE `jobs` (
   KEY `jobs_queue_index` (`queue`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `jobs`
+--
+
+LOCK TABLES `jobs` WRITE;
+/*!40000 ALTER TABLE `jobs` DISABLE KEYS */;
+/*!40000 ALTER TABLE `jobs` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `migrations`
+--
+
 DROP TABLE IF EXISTS `migrations`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
@@ -163,8 +327,23 @@ CREATE TABLE `migrations` (
   `migration` varchar(255) NOT NULL,
   `batch` int(11) NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=21 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=29 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `migrations`
+--
+
+LOCK TABLES `migrations` WRITE;
+/*!40000 ALTER TABLE `migrations` DISABLE KEYS */;
+INSERT INTO `migrations` VALUES (1,'0001_01_01_000000_create_users_table',1),(2,'2026_01_01_000000_create_groups_table',1),(3,'2026_01_01_000000_create_members_table',1),(4,'2026_01_01_000001_create_projects_table',1),(5,'2026_01_01_000002_create_project_members_table',1),(6,'2026_01_01_000003_create_tasks_table',1),(7,'2026_01_01_000004_create_activities_table',1),(8,'2026_01_01_000005_create_task_comments_table',1),(9,'2026_01_01_000006_create_attachments_table',1),(10,'2026_01_01_000007_create_notifications_table',1),(11,'2026_07_28_000000_add_color_to_projects_table',1),(12,'2026_07_28_000001_add_color_to_members_table',1),(13,'2026_07_29_000000_add_customers_and_planning_fields',1),(14,'2026_07_29_000001_remove_project_budget',1),(15,'2026_07_30_000000_add_soft_deletes_to_projects_and_tasks',1),(16,'2026_07_30_000001_create_task_progress_tables',1),(17,'0001_01_01_000001_create_cache_table',2),(18,'0001_01_01_000002_create_jobs_table',2),(19,'2026_07_30_000002_add_professional_project_management_features',3),(20,'2026_07_30_000003_merge_members_into_users',4),(21,'2026_07_30_000004_limit_system_roles_and_default_to_member',5),(22,'2026_07_31_000001_add_task_created_by_to_tasks_table',6),(23,'2026_07_31_000002_backfill_task_created_by',7),(24,'2026_07_31_000003_add_project_code_to_activities_table',8),(25,'2026_08_03_000001_add_deadline_governance',9),(26,'2026_08_03_000002_add_targets_to_notifications_table',10),(27,'2026_08_03_000003_create_project_notes_table',11);
+/*!40000 ALTER TABLE `migrations` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `notifications`
+--
+
 DROP TABLE IF EXISTS `notifications`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
@@ -185,6 +364,20 @@ CREATE TABLE `notifications` (
   CONSTRAINT `notifications_ibfk_1` FOREIGN KEY (`notif_user_code`) REFERENCES `users` (`user_code`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `notifications`
+--
+
+LOCK TABLES `notifications` WRITE;
+/*!40000 ALTER TABLE `notifications` DISABLE KEYS */;
+/*!40000 ALTER TABLE `notifications` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `project_automations`
+--
+
 DROP TABLE IF EXISTS `project_automations`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
@@ -201,6 +394,20 @@ CREATE TABLE `project_automations` (
   CONSTRAINT `project_automations_automation_project_code_foreign` FOREIGN KEY (`automation_project_code`) REFERENCES `projects` (`project_code`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `project_automations`
+--
+
+LOCK TABLES `project_automations` WRITE;
+/*!40000 ALTER TABLE `project_automations` DISABLE KEYS */;
+/*!40000 ALTER TABLE `project_automations` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `project_members`
+--
+
 DROP TABLE IF EXISTS `project_members`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
@@ -218,6 +425,20 @@ CREATE TABLE `project_members` (
   CONSTRAINT `project_members_pm_member_code_foreign` FOREIGN KEY (`pm_member_code`) REFERENCES `users` (`user_code`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `project_members`
+--
+
+LOCK TABLES `project_members` WRITE;
+/*!40000 ALTER TABLE `project_members` DISABLE KEYS */;
+/*!40000 ALTER TABLE `project_members` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `project_milestones`
+--
+
 DROP TABLE IF EXISTS `project_milestones`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
@@ -235,6 +456,20 @@ CREATE TABLE `project_milestones` (
   CONSTRAINT `project_milestones_milestone_project_code_foreign` FOREIGN KEY (`milestone_project_code`) REFERENCES `projects` (`project_code`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `project_milestones`
+--
+
+LOCK TABLES `project_milestones` WRITE;
+/*!40000 ALTER TABLE `project_milestones` DISABLE KEYS */;
+/*!40000 ALTER TABLE `project_milestones` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `project_notes`
+--
+
 DROP TABLE IF EXISTS `project_notes`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
@@ -250,10 +485,24 @@ CREATE TABLE `project_notes` (
   PRIMARY KEY (`note_code`),
   KEY `project_notes_note_author_code_foreign` (`note_author_code`),
   KEY `project_notes_project_pinned_updated_index` (`note_project_code`,`note_is_pinned`,`note_updated_at`),
-  CONSTRAINT `project_notes_note_project_code_foreign` FOREIGN KEY (`note_project_code`) REFERENCES `projects` (`project_code`) ON DELETE CASCADE,
-  CONSTRAINT `project_notes_note_author_code_foreign` FOREIGN KEY (`note_author_code`) REFERENCES `users` (`user_code`) ON DELETE CASCADE
+  CONSTRAINT `project_notes_note_author_code_foreign` FOREIGN KEY (`note_author_code`) REFERENCES `users` (`user_code`) ON DELETE CASCADE,
+  CONSTRAINT `project_notes_note_project_code_foreign` FOREIGN KEY (`note_project_code`) REFERENCES `projects` (`project_code`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `project_notes`
+--
+
+LOCK TABLES `project_notes` WRITE;
+/*!40000 ALTER TABLE `project_notes` DISABLE KEYS */;
+/*!40000 ALTER TABLE `project_notes` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `project_updates`
+--
+
 DROP TABLE IF EXISTS `project_updates`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
@@ -274,25 +523,20 @@ CREATE TABLE `project_updates` (
   CONSTRAINT `project_updates_update_project_code_foreign` FOREIGN KEY (`update_project_code`) REFERENCES `projects` (`project_code`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `deadline_extensions`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `deadline_extensions` (
-  `extension_code` varchar(50) NOT NULL,
-  `extension_target_type` varchar(20) NOT NULL,
-  `extension_target_code` varchar(50) NOT NULL,
-  `extension_old_due_date` date NOT NULL,
-  `extension_new_due_date` date NOT NULL,
-  `extension_reason` text NOT NULL,
-  `extension_created_by` varchar(50) NOT NULL,
-  `extension_created_at` timestamp NULL DEFAULT NULL,
-  `extension_updated_at` timestamp NULL DEFAULT NULL,
-  PRIMARY KEY (`extension_code`),
-  KEY `deadline_extension_target_index` (`extension_target_type`,`extension_target_code`,`extension_created_at`),
-  KEY `deadline_extensions_extension_created_by_foreign` (`extension_created_by`),
-  CONSTRAINT `deadline_extensions_extension_created_by_foreign` FOREIGN KEY (`extension_created_by`) REFERENCES `users` (`user_code`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `project_updates`
+--
+
+LOCK TABLES `project_updates` WRITE;
+/*!40000 ALTER TABLE `project_updates` DISABLE KEYS */;
+/*!40000 ALTER TABLE `project_updates` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `projects`
+--
+
 DROP TABLE IF EXISTS `projects`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
@@ -328,6 +572,20 @@ CREATE TABLE `projects` (
   CONSTRAINT `projects_project_manager_code_foreign` FOREIGN KEY (`project_manager_code`) REFERENCES `users` (`user_code`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `projects`
+--
+
+LOCK TABLES `projects` WRITE;
+/*!40000 ALTER TABLE `projects` DISABLE KEYS */;
+/*!40000 ALTER TABLE `projects` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `saved_views`
+--
+
 DROP TABLE IF EXISTS `saved_views`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
@@ -345,6 +603,20 @@ CREATE TABLE `saved_views` (
   CONSTRAINT `saved_views_view_user_code_foreign` FOREIGN KEY (`view_user_code`) REFERENCES `users` (`user_code`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `saved_views`
+--
+
+LOCK TABLES `saved_views` WRITE;
+/*!40000 ALTER TABLE `saved_views` DISABLE KEYS */;
+/*!40000 ALTER TABLE `saved_views` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `task_checklists`
+--
+
 DROP TABLE IF EXISTS `task_checklists`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
@@ -360,6 +632,20 @@ CREATE TABLE `task_checklists` (
   CONSTRAINT `task_checklists_ibfk_1` FOREIGN KEY (`checklist_task_code`) REFERENCES `tasks` (`task_code`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `task_checklists`
+--
+
+LOCK TABLES `task_checklists` WRITE;
+/*!40000 ALTER TABLE `task_checklists` DISABLE KEYS */;
+/*!40000 ALTER TABLE `task_checklists` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `task_comments`
+--
+
 DROP TABLE IF EXISTS `task_comments`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
@@ -379,6 +665,20 @@ CREATE TABLE `task_comments` (
   CONSTRAINT `task_comments_ibfk_2` FOREIGN KEY (`comment_user_code`) REFERENCES `users` (`user_code`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `task_comments`
+--
+
+LOCK TABLES `task_comments` WRITE;
+/*!40000 ALTER TABLE `task_comments` DISABLE KEYS */;
+/*!40000 ALTER TABLE `task_comments` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `task_dependencies`
+--
+
 DROP TABLE IF EXISTS `task_dependencies`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
@@ -395,6 +695,20 @@ CREATE TABLE `task_dependencies` (
   CONSTRAINT `task_dependencies_dependency_task_code_foreign` FOREIGN KEY (`dependency_task_code`) REFERENCES `tasks` (`task_code`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `task_dependencies`
+--
+
+LOCK TABLES `task_dependencies` WRITE;
+/*!40000 ALTER TABLE `task_dependencies` DISABLE KEYS */;
+/*!40000 ALTER TABLE `task_dependencies` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `task_watchers`
+--
+
 DROP TABLE IF EXISTS `task_watchers`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
@@ -411,6 +725,20 @@ CREATE TABLE `task_watchers` (
   CONSTRAINT `task_watchers_watcher_user_code_foreign` FOREIGN KEY (`watcher_user_code`) REFERENCES `users` (`user_code`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `task_watchers`
+--
+
+LOCK TABLES `task_watchers` WRITE;
+/*!40000 ALTER TABLE `task_watchers` DISABLE KEYS */;
+/*!40000 ALTER TABLE `task_watchers` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `task_work_logs`
+--
+
 DROP TABLE IF EXISTS `task_work_logs`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
@@ -433,6 +761,20 @@ CREATE TABLE `task_work_logs` (
   CONSTRAINT `task_work_logs_worklog_reporter_code_foreign` FOREIGN KEY (`worklog_reporter_code`) REFERENCES `users` (`user_code`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `task_work_logs`
+--
+
+LOCK TABLES `task_work_logs` WRITE;
+/*!40000 ALTER TABLE `task_work_logs` DISABLE KEYS */;
+/*!40000 ALTER TABLE `task_work_logs` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `tasks`
+--
+
 DROP TABLE IF EXISTS `tasks`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
@@ -473,6 +815,20 @@ CREATE TABLE `tasks` (
   CONSTRAINT `tasks_task_created_by_foreign` FOREIGN KEY (`task_created_by`) REFERENCES `users` (`user_code`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `tasks`
+--
+
+LOCK TABLES `tasks` WRITE;
+/*!40000 ALTER TABLE `tasks` DISABLE KEYS */;
+/*!40000 ALTER TABLE `tasks` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `users`
+--
+
 DROP TABLE IF EXISTS `users`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
@@ -503,38 +859,16 @@ CREATE TABLE `users` (
   UNIQUE KEY `users_api_token_unique` (`user_api_token`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-LOCK TABLES `migrations` WRITE;
-INSERT INTO `migrations` VALUES
-(1,'0001_01_01_000000_create_users_table',1),
-(2,'2026_01_01_000000_create_groups_table',1),
-(3,'2026_01_01_000000_create_members_table',1),
-(4,'2026_01_01_000001_create_projects_table',1),
-(5,'2026_01_01_000002_create_project_members_table',1),
-(6,'2026_01_01_000003_create_tasks_table',1),
-(7,'2026_01_01_000004_create_activities_table',1),
-(8,'2026_01_01_000005_create_task_comments_table',1),
-(9,'2026_01_01_000006_create_attachments_table',1),
-(10,'2026_01_01_000007_create_notifications_table',1),
-(11,'2026_07_28_000000_add_color_to_projects_table',1),
-(12,'2026_07_28_000001_add_color_to_members_table',1),
-(13,'2026_07_29_000000_add_customers_and_planning_fields',1),
-(14,'2026_07_29_000001_remove_project_budget',1),
-(15,'2026_07_30_000000_add_soft_deletes_to_projects_and_tasks',1),
-(16,'2026_07_30_000001_create_task_progress_tables',1),
-(17,'0001_01_01_000001_create_cache_table',2),
-(18,'0001_01_01_000002_create_jobs_table',2),
-(19,'2026_07_30_000002_add_professional_project_management_features',3),
-(20,'2026_07_30_000003_merge_members_into_users',4),
-(21,'2026_07_30_000004_limit_system_roles_and_default_to_member',5),
-(22,'2026_07_31_000001_add_task_created_by_to_tasks_table',6),
-(23,'2026_07_31_000002_backfill_task_created_by',7),
-(24,'2026_07_31_000003_add_project_code_to_activities_table',8),
-(25,'2026_08_03_000001_add_deadline_governance',9),
-(26,'2026_08_03_000002_add_targets_to_notifications_table',10);
-UNLOCK TABLES;
 
--- Tài khoản thử nghiệm không được ghi cứng vào mã nguồn.
--- Sau khi import, chạy: php artisan ringnet:create-test-accounts
+--
+-- Dumping data for table `users`
+--
+
+LOCK TABLES `users` WRITE;
+/*!40000 ALTER TABLE `users` DISABLE KEYS */;
+INSERT INTO `users` VALUES ('US0001','Quản trị viên RingNet','admin@example.com',NULL,'violet','admin','Quản trị hệ thống','0900000001','Ban điều hành','2026-07-30',NULL,1,40.00,'2026-07-30 09:49:01',NULL,NULL,'$2y$12$/JCK9UvT4p7yWCHpD4j3MOVuKOEYeLmO2QutOIRC4Cv5mkJvIhP46','37424c70b4a6c97e71a338e581b2a238e9fbc517d15812f47ec0dab106cb767a',NULL,'2026-07-30 09:49:01','2026-08-04 03:31:01'),('US0002','Quản lý dự án','manager@example.com',NULL,'indigo','project_manager','Project Manager','0900000002','Quản lý dự án','2026-07-30',NULL,1,40.00,'2026-07-30 09:49:01',NULL,NULL,'$2y$12$Ohs2Q/3u1Ngf.cqXDEMlZu0wMHRn1psYiYsn7.qxQPNRVrtgw5gVS',NULL,NULL,'2026-07-30 09:49:01','2026-08-04 02:55:48'),('US0003','Nhân viên kiểm thử','employee@example.com',NULL,'emerald','member','Nhân viên','0900000003','Phát triển sản phẩm','2026-07-30',NULL,1,40.00,'2026-07-30 09:49:01',NULL,NULL,'$2y$12$fozL2rXQbVWq0JfCNYum2ePz3V4JVnTdWzX/JjKrJH4Tqtch9bqJu',NULL,NULL,'2026-07-30 09:49:01','2026-08-04 03:30:53'),('US0004','Khách Hàng Demo','khachhang@ringnet.vn',NULL,'emerald','customer','Khách hàng','0900000099','Khách hàng','2026-08-04',NULL,1,0.00,'2026-08-04 02:47:24',NULL,NULL,'$2y$12$NimiBvT3kF4CvJYx1vk53OI/tKvBzJG5uB2j0H34ZksdVWS.Wf8Tq',NULL,NULL,'2026-08-04 02:47:24','2026-08-04 03:06:16');
+/*!40000 ALTER TABLE `users` ENABLE KEYS */;
+UNLOCK TABLES;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
 /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
@@ -544,3 +878,5 @@ UNLOCK TABLES;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
+
+-- Dump completed on 2026-08-05 16:45:55

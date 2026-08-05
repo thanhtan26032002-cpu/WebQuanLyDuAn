@@ -6,11 +6,15 @@ import { useProjectWorkspace } from '../../composables/useProjectWorkspace'
 const props = defineProps({
   memberId: {
     type: [Number, String],
-    required: true
+    required: false
+  },
+  user: {
+    type: Object,
+    required: false
   },
   size: {
-    type: String,
-    default: 'md' // sm, md, lg
+    type: [String, Number],
+    default: 'md' // sm, md, lg, or number in px
   },
   showPopover: {
     type: Boolean,
@@ -19,7 +23,27 @@ const props = defineProps({
 })
 
 const { findMember } = useProjectWorkspace()
-const member = computed(() => findMember(props.memberId))
+const member = computed(() => {
+  if (props.user) {
+    const name = props.user.user_name || props.user.name || '?'
+    const code = props.user.user_code || props.user.code || ''
+    const colorIndex = code ? code.charCodeAt(code.length - 1) % 6 : 0;
+    const defaultColor = ['purple', 'blue', 'pink', 'orange', 'green', 'sky'][colorIndex]
+
+    return {
+      name: name,
+      avatar: props.user.user_avatar || props.user.avatar,
+      color: props.user.user_color || props.user.color || defaultColor,
+      role: props.user.user_role || props.user.role,
+      department: props.user.user_department || props.user.department,
+      email: props.user.user_email || props.user.email,
+      phone: props.user.user_phone || props.user.phone,
+      initials: name.split(' ').filter(Boolean).map(n => n[0]).join('').toUpperCase().slice(0, 2) || '??'
+    };
+  }
+  if (props.memberId) return findMember(props.memberId);
+  return null;
+})
 
 const isHovered = ref(false)
 const imageFailed = ref(false)
@@ -59,17 +83,18 @@ const bgClasses = {
       :class="[
         'rounded-full flex items-center justify-center font-bold text-white shrink-0 cursor-pointer shadow-sm', 
         bgClasses[member?.color] || 'bg-blue-500',
-        sizeClasses[size]
+        sizeClasses[size] || ''
       ]"
+      :style="!sizeClasses[size] ? `width: ${size}px; height: ${size}px; font-size: ${Math.max(10, size / 2.5)}px` : ''"
     >
       <img
         v-if="avatarUrl"
         :src="avatarUrl"
-        :alt="`Ảnh đại diện của ${member.name}`"
+        :alt="`Ảnh đại diện của ${member?.name || '?'}`"
         class="h-full w-full rounded-full object-cover"
         @error="imageFailed = true"
       />
-      <span v-else>{{ member.initials }}</span>
+      <span v-else>{{ member?.initials || '??' }}</span>
     </div>
 
     <!-- Popover -->
@@ -89,8 +114,8 @@ const bgClasses = {
       >
         <div class="flex items-start gap-3 mb-3">
           <div :class="['w-12 h-12 rounded-full flex items-center justify-center font-bold text-white shrink-0 shadow-sm', bgClasses[member?.color] || 'bg-blue-500']">
-            <img v-if="avatarUrl" :src="avatarUrl" :alt="`Ảnh đại diện của ${member.name}`" class="h-full w-full rounded-full object-cover" />
-            <span v-else>{{ member.initials }}</span>
+            <img v-if="avatarUrl" :src="avatarUrl" :alt="`Ảnh đại diện của ${member?.name || '?'}`" class="h-full w-full rounded-full object-cover" />
+            <span v-else>{{ member?.initials || '??' }}</span>
           </div>
           <div>
             <h4 class="font-bold text-slate-900 leading-tight">{{ member.name }}</h4>

@@ -3,7 +3,7 @@ import { getStoredUser, hasAuthSession } from '../services/api'
 const routes = [
   { path: '/login', name: 'login', component: () => import('../views/LoginView.vue'), meta: { title: 'Đăng nhập', public: true } },
   { path: '/complete-profile', name: 'complete-profile', component: () => import('../views/CompleteProfileView.vue'), meta: { title: 'Hoàn tất hồ sơ', onboarding: true } },
-  { path: '/my-work', name: 'my-work', component: () => import('../views/MyWorkView.vue'), meta: { title: 'Công việc của tôi' } },
+  { path: '/my-work', name: 'my-work', component: () => import('../views/MyWorkView.vue'), meta: { title: 'Công việc của tôi', roles: ['admin', 'project_manager', 'manager', 'member'] } },
   { path: '/', name: 'dashboard', component: () => import('../views/DashboardView.vue'), meta: { title: 'Tổng quan' } },
   { path: '/projects', name: 'projects', component: () => import('../views/ProjectsView.vue'), meta: { title: 'Dự án' } },
   { path: '/projects/:id', name: 'project-detail', component: () => import('../views/ProjectDetailView.vue'), meta: { title: 'Chi tiết dự án' } },

@@ -18,6 +18,7 @@ use App\Http\Controllers\TaskController;
 use App\Http\Controllers\TaskProgressController;
 use App\Http\Controllers\TaskRelationsController;
 use App\Http\Controllers\UserController;
+
 use Illuminate\Support\Facades\Route;
 
 Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:30,1');
@@ -73,6 +74,7 @@ Route::middleware('api.token')->group(function () {
         Route::post('/tasks/{taskId}/work-logs', [TaskProgressController::class, 'storeWorkLog']);
         Route::get('/tasks/{taskId}/comments', [TaskController::class, 'comments']);
         Route::post('/tasks/{taskId}/comments', [TaskController::class, 'storeComment']);
+
 
         Route::get('/saved-views', [SavedViewController::class, 'index']);
         Route::post('/saved-views', [SavedViewController::class, 'store']);

@@ -1079,16 +1079,21 @@ export function useProjectWorkspace() {
     }
   }
 
-  async function addComment(taskId, text, fileUrl = null, fileName = null, attachmentCode = null) {
+  async function addComment(taskId, text, fileUrl = null, fileName = null, attachmentCode = null, mentions = []) {
     try {
       const res = await fetch(`${API_URL}/tasks/${taskId}/comments`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('ringnet_api_token')}`
+        },
         body: JSON.stringify({ 
           text, 
           file_url: fileUrl, 
           file_name: fileName,
           attachment_code: attachmentCode,
+          mentions,
           user_code: currentUser.value.code
         })
       })

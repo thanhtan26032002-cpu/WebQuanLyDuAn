@@ -574,6 +574,8 @@ class TaskController extends Controller
             'file_url' => 'nullable|string',
             'file_name' => 'nullable|string',
             'attachment_code' => 'nullable|string|exists:attachments,attachment_code',
+            'mentions' => 'nullable|array',
+            'mentions.*' => 'string|exists:users,user_code',
         ]);
 
         $commentAttachment = null;
@@ -616,6 +618,23 @@ class TaskController extends Controller
         );
 
         $this->notifyTaskWatchers($task, $userCode, 'Bình luận mới', $request->user()->user_name.' đã bình luận trong '.$task->task_title);
+
+        if (!empty($validated['mentions'])) {
+            $mentionedUsers = array_unique($validated['mentions']);
+            $senderName = $request->user()->user_name;
+            foreach ($mentionedUsers as $uCode) {
+                if ($uCode !== $request->user()->user_code) {
+                    \App\Models\Notification::create([
+                        'notif_user_code' => $uCode,
+                        'notif_title' => 'Bạn được nhắc đến',
+                        'notif_message' => $senderName . ' đã nhắc đến bạn trong một bình luận ở nhiệm vụ "' . $task->task_title . '".',
+                        'notif_type' => 'mention',
+                        'notif_target_type' => 'Task',
+                        'notif_target_code' => $taskCode,
+                    ]);
+                }
+            }
+        }
 
         return response()->json([
             'message' => 'Đã gửi bình luận',

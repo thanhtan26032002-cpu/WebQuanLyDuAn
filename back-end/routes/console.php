@@ -63,3 +63,33 @@ Artisan::command('ringnet:create-test-accounts {--password= : Mật khẩu dùng
 
     return 0;
 })->purpose('Tạo lại ba tài khoản kiểm thử phân quyền trong môi trường local/testing');
+
+Artisan::command('ringnet:create-customer {--email=khachhang@ringnet.vn : Email khách hàng} {--password=123456 : Mật khẩu} {--name=Khách Hàng Demo : Tên khách hàng}', function () {
+    $email = $this->option('email');
+    $password = $this->option('password');
+    $name = $this->option('name');
+
+    $user = User::updateOrCreate(
+        ['user_email' => $email],
+        [
+            'user_name' => $name,
+            'user_password' => Hash::make($password),
+            'user_role' => 'customer',
+            'user_job_title' => 'Khách hàng',
+            'user_department' => 'Khách hàng',
+            'user_phone' => '0900000099',
+            'user_color' => 'emerald',
+            'user_join_date' => now()->toDateString(),
+            'user_online' => true,
+            'user_weekly_capacity_hours' => 0,
+            'user_profile_completed_at' => now(),
+        ]
+    );
+
+    $this->info("Tài khoản khách hàng đã được tạo/cập nhật:");
+    $this->table(['Tên', 'Email', 'Mật khẩu', 'Vai trò'], [
+        [$name, $email, $password, 'customer'],
+    ]);
+
+    return 0;
+})->purpose('Tạo tài khoản khách hàng mẫu');

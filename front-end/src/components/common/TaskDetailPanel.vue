@@ -200,19 +200,70 @@ const handleDownloadArchive = async (payload) => {
   isDownloadModalOpen.value = false
 }
 
+// Mentions logic
+const mentionSearchText = ref('')
+const showMentionPopover = ref(false)
+const mentionedUserCodes = ref([])
+const mentionSuggestions = computed(() => {
+  const query = mentionSearchText.value.toLowerCase()
+  let list = []
+  if (project.value) {
+    list = project.value.members?.map(m => m.user) || []
+    if (project.value.manager) list.push(project.value.manager)
+    if (project.value.creator) list.push(project.value.creator)
+  } else {
+    list = members.value || []
+  }
+  
+  const unique = []
+  const map = new Map()
+  for (const item of list) {
+    if (item && !map.has(item.code || item.user_code)) {
+        map.set(item.code || item.user_code, true)
+        unique.push(item)
+    }
+  }
+  return unique.filter(u => 
+    (u.code || u.user_code) !== currentUser.value?.code && 
+    ((u.name || u.user_name || '').toLowerCase().includes(query) || (u.code || u.user_code || '').toLowerCase().includes(query))
+  )
+})
+
+function handleCommentInput() {
+  const match = newComment.value.match(/@(\S*)$/)
+  if (match) {
+    mentionSearchText.value = match[1]
+    showMentionPopover.value = true
+  } else {
+    showMentionPopover.value = false
+  }
+}
+
+function selectMention(user) {
+  const name = user.name || user.user_name || ''
+  newComment.value = newComment.value.replace(/@(\S*)$/, `@${name.replace(/\s+/g, '_')} `)
+  showMentionPopover.value = false
+  const code = user.code || user.user_code
+  if (code && !mentionedUserCodes.value.includes(code)) {
+    mentionedUserCodes.value.push(code)
+  }
+}
+
 const submitComment = async () => {
   if (!newComment.value.trim() && !attachedFile.value) return
   
   const fileUrl = attachedFile.value?.file_path || null
   const fileName = attachedFile.value?.file_name || null
 
-  const res = await addComment(task.value.id, newComment.value, fileUrl, fileName, attachedFile.value?.code || null)
+  const res = await addComment(task.value.id, newComment.value, fileUrl, fileName, attachedFile.value?.code || null, mentionedUserCodes.value)
   
   if (res && res.success === false && res.errors) {
     alert(res.errors._general || 'Vui lòng kiểm tra lại dữ liệu.')
   } else if (res && res.success) {
     newComment.value = ''
     attachedFile.value = null
+    mentionedUserCodes.value = []
+    showMentionPopover.value = false
   }
 }
 
@@ -895,9 +946,28 @@ const formatDateTime = (isoStr) => {
               <textarea 
                 v-model="newComment"
                 class="w-full bg-white border border-slate-200 rounded-xl p-3 pb-12 text-sm focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition-all resize-none min-h-[90px]"
-                placeholder="Cập nhật tiến độ... Bạn có thể tải lên tệp minh chứng ở đây."
+                placeholder="Cập nhật tiến độ (Gõ @ để tag)... Bạn có thể tải lên tệp minh chứng ở đây."
                 @keydown.enter.prevent="submitComment"
+                @input="handleCommentInput"
               ></textarea>
+
+              <!-- Mentions Popover -->
+              <div v-if="showMentionPopover && mentionSuggestions.length > 0" class="absolute z-10 bottom-full left-0 mb-1 w-64 bg-white border border-slate-200 shadow-lg rounded-xl overflow-hidden">
+                <div class="max-h-48 overflow-y-auto py-1">
+                  <button
+                    v-for="user in mentionSuggestions"
+                    :key="user.code || user.user_code"
+                    @click="selectMention(user)"
+                    class="w-full text-left px-3 py-2 hover:bg-slate-50 flex items-center gap-2 transition"
+                  >
+                    <UserAvatar :user="user" :size="24" class="shrink-0" />
+                    <div class="min-w-0">
+                      <p class="text-sm font-medium text-slate-800 truncate">{{ user.name || user.user_name }}</p>
+                      <p class="text-[10px] text-slate-400 truncate">{{ user.email || user.user_email }}</p>
+                    </div>
+                  </button>
+                </div>
+              </div>
               
               <div v-if="attachedFile" class="absolute bottom-12 left-3 right-3 bg-slate-50 p-2 mb-1 rounded-lg border border-slate-200 flex items-center justify-between">
                 <div class="flex items-center gap-2 text-sm text-slate-700 truncate">

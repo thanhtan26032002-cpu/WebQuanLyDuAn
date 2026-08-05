@@ -29,7 +29,9 @@ const pendingTasksCount = computed(
 );
 
 const navigation = computed(() => [
-  { name: 'C\u00f4ng vi\u1ec7c c\u1ee7a t\u00f4i', href: '/my-work', icon: UserRoundCheck },
+  ...(currentUser.value && currentUser.value.role !== 'customer'
+    ? [{ name: 'C\u00f4ng vi\u1ec7c c\u1ee7a t\u00f4i', href: '/my-work', icon: UserRoundCheck }]
+    : []),
   { name: "Tổng quan", href: "/", icon: LayoutDashboard },
   {
     name: "Dự án",
