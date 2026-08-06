@@ -644,7 +644,7 @@ const projectStatusClasses = {
           <div><h2 class="flex items-center gap-2 text-lg font-bold"><HeartPulse class="h-5 w-5 text-violet-500" /> Sức khỏe dự án</h2><p class="mt-1 text-sm text-slate-500">Tình trạng, rủi ro và bước tiếp theo.</p></div>
           <span :class="['rounded-full px-3 py-1 text-xs font-bold', healthClasses[project.health] || healthClasses.on_track]">{{ healthLabels[project.health] || healthLabels.on_track }}</span>
         </header>
-        <button v-if="canManageProject && !showUpdateForm" class="mt-5 w-full rounded-xl border border-dashed border-violet-200 bg-violet-50/50 py-2.5 text-sm font-semibold text-violet-700 hover:bg-violet-50" @click="showUpdateForm = true; updateDraft.health = project.health">+ Đăng cập nhật định kỳ</button>
+        <button v-if="canCreateTaskInProject && !showUpdateForm" class="mt-5 w-full rounded-xl border border-dashed border-violet-200 bg-violet-50/50 py-2.5 text-sm font-semibold text-violet-700 hover:bg-violet-50" @click="showUpdateForm = true; updateDraft.health = project.health">+ Đăng cập nhật định kỳ</button>
         <form v-else class="mt-5 space-y-3 rounded-xl bg-slate-50 p-4" @submit.prevent="submitProjectUpdate">
           <select v-model="updateDraft.health" class="w-full rounded-lg border border-slate-200 bg-white p-2.5 text-sm font-semibold"><option value="on_track">Đúng tiến độ</option><option value="at_risk">Có rủi ro</option><option value="off_track">Chậm tiến độ</option></select>
           <textarea v-model="updateDraft.completed" rows="2" placeholder="Những việc đã hoàn thành" class="w-full rounded-lg border border-slate-200 p-3 text-sm"></textarea>

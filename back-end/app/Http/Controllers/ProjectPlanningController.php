@@ -16,7 +16,7 @@ class ProjectPlanningController extends Controller
     public function storeUpdate(Request $request, string $projectCode)
     {
         $project = Project::findOrFail($projectCode);
-        AccessService::authorize(AccessService::canManageProject($request->user(), $project));
+        AccessService::authorize(AccessService::isProjectParticipant($request->user(), $project));
 
         $validated = $request->validate([
             'health' => 'required|in:on_track,at_risk,off_track',
